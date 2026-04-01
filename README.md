@@ -71,7 +71,7 @@ rogplaynew/
 - **State Management**: [Zustand](https://github.com/pmndrs/zustand)
 - **Backend**: [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/) + [MongoDB](https://www.mongodb.com/)
 - **Real-time**: [Socket.io](https://socket.io/)
-- **Video Playback**: VLC Media Player (Native), Expo Video, React Player
+- **Video Playback**: VLC Media Player (Native), React Native Video
 
 ---
 
@@ -113,6 +113,7 @@ npm run dev
 
 ## 🤝 Contributing
 Built with ❤️ by the Rogplay team. For major changes, please open an issue first to discuss what you would like to change.
+Feel free to contribute in any way you can.
 
 ---
 *Developed by [kunwarxshashank](https://github.com/kunwarxshashank)*
