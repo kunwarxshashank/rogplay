@@ -1,0 +1,132 @@
+{
+  "expo": {
+    "name": "RogPlay",
+    "slug": "rogplay",
+    "version": "6.3.0",
+    "orientation": "default",
+    "scheme": "rogplay",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#04070D"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rogplay.org",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.rogplay.org",
+      "versionCode": 17,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#04070D"
+      },
+      "banner": "./assets/tv_banner.png",
+      "intentFilters": [
+        {
+          "action": "MAIN",
+          "category": [
+            "LEANBACK_LAUNCHER",
+            "LAUNCHER"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "rogplay"
+          }
+        },
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "play"
+          }
+        },
+        {
+          "action": "VIEW",
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
+          "data": [
+            {
+              "mimeType": "video/*"
+            },
+            {
+              "mimeType": "application/x-mpegURL"
+            },
+            {
+              "mimeType": "application/vnd.apple.mpegurl"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
+          "data": [
+            {
+              "scheme": "http",
+              "mimeType": "video/*"
+            },
+            {
+              "scheme": "https",
+              "mimeType": "video/*"
+            }
+          ]
+        }
+      ],
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ],
+      "edgeToEdgeEnabled": true,
+      "usesCleartextTraffic": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-router",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "DEFAULT"
+        }
+      ],
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow RogPlay to access your photos and videos.",
+          "savePhotosPermission": "Allow RogPlay to save photos and videos.",
+          "audioPermission": "Allow RogPlay to access audio files.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      "react-native-video",
+      "@react-native-google-signin/google-signin"
+    ]
+  }
+}

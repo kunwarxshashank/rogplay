@@ -1,0 +1,798 @@
+
+import React, { useEffect, useState } from 'react';
+import {
+    View,
+    Text,
+    Modal,
+    TouchableOpacity,
+    StyleSheet,
+    Dimensions,
+    Platform,
+    ScrollView,
+    FlatList,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
+import { useSettingsStore } from '@/store/settingsStore';
+import { Colors } from '@/constants/Colors';
+import { TVFocusable } from '@/components/TVFocusable';
+
+interface Track {
+    title?: string;
+    language?: string;
+    height?: number;
+    width?: number;
+    bitrate?: number;
+}
+
+interface PlayerModalProps {
+    visible: boolean;
+    audioTracks: Track[];
+    videoTracks: Track[];
+    selectedAudioTrack: number;
+    selectedVideoTrack: number;
+    onSelectAudio: (index: number) => void;
+    onSelectVideo: (index: number) => void;
+    onApply: () => void;
+    onCancel: () => void;
+}
+
+const PlayerModal: React.FC<PlayerModalProps> = ({
+    visible,
+    audioTracks,
+    videoTracks,
+    selectedAudioTrack,
+    selectedVideoTrack,
+    onSelectAudio,
+    onSelectVideo,
+    onApply,
+    onCancel
+}) => {
+    const { theme } = useSettingsStore();
+    const activeColors = Colors[theme] || Colors.dark;
+    const [screenData, setScreenData] = useState(Dimensions.get('window'));
+    const [isLandscape, setIsLandscape] = useState(false);
+
+    useEffect(() => {
+        const onChange = (result: { window: any }) => {
+            setScreenData(result.window);
+            setIsLandscape(result.window.width > result.window.height);
+        };
+
+        const subscription = Dimensions.addEventListener('change', onChange);
+
+        const { width, height } = Dimensions.get('window');
+        setIsLandscape(width > height);
+
+        return () => subscription?.remove();
+    }, []);
+
+    const { width, height } = screenData;
+    const isTV = Platform.isTV;
+
+    const getResponsiveSize = (mobile: number, tablet: number, tv: number) => {
+        if (isTV) return tv;
+        if (width >= 768) return tablet;
+        return mobile;
+    };
+
+    const shouldUseHorizontalLayout = () => {
+        return isTV || (isLandscape && width >= 768);
+    };
+
+    const getMaxTrackListHeight = () => {
+        // Targets roughly 3.5 items visible at once
+        // Item minHeight (44/48/52) + marginBottom (6) + border/padding buffer
+        const itemHeight = getResponsiveSize(64, 72, 82);
+        return itemHeight * 3.5;
+    };
+
+    const TrackItem = ({ track, index, type, selectedIndex, onSelect }: { track: Track, index: number, type: 'audio' | 'video' | 'subtitle', selectedIndex: number, onSelect: (index: number) => void }) => {
+        const isSelected = selectedIndex === index;
+
+        let displayText = '';
+        let subText = '';
+
+        if (type === 'audio') {
+            displayText = track.title || `Audio ${index + 1}`;
+            if (track.language) subText = track.language;
+        } else if (type === 'video') {
+            displayText = `${track.height}p`;
+            subText = `${track.width} × ${track.height}`;
+            if (track.bitrate) {
+                subText += ` • ${Math.round(track.bitrate / 1000)}kbps`;
+            }
+        }
+
+        return (
+            <TVFocusable
+                autoFlex={false}
+                style={[
+                    styles.trackItem,
+                    isSelected && { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '60' },
+                    { minHeight: getResponsiveSize(44, 48, 52) }
+                ]}
+                onPress={() => onSelect(index)}
+                focusedBackgroundColor={activeColors.surface + '40'}
+                focusedBorderColor={activeColors.primary}
+            >
+                {({ focused }) => (
+                    <View style={styles.trackContentRow}>
+                        <View style={styles.trackContent}>
+                            <Text style={[
+                                styles.trackText,
+                                { color: activeColors.text },
+                                isSelected && { color: activeColors.primary, fontWeight: 'bold' },
+                                focused && { color: activeColors.text, fontWeight: 'bold' },
+                                { fontSize: getResponsiveSize(13, 15, 17) }
+                            ]}>
+                                {displayText}
+                            </Text>
+                            {subText ? (
+                                <Text style={[
+                                    styles.trackSubText,
+                                    { color: activeColors.textSecondary },
+                                    isSelected && { color: activeColors.primary + 'CC' },
+                                    focused && { color: activeColors.textSecondary },
+                                    { fontSize: getResponsiveSize(11, 13, 15) }
+                                ]}>
+                                    {subText}
+                                </Text>
+                            ) : null}
+                        </View>
+                        {isSelected && (
+                            <MaterialIcons
+                                name="check-circle"
+                                size={getResponsiveSize(18, 20, 22)}
+                                color={activeColors.primary}
+                            />
+                        )}
+                    </View>
+                )}
+            </TVFocusable>
+        );
+    };
+
+    const Section = ({ title, icon, color, tracks, selectedIndex, onSelect, type }: { title: string, icon: any, color: string, tracks: Track[], selectedIndex: number, onSelect: (index: number) => void, type: 'audio' | 'video' | 'subtitle' }) => {
+        const trackCount = tracks?.length || 0;
+        const isHorizontal = shouldUseHorizontalLayout();
+
+        return (
+            <View style={[
+                styles.section,
+                { backgroundColor: activeColors.surface, borderColor: activeColors.border },
+                isHorizontal && styles.horizontalSection
+            ]}>
+                <View style={styles.sectionHeader}>
+                    <MaterialIcons
+                        name={icon}
+                        size={getResponsiveSize(18, 20, 22)}
+                        color={color}
+                    />
+                    <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: activeColors.text }]}>
+                        {title}
+                    </Text>
+                    <View style={[styles.badge, { backgroundColor: color + '30' }]}>
+                        <Text style={[styles.badgeText, { fontSize: getResponsiveSize(10, 11, 12), color: color }]}>
+                            {trackCount}
+                        </Text>
+                    </View>
+                </View>
+
+                <FlatList
+                    style={[
+                        styles.tracksList,
+                        { maxHeight: getMaxTrackListHeight() },
+                        isHorizontal && { flex: 1 }
+                    ]}
+                    contentContainerStyle={styles.tracksContent}
+                    data={tracks || []}
+                    keyExtractor={(_, index) => `${type}-${index}`}
+                    renderItem={({ item, index }) => (
+                        <TrackItem
+                            track={item}
+                            index={index}
+                            type={type}
+                            selectedIndex={selectedIndex}
+                            onSelect={onSelect}
+                        />
+                    )}
+                    showsVerticalScrollIndicator={true}
+                    persistentScrollbar={Platform.isTV}
+                    removeClippedSubviews={false}
+                    nestedScrollEnabled={true}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No {title.toLowerCase()} tracks available</Text>
+                        </View>
+                    }
+                />
+            </View>
+        );
+    };
+
+    return (
+        <Modal
+            transparent={true}
+            statusBarTranslucent={true}
+            visible={visible}
+            animationType='slide'
+            onRequestClose={onCancel}
+        >
+            <View style={styles.modalOverlay}>
+                <TouchableOpacity
+                    style={styles.backdrop}
+                    activeOpacity={1}
+                    onPress={onCancel}
+                />
+
+                <View style={[
+                    styles.modalContainer,
+                    {
+                        width: shouldUseHorizontalLayout() ? '92%' : '95%',
+                        height: shouldUseHorizontalLayout() ? '85%' : '80%',
+                        maxWidth: shouldUseHorizontalLayout() ? 1100 : 500,
+                        maxHeight: height * 0.9,
+                        backgroundColor: activeColors.background,
+                        borderColor: activeColors.border,
+                    }
+                ]}>
+                    <SafeAreaView style={styles.modalContent}>
+
+                        <View style={[styles.header, { borderBottomColor: activeColors.border }]}>
+                            <View style={styles.headerLeft}>
+                                <MaterialIcons
+                                    name="settings"
+                                    size={getResponsiveSize(22, 24, 28)}
+                                    color={activeColors.text}
+                                />
+                                <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, 20, 24), color: activeColors.text }]}>
+                                    Player Settings
+                                </Text>
+                            </View>
+                            <TVFocusable
+                                autoFlex={false}
+                                style={styles.closeBtn}
+                                onPress={onCancel}
+                                focusedBackgroundColor={activeColors.error}
+                            >
+                                <MaterialIcons
+                                    name="close"
+                                    size={getResponsiveSize(22, 24, 28)}
+                                    color={Platform.isTV ? "#fff" : activeColors.text}
+                                />
+                            </TVFocusable>
+                        </View>
+
+                        <View style={styles.contentContainer}>
+                            {shouldUseHorizontalLayout() ? (
+                                <View style={styles.horizontalLayout}>
+                                    <Section title="Audio" icon="audiotrack" color="#00C851" tracks={audioTracks} selectedIndex={selectedAudioTrack} onSelect={onSelectAudio} type="audio" />
+                                    <Section title="Video" icon="high-quality" color="#FF6B35" tracks={videoTracks} selectedIndex={selectedVideoTrack} onSelect={onSelectVideo} type="video" />
+                                </View>
+                            ) : (
+                                <ScrollView
+                                    style={styles.verticalLayout}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={styles.verticalContent}
+                                >
+                                    <Section title="Audio" icon="audiotrack" color="#00C851" tracks={audioTracks} selectedIndex={selectedAudioTrack} onSelect={onSelectAudio} type="audio" />
+                                    <Section title="Video" icon="high-quality" color="#FF6B35" tracks={videoTracks} selectedIndex={selectedVideoTrack} onSelect={onSelectVideo} type="video" />
+                                </ScrollView>
+                            )}
+                        </View>
+
+                        <View style={[styles.footer, { borderTopColor: activeColors.border }]}>
+                            <TVFocusable
+                                autoFlex={false}
+                                style={[styles.cancelButton, { backgroundColor: activeColors.surface }]}
+                                onPress={onCancel}
+                                focusedBackgroundColor={activeColors.error}
+                            >
+                                <View style={styles.buttonContent}>
+                                    <MaterialIcons name="close" size={getResponsiveSize(16, 18, 20)} color={activeColors.text} />
+                                    <Text style={[styles.buttonText, { fontSize: getResponsiveSize(14, 16, 18), color: activeColors.text }]}>
+                                        Cancel
+                                    </Text>
+                                </View>
+                            </TVFocusable>
+
+                            <TVFocusable
+                                autoFlex={false}
+                                style={[styles.applyButton, { backgroundColor: activeColors.primary }]}
+                                onPress={onApply}
+                                focusedBackgroundColor={activeColors.primary}
+                                hasTVPreferredFocus={true}
+                            >
+                                <View style={styles.buttonContent}>
+                                    <MaterialIcons name="check" size={getResponsiveSize(16, 18, 20)} color="#FFFFFF" />
+                                    <Text style={[styles.buttonText, { fontSize: getResponsiveSize(14, 16, 18), color: '#FFFFFF' }]}>
+                                        Apply
+                                    </Text>
+                                </View>
+                            </TVFocusable>
+                        </View>
+                    </SafeAreaView>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
+export default React.memo(PlayerModal);
+
+interface SpeedModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onSelectSpeed: (speed: number) => void;
+    selectedSpeed: number;
+}
+
+export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onSelectSpeed, selectedSpeed }: SpeedModalProps) {
+    const { theme } = useSettingsStore();
+    const activeColors = Colors[theme] || Colors.dark;
+    const [screenData, setScreenData] = useState(Dimensions.get('window'));
+    const [currentSpeed, setCurrentSpeed] = useState(selectedSpeed);
+
+    const quickSpeeds = [0.25, 1.0, 1.5, 2.0, 3.0];
+
+    useEffect(() => {
+        setCurrentSpeed(selectedSpeed);
+    }, [selectedSpeed, visible]);
+
+    useEffect(() => {
+        const onChange = (result: { window: any }) => {
+            setScreenData(result.window);
+        };
+
+        const subscription = Dimensions.addEventListener('change', onChange);
+        return () => subscription?.remove();
+    }, []);
+
+    const { width, height } = screenData;
+    const isTV = Platform.isTV;
+    const isLandscape = width > height;
+
+    const getResponsiveSize = (mobile: number, tablet: number, tv: number) => {
+        if (isTV) return tv;
+        if (width >= 768) return tablet;
+        return mobile;
+    };
+
+    const handleApply = () => {
+        onSelectSpeed(currentSpeed);
+        onClose();
+    };
+
+    const incrementSpeed = () => {
+        setCurrentSpeed(prev => Math.min(prev + 0.05, 4.0));
+    };
+
+    const decrementSpeed = () => {
+        setCurrentSpeed(prev => Math.max(prev - 0.05, 0.25));
+    };
+
+    return (
+        <Modal
+            transparent={true}
+            visible={visible}
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            <View style={styles.speedModalOverlay}>
+                <TouchableOpacity
+                    style={styles.speedBackdrop}
+                    activeOpacity={1}
+                    onPress={onClose}
+                />
+
+                <View style={[
+                    styles.speedModalContainer,
+                    {
+                        width: isTV ? '55%' : (isLandscape ? '70%' : '85%'),
+                        maxWidth: isTV ? 600 : 500,
+                        backgroundColor: '#121212', // Premium dark look from image
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                    }
+                ]}>
+                    <View style={styles.speedHeaderRow}>
+                        <View style={styles.premiumBadge}>
+                            <Text style={styles.premiumText}>P</Text>
+                        </View>
+                        <Text style={[styles.currentSpeedText, { fontSize: getResponsiveSize(24, 28, 36) }]}>
+                            {currentSpeed.toFixed(1)}x
+                        </Text>
+                    </View>
+
+                    <View style={styles.sliderSection}>
+                        <TVFocusable
+                            autoFlex={false}
+                            style={styles.speedControlButton}
+                            onPress={decrementSpeed}
+                            focusedBackgroundColor="rgba(255, 255, 255, 0.2)"
+                        >
+                            <MaterialIcons name="remove" size={getResponsiveSize(24, 28, 32)} color="white" />
+                        </TVFocusable>
+
+                        <Slider
+                            style={styles.slider}
+                            minimumValue={0.25}
+                            maximumValue={4.0}
+                            step={0.05}
+                            value={currentSpeed}
+                            onValueChange={setCurrentSpeed}
+                            minimumTrackTintColor="#FFFFFF"
+                            maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
+                            thumbTintColor="#FFFFFF"
+                        />
+
+                        <TVFocusable
+                            autoFlex={false}
+                            style={styles.speedControlButton}
+                            onPress={incrementSpeed}
+                            focusedBackgroundColor="rgba(255, 255, 255, 0.2)"
+                        >
+                            <MaterialIcons name="add" size={getResponsiveSize(24, 28, 32)} color="white" />
+                        </TVFocusable>
+                    </View>
+
+                    <View style={styles.quickSpeedsRow}>
+                        {quickSpeeds.map((speed) => (
+                            <TVFocusable
+                                key={speed.toString()}
+                                autoFlex={false}
+                                style={[
+                                    styles.quickSpeedBtn,
+                                    currentSpeed === speed && styles.quickSpeedBtnActive
+                                ]}
+                                onPress={() => setCurrentSpeed(speed)}
+                                focusedBackgroundColor="rgba(255, 255, 255, 0.3)"
+                            >
+                                <Text style={[
+                                    styles.quickSpeedText,
+                                    { fontSize: getResponsiveSize(14, 16, 18) },
+                                    currentSpeed === speed && styles.quickSpeedTextActive
+                                ]}>
+                                    {speed === 1.0 ? '1.0' : speed}
+                                </Text>
+                                {Math.abs(currentSpeed - speed) < 0.01 && (
+                                    <View style={styles.activeIndicator} />
+                                )}
+                            </TVFocusable>
+                        ))}
+                    </View>
+
+                    <View style={styles.modalFooter}>
+                        <TVFocusable
+                            autoFlex={false}
+                            style={styles.modalActionBtn}
+                            onPress={onClose}
+                            focusedBackgroundColor="rgba(255, 255, 255, 0.1)"
+                        >
+                            <Text style={styles.modalActionText}>Close</Text>
+                        </TVFocusable>
+                        <TVFocusable
+                            autoFlex={false}
+                            style={[styles.modalActionBtn, styles.modalApplyBtn]}
+                            onPress={handleApply}
+                            focusedBackgroundColor="rgba(255, 255, 255, 0.3)"
+                            hasTVPreferredFocus={true}
+                        >
+                            <Text style={[styles.modalActionText, styles.modalApplyText]}>Apply</Text>
+                        </TVFocusable>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+});
+
+const styles = StyleSheet.create({
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    backdrop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    modalContainer: {
+        borderRadius: 16,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    modalContent: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: Platform.isTV ? 20 : 18,
+        borderBottomWidth: 1,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    headerTitle: {
+        fontWeight: '600',
+    },
+    closeBtn: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    contentContainer: {
+        flex: 1,
+        padding: Platform.isTV ? 16 : 14,
+    },
+    horizontalLayout: {
+        flexDirection: 'row',
+        flex: 1,
+        gap: Platform.isTV ? 12 : 10,
+    },
+    verticalLayout: {
+        flex: 1,
+    },
+    verticalContent: {
+        flexGrow: 1,
+    },
+    section: {
+        borderRadius: 12,
+        padding: Platform.isTV ? 14 : 12,
+        marginBottom: 12,
+        borderWidth: 1,
+    },
+    horizontalSection: {
+        flex: 1,
+        marginBottom: 0,
+        minWidth: 0,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    sectionTitle: {
+        fontWeight: '600',
+        flex: 1,
+    },
+    importBtn: {
+        borderRadius: 12,
+        marginRight: 8,
+        overflow: 'hidden',
+    },
+    importBtnContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    importText: {
+        fontWeight: 'bold',
+    },
+    badge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        minWidth: 20,
+        alignItems: 'center',
+    },
+    badgeText: {
+        fontWeight: '600',
+    },
+    tracksList: {
+    },
+    tracksContent: {
+        paddingBottom: 8,
+    },
+    trackContentRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    trackItem: {
+        borderRadius: 8,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        overflow: 'hidden',
+        width: '100%',
+    },
+    trackContent: {
+        flex: 1,
+        marginRight: 8,
+    },
+    trackText: {
+        fontWeight: '500',
+    },
+    trackSubText: {
+        marginTop: 2,
+    },
+    emptyState: {
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyText: {
+        fontStyle: 'italic',
+        textAlign: 'center',
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 12,
+        padding: Platform.isTV ? 20 : 18,
+        borderTopWidth: 1,
+    },
+    cancelButton: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    applyButton: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    buttonText: {
+        fontWeight: '600',
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+    },
+    speedModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    speedBackdrop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    speedModalContainer: {
+        borderRadius: 24,
+        padding: Platform.isTV ? 32 : 24,
+        elevation: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    speedHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        marginBottom: 24,
+    },
+    premiumBadge: {
+        backgroundColor: '#FF0000',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    premiumText: {
+        color: 'white',
+        fontWeight: '900',
+        fontSize: 16,
+    },
+    currentSpeedText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
+    sliderSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        gap: 16,
+        marginBottom: 32,
+    },
+    slider: {
+        flex: 1,
+        height: 40,
+    },
+    speedControlButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    quickSpeedsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        width: '100%',
+        gap: 12,
+        marginBottom: 32,
+        flexWrap: 'wrap',
+    },
+    quickSpeedBtn: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        minWidth: 70,
+        alignItems: 'center',
+        position: 'relative',
+    },
+    quickSpeedBtnActive: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    quickSpeedText: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontWeight: '600',
+    },
+    quickSpeedTextActive: {
+        color: 'white',
+    },
+    activeIndicator: {
+        position: 'absolute',
+        bottom: -6,
+        width: 20,
+        height: 3,
+        backgroundColor: 'white',
+        borderRadius: 2,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 16,
+        width: '100%',
+    },
+    modalActionBtn: {
+        paddingHorizontal: 32,
+        paddingVertical: 12,
+        borderRadius: 24,
+        minWidth: 120,
+        alignItems: 'center',
+    },
+    modalApplyBtn: {
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    modalActionText: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    modalApplyText: {
+        color: 'white',
+    },
+});
