@@ -117,6 +117,3 @@ Feel free to contribute in any way you can.
 
 ---
 *Developed by [kunwarxshashank](https://github.com/kunwarxshashank)*
-# rogplay
-# rogplay
-# rogplay
