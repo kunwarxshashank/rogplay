@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { zustandStorage } from './mmkv';
 import { Platform } from 'react-native';
 
 export type AppTheme = 'dark' | 'dark_red' | 'dark_yellow' | 'dark_blue' | 'dark_pink' | 'light';
@@ -54,7 +54,7 @@ export const useSettingsStore = create<SettingsState>()(
         }),
         {
             name: 'app-settings',
-            storage: createJSONStorage(() => AsyncStorage),
+            storage: createJSONStorage(() => zustandStorage),
         }
     )
 );

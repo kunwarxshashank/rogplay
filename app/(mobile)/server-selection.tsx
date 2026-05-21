@@ -12,7 +12,7 @@ import { useStreamSources } from '@/hooks/useStreamSources';
 export default function ContentListScreen() {
     const { query, type: rawType, movieUrl, tmdb, season, episode, movieData, title, poster, backdrop } = useLocalSearchParams();
     const type = Array.isArray(rawType) ? rawType[0] : rawType;
-    const { addons } = useAddonsStore();
+    const { addons, isHydrated } = useAddonsStore();
     const { results, loading, searchStreams } = useStreamSources();
     const router = useRouter();
 
@@ -97,7 +97,7 @@ export default function ContentListScreen() {
                 </View>
             </View>
 
-            {results.length === 0 && loading ? (
+            {results.length === 0 && (loading || !isHydrated) ? (
                 <View style={styles.list}>
                     {Array.from({ length: 8 }).map((_, index) => (
                         <StreamSourceSkeleton key={index} />
@@ -107,16 +107,16 @@ export default function ContentListScreen() {
                 <View style={styles.empty}>
                     <MaterialIcons name="cloud-off" size={64} color={activeColors.textSecondary + '40'} />
                     <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>
-                        {addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0
+                        {isHydrated && addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0
                             ? 'Please Install Cinema Addons First'
                             : 'No streams found'}
                     </Text>
                     <Text style={[styles.emptySubtext, { color: activeColors.textSecondary }]}>
-                        {addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0
+                        {isHydrated && addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0
                             ? 'Go to Addon Store to install'
                             : 'Try adding more cinema addons'}
                     </Text>
-                    {addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0 && (
+                    {isHydrated && addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0 && (
                         <TouchableOpacity
                             style={[styles.addButton, { backgroundColor: activeColors.primary }]}
                             onPress={() => router.push('/addons')}

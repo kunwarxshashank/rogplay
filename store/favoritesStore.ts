@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { zustandStorage } from './mmkv';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import axios from 'axios';
@@ -145,7 +145,7 @@ export const useFavoritesStore = create<FavoritesState>()(
         }),
         {
             name: 'favorites-store',
-            storage: createJSONStorage(() => AsyncStorage),
+            storage: createJSONStorage(() => zustandStorage),
         }
     )
 );

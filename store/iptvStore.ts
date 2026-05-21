@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { zustandStorage } from './mmkv';
 export interface IptvPlaylist {
     id: string;
     title: string;
     url: string;
-    type: 'remote' | 'local';
+    type: 'remote' | 'local' | 'xtreme';
     createdAt: number;
+    // Xtreme Codes specific fields
+    xtremeServer?: string;
+    xtremeUsername?: string;
+    xtremePassword?: string;
 }
 
 interface IptvState {
@@ -40,7 +43,7 @@ export const useIptvStore = create<IptvState>()(
         }),
         {
             name: 'iptv-playlists',
-            storage: createJSONStorage(() => AsyncStorage),
+            storage: createJSONStorage(() => zustandStorage),
         }
     )
 );

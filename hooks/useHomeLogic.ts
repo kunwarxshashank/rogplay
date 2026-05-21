@@ -168,50 +168,66 @@ export function useHomeLogic() {
                 sortBy: MediaLibrary.SortBy.modificationTime,
             });
 
-            // Initial load: Try to find existing cached thumbnails instantly
-            await ensureCacheDir();
-            const initialVideos = await Promise.all(media.assets.map(async (asset) => {
-                const cached = await getCachedThumbnail(asset.id);
-                return { ...asset, thumbnailUri: cached };
-            }));
-
-            setVideos(initialVideos);
-            setFilteredVideos(initialVideos);
+            // Set videos instantly without thumbnails
+            const instantVideos = media.assets.map(asset => ({ ...asset, thumbnailUri: undefined as string | undefined }));
+            setVideos(instantVideos);
+            setFilteredVideos(instantVideos);
             setLoading(false);
 
-            // Background generation for missing thumbnails
-            const batchSize = 4;
-            let currentVideos = [...initialVideos];
-            let needsUpdate = false;
+            // Load thumbnails asynchronously
+            setTimeout(async () => {
+                try {
+                    await ensureCacheDir();
 
-            for (let i = 0; i < currentVideos.length; i += batchSize) {
-                const batch = currentVideos.slice(i, i + batchSize);
-                const results = await Promise.all(
-                    batch.map(async (video) => {
-                        if (video.thumbnailUri) return video;
-                        const thumbnailUri = await generateThumbnail(video.uri, video.id);
-                        if (thumbnailUri) {
-                            needsUpdate = true;
-                            return { ...video, thumbnailUri };
+                    // Phase 1: Load all cached thumbnails rapidly
+                    const withCache = await Promise.all(instantVideos.map(async (video) => {
+                        const cached = await getCachedThumbnail(video.id);
+                        return cached ? { ...video, thumbnailUri: cached } : video;
+                    }));
+
+                    setVideos(prev => {
+                        return prev.map(v => {
+                            const cachedItem = withCache.find(c => c.id === v.id);
+                            return cachedItem && cachedItem.thumbnailUri ? { ...v, thumbnailUri: cachedItem.thumbnailUri } : v;
+                        });
+                    });
+
+                    // Phase 2: Generate missing thumbnails in small batches
+                    const batchSize = 4;
+                    for (let i = 0; i < withCache.length; i += batchSize) {
+                        const batch = withCache.slice(i, i + batchSize);
+                        const missingInBatch = batch.filter(v => !v.thumbnailUri);
+
+                        if (missingInBatch.length === 0) continue;
+
+                        const generated = await Promise.all(
+                            missingInBatch.map(async (video) => {
+                                const thumbnailUri = await generateThumbnail(video.uri, video.id);
+                                return { id: video.id, thumbnailUri };
+                            })
+                        );
+
+                        const validGenerated = generated.filter(g => g.thumbnailUri);
+
+                        if (validGenerated.length > 0) {
+                            setVideos(prev => {
+                                const newVideos = [...prev];
+                                validGenerated.forEach(g => {
+                                    const index = newVideos.findIndex(v => v.id === g.id);
+                                    if (index !== -1) {
+                                        newVideos[index] = { ...newVideos[index], thumbnailUri: g.thumbnailUri };
+                                    }
+                                });
+                                return newVideos;
+                            });
                         }
-                        return video;
-                    })
-                );
-
-                // Update the array with new results
-                for (let j = 0; j < results.length; j++) {
-                    currentVideos[i + j] = results[j];
+                    }
+                } catch (err) {
+                    console.error('Error in background thumbnail generation:', err);
                 }
-
-                // Update UI every few batches or if we found new ones
-                if (needsUpdate && (i + batchSize >= currentVideos.length || i % (batchSize * 3) === 0)) {
-                    setVideos([...currentVideos]);
-                    needsUpdate = false;
-                }
-            }
+            }, 50);
         } catch (error) {
             console.error('Error loading videos:', error);
-        } finally {
             setLoading(false);
         }
     };

@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { zustandStorage } from './mmkv';
 export type ContinueWatchingItem = {
     id: string;
     sourceType: 'cinema';
@@ -68,7 +67,7 @@ export const useContinueWatchingStore = create<ContinueWatchingState>()(
         }),
         {
             name: 'continue-watching-store',
-            storage: createJSONStorage(() => AsyncStorage),
+            storage: createJSONStorage(() => zustandStorage),
         }
     )
 );

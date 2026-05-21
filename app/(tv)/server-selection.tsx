@@ -14,7 +14,7 @@ export default function TVServerSelectionScreen() {
     const router = useRouter();
     const { theme } = useSettingsStore();
     const activeColors = Colors[theme] || Colors.dark;
-    const { addons } = useAddonsStore();
+    const { addons, isHydrated } = useAddonsStore();
 
     const { results, loading, searchStreams } = useStreamSources();
 
@@ -94,17 +94,17 @@ export default function TVServerSelectionScreen() {
                     </View>
                 </View>
 
-                {loading ? (
+                {loading || !isHydrated ? (
                     <TVServerSelectionSkeleton />
                 ) : results.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <MaterialIcons name="cloud-off" size={64} color={activeColors.textSecondary} />
                         <Text style={[styles.emptyText, { color: activeColors.text }]}>
-                            {addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0
+                            {isHydrated && addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0
                                 ? 'Please Install Cinema Addons First'
                                 : 'No streams found'}
                         </Text>
-                        {addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0 ? (
+                        {isHydrated && addons.filter(addon => addon.type === 'cinema' || addon.type === 'movie').length === 0 ? (
                             <TVFocusable
                                 style={[styles.backButton, { backgroundColor: activeColors.primary }]}
                                 onPress={() => router.push('/(tv)/addons')}

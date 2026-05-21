@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './mmkv';
 import axios from 'axios';
 import { useAuthStore } from './authStore';
 
@@ -21,6 +21,7 @@ interface AddonsState {
     addons: Addon[];
     addonUrls: string[];
     isLoading: boolean;
+    isHydrated: boolean;
     loadAddons: (incomingUrls?: string[]) => Promise<void>;
     addAddon: (url: string) => Promise<boolean>;
     removeAddon: (sourceUrl: string) => Promise<void>;
@@ -32,6 +33,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
     addons: [],
     addonUrls: [],
     isLoading: false,
+    isHydrated: false,
     fetchAddonsFromBackend: async () => {
         const { user, token } = useAuthStore.getState();
         if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123') {
@@ -66,14 +68,14 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                     }
                 } catch (e) {
                     console.warn('Failed to fetch addons from backend, falling back to local storage', e);
-                    const urlListString = await AsyncStorage.getItem(LOCAL_ADDONKEY);
+                    const urlListString = storage.getString(LOCAL_ADDONKEY);
                     if (urlListString) {
                         urlList = JSON.parse(urlListString);
                     }
                 }
             } else {
                 // Non-premium or not logged in: load from storage
-                const urlListString = await AsyncStorage.getItem(LOCAL_ADDONKEY);
+                const urlListString = storage.getString(LOCAL_ADDONKEY);
                 if (urlListString) {
                     urlList = JSON.parse(urlListString);
                 }
@@ -83,10 +85,10 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             urlList = [...new Set(urlList)].filter(url => !!url);
 
             set({ addonUrls: urlList, isLoading: true }); // Keep loading while fetching manifests
-            await AsyncStorage.setItem(LOCAL_ADDONKEY, JSON.stringify(urlList));
+            storage.set(LOCAL_ADDONKEY, JSON.stringify(urlList));
 
             // ─── Load cached addon data first (instant display) ─────
-            const cachedDataString = await AsyncStorage.getItem(JSON_DATAKEY);
+            const cachedDataString = storage.getString(JSON_DATAKEY);
             let cachedAddons: Addon[] = [];
             if (cachedDataString) {
                 try {
@@ -137,8 +139,8 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             }
 
             // Update state with fresh data
-            set({ addons: fetchedData, isLoading: false });
-            await AsyncStorage.setItem(JSON_DATAKEY, JSON.stringify(fetchedData));
+            set({ addons: fetchedData, isLoading: false, isHydrated: true });
+            storage.set(JSON_DATAKEY, JSON.stringify(fetchedData));
 
             // Proactively sync back if we had incomingUrls that might be different from backend
             if (incomingUrls) {
@@ -146,7 +148,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             }
         } catch (error) {
             console.error('Error in loadAddons:', error);
-            set({ isLoading: false });
+            set({ isLoading: false, isHydrated: true });
         }
     },
 
@@ -214,8 +216,8 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
 
             set({ addons: newAddons, addonUrls: newUrls });
 
-            await AsyncStorage.setItem(LOCAL_ADDONKEY, JSON.stringify(newUrls));
-            await AsyncStorage.setItem(JSON_DATAKEY, JSON.stringify(newAddons));
+            storage.set(LOCAL_ADDONKEY, JSON.stringify(newUrls));
+            storage.set(JSON_DATAKEY, JSON.stringify(newAddons));
 
             // Sync with backend if logged in
             await get().syncWithBackend();
@@ -232,8 +234,8 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
         const newAddons = addons.filter(a => a.source !== sourceUrl);
 
         set({ addons: newAddons, addonUrls: newUrls });
-        await AsyncStorage.setItem(LOCAL_ADDONKEY, JSON.stringify(newUrls));
-        await AsyncStorage.setItem(JSON_DATAKEY, JSON.stringify(newAddons));
+        storage.set(LOCAL_ADDONKEY, JSON.stringify(newUrls));
+        storage.set(JSON_DATAKEY, JSON.stringify(newAddons));
 
         // Sync with backend if logged in
         await syncWithBackend();

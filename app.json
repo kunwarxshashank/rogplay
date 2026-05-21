@@ -2,7 +2,7 @@
   "expo": {
     "name": "RogPlay",
     "slug": "rogplay",
-    "version": "6.3.0",
+    "version": "6.5.0",
     "orientation": "default",
     "scheme": "rogplay",
     "icon": "./assets/icon.png",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.rogplay.org",
-      "versionCode": 17,
+      "versionCode": 18,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#04070D"
@@ -92,7 +92,8 @@
         "WRITE_EXTERNAL_STORAGE",
         "READ_MEDIA_AUDIO",
         "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO"
+        "READ_MEDIA_VIDEO",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
       "edgeToEdgeEnabled": true,
       "usesCleartextTraffic": true,
