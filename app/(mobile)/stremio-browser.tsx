@@ -57,8 +57,14 @@ interface StremioStream {
 }
 
 export default function StremioBrowserScreen() {
-    const { url, title, manifest: manifestStr } = useLocalSearchParams();
-    const manifest = useMemo(() => JSON.parse(manifestStr as string), [manifestStr]);
+    const { url, title, manifest: manifestStr, selectedItemId, selectedItemType } = useLocalSearchParams();
+    const manifest = useMemo(() => {
+        try {
+            return JSON.parse(manifestStr as string);
+        } catch {
+            return { catalogs: [], name: 'Stremio Addon' };
+        }
+    }, [manifestStr]);
     const router = useRouter();
     const theme = useSettingsStore(state => state.theme);
     const activeColors = Colors[theme] || Colors.dark;
@@ -91,7 +97,13 @@ export default function StremioBrowserScreen() {
     const isFavorite = useFavoritesStore((state) => state.isFavorite);
     const showToast = useToastStore((state) => state.showToast);
 
-    const baseUrl = (url as string).replace('/manifest.json', '');
+    // Derive baseUrl: prefer explicit url param, then manifest.url, then manifest.baseUrl
+    const baseUrl = useMemo(() => {
+        if (url) return (url as string).replace('/manifest.json', '');
+        if (manifest?.url) return (manifest.url as string).replace('/manifest.json', '');
+        if (manifest?.baseUrl) return manifest.baseUrl as string;
+        return '';
+    }, [url, manifest]);
 
     // ─── Filter out search catalogs ─────────────────────
     const browsableCatalogs = useMemo(
@@ -107,6 +119,19 @@ export default function StremioBrowserScreen() {
             setSelectedCatalog(browsableCatalogs[0]);
         }
     }, [browsableCatalogs]);
+
+    // Auto-load detail view if selectedItemId is provided (from cinema catalog click)
+    useEffect(() => {
+        if (!selectedItemId) return;
+        const itemType = typeof selectedItemType === 'string' ? selectedItemType : 'series';
+        const syntheticItem: StremioMeta = {
+            id: selectedItemId as string,
+            type: itemType,
+            name: typeof title === 'string' ? title : 'Loading...',
+        };
+        handlePress(syntheticItem);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedItemId]);
 
     useEffect(() => {
         if (selectedCatalog) {
@@ -216,38 +241,58 @@ export default function StremioBrowserScreen() {
     }, [items, isMediaCatalog]);
 
     const handlePress = async (item: StremioMeta) => {
-        const catalogType = selectedCatalog?.type?.toLowerCase();
+        const resolvedType = (item.type || selectedCatalog?.type || '').toLowerCase();
 
-        // Only series gets the detail/episode view
-        if (catalogType !== 'series') {
-            // Movie / TV / Live / other — direct stream fetch
+        // ── tv / livetv / iptv: directly play stream without detail view ──
+        if (resolvedType === 'tv' || resolvedType === 'livetv' || resolvedType === 'iptv' || resolvedType === 'live') {
             fetchAndPlayStreams(item);
             return;
         }
 
-        // Series — fetch full meta to get episodes
+        const hasMeta = (() => {
+            if (resolvedType === 'series' || resolvedType === 'movie' || resolvedType === 'anime') return true;
+            if (!manifest || !manifest.resources) return false;
+            for (const r of manifest.resources) {
+                if (r === 'meta') return true;
+                if (typeof r === 'object' && r.name === 'meta') {
+                    const typeMatch = !r.types || r.types.includes(resolvedType);
+                    const idPrefixMatch = !r.idPrefixes || r.idPrefixes.some((prefix: string) => item.id.startsWith(prefix));
+                    if (typeMatch && idPrefixMatch) return true;
+                }
+            }
+            return false;
+        })();
+
+        if (!hasMeta) {
+            fetchAndPlayStreams(item);
+            return;
+        }
+
         setDetailLoading(true);
         try {
-            const metaUrl = `${baseUrl}/meta/${item.type}/${encodeURIComponent(item.id)}.json`;
-            const response = await axios.get(metaUrl);
+            const metaType = item.type || resolvedType;
+            let response;
+            try {
+                const metaUrl = `${baseUrl}/meta/${metaType}/${encodeURIComponent(item.id)}.json`;
+                console.log(`meta: ${metaUrl}`)
+                response = await axios.get(metaUrl);
+            } catch (addonErr) {
+                console.log('Addon meta failed, falling back to cinemeta...', addonErr);
+                const cinemetaUrl = `https://v3-cinemeta.strem.io/meta/${metaType}/${encodeURIComponent(item.id)}.json`;
+                response = await axios.get(cinemetaUrl);
+            }
             const fullMeta: StremioMeta = response.data.meta;
 
-            if (!fullMeta.videos || fullMeta.videos.length === 0) {
-                // No episodes found — fallback to direct stream
-                setDetailLoading(false);
-                fetchAndPlayStreams({ ...item, ...fullMeta });
-            } else {
-                // Show series detail view with episodes
-                setDetailMeta(fullMeta);
+            setDetailMeta(fullMeta);
+            if (fullMeta.videos && fullMeta.videos.length > 0) {
                 const seasons = Array.from(new Set(fullMeta.videos.map(v => v.season || 1))).sort((a, b) => a - b);
                 setSelectedSeason(seasons[0]);
-                setShowDetail(true);
-                setDetailLoading(false);
             }
+            setShowDetail(true);
+            setDetailLoading(false);
         } catch (e) {
             console.error('Failed to load meta', e);
             setDetailLoading(false);
-            // Fallback: treat like direct stream
             fetchAndPlayStreams(item);
         }
     };
@@ -258,6 +303,8 @@ export default function StremioBrowserScreen() {
         setLoading(true);
         try {
             const streamId = videoId || item.id;
+            console.log('Manifest:', manifest);
+            console.log('Base URL for streams:', baseUrl);
             const fetchUrl = `${baseUrl}/stream/${item.type}/${encodeURIComponent(streamId)}.json`;
             const response = await axios.get(fetchUrl);
             const streamList = response.data.streams || [];
@@ -359,6 +406,7 @@ export default function StremioBrowserScreen() {
             browserUrl: url as string,
             browserManifest: manifestStr as string,
         });
+        console.log('Saving favorite with browserUrl:', url, 'and browserManifest:', manifestStr);
         showToast(exists ? 'Removed from favourites' : 'Added to favourites', 'success');
     }, [isFavorite, items, manifestStr, selectedCatalog, showToast, toggleFavorite, url]);
 
@@ -482,6 +530,17 @@ export default function StremioBrowserScreen() {
                     <Text style={[styles.detailDescription, { color: activeColors.textSecondary }]} numberOfLines={4}>
                         {detailMeta.description}
                     </Text>
+                )}
+
+                {/* Play Movie Button (If no videos/episodes) */}
+                {(!detailMeta.videos || detailMeta.videos.length === 0) && (
+                    <TouchableOpacity
+                        style={[styles.playMovieBtn, { backgroundColor: activeColors.primary }]}
+                        onPress={() => fetchAndPlayStreams(detailMeta)}
+                    >
+                        <MaterialIcons name="play-arrow" size={24} color="#fff" />
+                        <Text style={styles.playMovieText}>WATCH NOW</Text>
+                    </TouchableOpacity>
                 )}
 
                 {/* Season Selector */}
@@ -717,6 +776,21 @@ const styles = StyleSheet.create({
     detailMetaText: {
         fontSize: 13,
         fontFamily: 'Outfit_500Medium',
+    },
+    playMovieBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+        marginHorizontal: 20,
+        marginTop: 20,
+        gap: 8,
+    },
+    playMovieText: {
+        color: '#fff',
+        fontSize: 16,
+        fontFamily: 'Outfit_700Bold',
     },
     detailDescription: {
         paddingHorizontal: 20,

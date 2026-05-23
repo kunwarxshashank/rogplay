@@ -60,7 +60,7 @@ const FILTER_ICONS: Record<string, string> = {
 };
 
 export default function TVAddonsScreen() {
-    const { addons, loadAddons, addAddon, removeAddon, isLoading } = useAddonsStore();
+    const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
     const { theme } = useSettingsStore();
     const c = Colors[theme] || Colors.dark;
     const gradients = c.gradients || { primary: [c.primary, c.primary] };
@@ -124,29 +124,8 @@ export default function TVAddonsScreen() {
     };
 
     const handleOpenAddon = (item: any) => {
-        if (item.manifest) {
-            router.push({
-                pathname: '/(tv)/stremio-browser',
-                params: {
-                    url: item.url,
-                    title: item.title,
-                    manifest: JSON.stringify(item.manifest)
-                }
-            });
-            return;
-        }
-        if (item.type === 'cinema') {
-            Alert.alert('Cinema Addon', "You can't directly access this addon. It is accessible via the Cinema section.");
-            return;
-        }
-        router.push({
-            pathname: '/(tv)/addon-browser',
-            params: {
-                url: item.url,
-                title: item.title,
-                type: item.type
-            }
-        });
+        setActiveCinemaAddon(item.url || item.source);
+        router.push('/');
     };
 
     const filteredAddons = useMemo(() => {

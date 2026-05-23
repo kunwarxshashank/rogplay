@@ -20,20 +20,29 @@ interface Addon {
 interface AddonsState {
     addons: Addon[];
     addonUrls: string[];
+    activeCinemaAddon: string | null;
     isLoading: boolean;
     isHydrated: boolean;
     loadAddons: (incomingUrls?: string[]) => Promise<void>;
     addAddon: (url: string) => Promise<boolean>;
     removeAddon: (sourceUrl: string) => Promise<void>;
+    setActiveCinemaAddon: (url: string) => void;
     syncWithBackend: () => Promise<void>;
     fetchAddonsFromBackend: () => Promise<string[] | null>;
 }
 
+const ACTIVE_CINEMA_KEY = 'activecinemadata';
+
 export const useAddonsStore = create<AddonsState>((set, get) => ({
     addons: [],
     addonUrls: [],
+    activeCinemaAddon: null,
     isLoading: false,
     isHydrated: false,
+    setActiveCinemaAddon: (url: string) => {
+        set({ activeCinemaAddon: url });
+        storage?.set(ACTIVE_CINEMA_KEY, url);
+    },
     fetchAddonsFromBackend: async () => {
         const { user, token } = useAuthStore.getState();
         if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123') {
@@ -52,6 +61,11 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
     loadAddons: async (incomingUrls?: string[]) => {
         const { user, token } = useAuthStore.getState();
         const isPremium = user?.isPremium && token && token !== 'SKIP_TOKEN123';
+
+        const storedActiveCinema = storage?.getString(ACTIVE_CINEMA_KEY);
+        if (storedActiveCinema && !get().activeCinemaAddon) {
+            set({ activeCinemaAddon: storedActiveCinema });
+        }
 
         set({ isLoading: true });
         try {
@@ -114,7 +128,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
 
                     if (isStremioUrl || (data.id && data.resources && data.catalogs)) {
                         items = [{
-                            title: data.name,
+                            title: data.name || data.title,
                             description: data.description,
                             logo: data.logo,
                             url: url,
@@ -124,8 +138,19 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                             id: data.id,
                             manifest: data
                         }];
+                    } else if (data.addontype === 'tmdbaddon' || data.addontype === 'serveraddon') {
+                        items = [{
+                            title: data.title || data.name,
+                            description: data.description,
+                            logo: data.logo,
+                            url: url,
+                            type: 'cinema',
+                            id: data.id || url,
+                            manifest: data
+                        }];
                     } else {
                         items = Array.isArray(data) ? data : [data];
+                        items = items.map(ite => ({ ...ite, title: ite.title || ite.name }));
                     }
                     const sourcedItems = items.map((item: any) => ({ ...item, source: url }));
                     fetchedData.push(...sourcedItems);
@@ -195,7 +220,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                 // Stremio Manifest
                 isStremio = true;
                 items = [{
-                    title: data.name,
+                    title: data.name || data.title,
                     description: data.description,
                     logo: data.logo,
                     url: finalUrl, // The manifest URL
@@ -205,8 +230,19 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                     id: data.id,
                     manifest: data
                 }];
+            } else if (data.addontype === 'tmdbaddon' || data.addontype === 'serveraddon') {
+                items = [{
+                    title: data.title || data.name,
+                    description: data.description,
+                    logo: data.logo,
+                    url: finalUrl,
+                    type: 'cinema',
+                    id: data.id || finalUrl,
+                    manifest: data
+                }];
             } else {
                 items = Array.isArray(data) ? data : [data];
+                items = items.map(ite => ({ ...ite, title: ite.title || ite.name }));
             }
 
             const sourcedItems = items.map((item: any) => ({ ...item, source: finalUrl }));

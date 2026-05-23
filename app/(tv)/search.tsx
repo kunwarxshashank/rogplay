@@ -9,6 +9,8 @@ import { TVSearchBar } from '@/components/tv/TVSearchBar';
 import { GridSkeleton, MovieCardSkeleton } from '@/components/Skeleton';
 import { Platform } from 'react-native';
 
+import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
+
 export default function TVSearchScreen() {
     const { query } = useLocalSearchParams();
     const { theme } = useSettingsStore();
@@ -17,6 +19,8 @@ export default function TVSearchScreen() {
     const [searchQuery, setSearchQuery] = useState(query as string || '');
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const addonConfig = useCinemaAddon();
 
     useEffect(() => {
         if (searchQuery) {
@@ -29,7 +33,13 @@ export default function TVSearchScreen() {
         if (text.length > 2) {
             setLoading(true);
             try {
-                const data = await searchMulti(text);
+                let data = [];
+                if (addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
+                    const searchUrl = addonConfig.searchcatalog[0].searchurl.replace('${search}', encodeURIComponent(text));
+                    data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
+                } else {
+                    data = await searchMulti(text);
+                }
                 setResults(data);
             } catch (error) {
                 console.error(error);

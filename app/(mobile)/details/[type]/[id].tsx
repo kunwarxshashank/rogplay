@@ -30,7 +30,7 @@ export default function DetailsScreen() {
 
     useEffect(() => {
         if (id && type) {
-            getDetails(type as 'movie' | 'tv', Number(id)).then(setDetails).catch(console.error);
+            getDetails(type as 'movie' | 'tv', id as string).then(setDetails).catch(console.error);
         }
     }, [id, type]);
 

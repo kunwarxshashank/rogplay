@@ -33,7 +33,7 @@ export default function SeasonDetailsScreen() {
 
     const loadSeasonDetails = async () => {
         try {
-            const data = await getSeasonDetails(Number(tvId), Number(seasonNumber));
+            const data = await getSeasonDetails(tvId as string, Number(seasonNumber));
             setSeasonInfo(data);
             setEpisodes(data.episodes || []);
         } catch (error) {

@@ -17,7 +17,7 @@ import { AddonsFTUE } from '@/components/addons/AddonsFTUE';
 const FILTERS = ['All', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
 
 function useAddonsLogic() {
-    const { addons, loadAddons, addAddon, removeAddon, isLoading } = useAddonsStore();
+    const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
     const theme = useSettingsStore(state => state.theme);
     const activeColors = Colors[theme] || Colors.dark;
     const { user } = useAuthStore();
@@ -97,33 +97,8 @@ function useAddonsLogic() {
     }, [addons, searchQuery, selectedFilter]);
 
     const handleOpenAddon = (item: any) => {
-        if (item.manifest) {
-            router.push({
-                pathname: '/stremio-browser',
-                params: {
-                    url: item.url,
-                    title: item.title,
-                    manifest: JSON.stringify(item.manifest)
-                }
-            });
-            return;
-        }
-
-        if (item.type === 'cinema') {
-            Alert.alert('Cinema Addon', "You can't directly access this addon. It is accessible via the Cinema section.");
-            return;
-        }
-
-        // Navigate to Browser
-        // @ts-ignore
-        router.push({
-            pathname: '/addon-browser',
-            params: {
-                url: item.url,
-                title: item.title,
-                type: item.type
-            }
-        });
+        setActiveCinemaAddon(item.url || item.source);
+        router.push('/');
     };
 
     const hasSeenAddonFTUE = useSettingsStore(state => state.hasSeenAddonFTUE);

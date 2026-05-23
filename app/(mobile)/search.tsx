@@ -11,6 +11,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { MovieCardSkeleton, GridSkeleton } from '@/components/Skeleton';
 import MovieCard from '@/components/cinema/MovieCard';
 
+import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
+
 function useSearchLogic() {
     const { query: initialQuery } = useLocalSearchParams();
     const [query, setQuery] = useState(initialQuery as string || '');
@@ -19,6 +21,7 @@ function useSearchLogic() {
     const router = useRouter();
     const { theme } = useSettingsStore();
     const activeColors = Colors[theme] || Colors.dark;
+    const addonConfig = useCinemaAddon();
 
     useEffect(() => {
         if (initialQuery) {
@@ -31,7 +34,13 @@ function useSearchLogic() {
 
         setLoading(true);
         try {
-            const data = await searchMulti(searchQuery);
+            let data = [];
+            if (addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
+                const searchUrl = addonConfig.searchcatalog[0].searchurl.replace('${search}', encodeURIComponent(searchQuery));
+                data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
+            } else {
+                data = await searchMulti(searchQuery);
+            }
             setResults(data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv'));
         } catch (error) {
             console.error('Search error:', error);
