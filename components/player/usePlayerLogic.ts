@@ -10,6 +10,7 @@ import { PlaylistItem } from '@/services/playlistParser';
 import { EpgProgram } from '@/services/epgParser';
 import { TextTrackType, DRMType } from 'react-native-video';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { useAuthStore } from '@/store/authStore';
 
 export interface UsePlayerLogicProps {
@@ -458,17 +459,35 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
 
             if (!result.canceled) {
                 const asset = result.assets[0];
+                // Normalize/copy URIs (Android content:// URIs may be inaccessible to ExoPlayer)
+                let normalizedUri = asset.uri;
+                try {
+                    if (Platform.OS === 'android' && normalizedUri && normalizedUri.startsWith('content://')) {
+                        const fileName = asset.name || `subtitle-${Date.now()}`;
+                        const dest = FileSystem.cacheDirectory + fileName;
+                        await FileSystem.copyAsync({ from: normalizedUri, to: dest });
+                        normalizedUri = dest;
+                    } else if (normalizedUri && !normalizedUri.startsWith('file://') && normalizedUri.startsWith('/')) {
+                        normalizedUri = `file://${normalizedUri}`;
+                    }
+                } catch (copyErr) {
+                    console.warn('Subtitle copy to cache failed, using original uri', copyErr, asset.uri);
+                    // fallback: keep original uri
+                }
+
                 const newSubtitle = {
-                    title: asset.name,
+                    title: asset.name || 'subtitle',
                     language: 'en',
-                    type: asset.name.toLowerCase().endsWith('.vtt') ? TextTrackType.VTT : TextTrackType.SUBRIP,
-                    uri: asset.uri,
+                    type: asset.name?.toLowerCase().endsWith('.vtt') ? TextTrackType.VTT : TextTrackType.SUBRIP,
+                    uri: normalizedUri,
                 };
                 setImportedSubtitles(prev => {
                     const updated = [...prev, newSubtitle];
                     const newIndex = allTextTracks.length + updated.length - 1;
+                    const totalTracks = allTextTracks.length + updated.length;
+                    const safeIndex = Math.max(0, Math.min(totalTracks - 1, newIndex));
                     setTimeout(() => {
-                        setSelectedTextTrack(newIndex);
+                        setSelectedTextTrack(safeIndex);
                     }, 500);
                     return updated;
                 });

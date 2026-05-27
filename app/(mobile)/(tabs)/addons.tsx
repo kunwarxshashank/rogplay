@@ -98,7 +98,7 @@ function useAddonsLogic() {
 
     const handleOpenAddon = (item: any) => {
         setActiveCinemaAddon(item.url || item.source);
-        router.push('/');
+        router.push('/cinema');
     };
 
     const hasSeenAddonFTUE = useSettingsStore(state => state.hasSeenAddonFTUE);

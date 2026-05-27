@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -65,12 +66,13 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
         const finalAddonType = addonType || item.addonType;
         const streamUrl = item.url || item.movieUrl || item.link || item.source || '';
 
+
         // ── serveraddon: items have a direct stream URL, skip details entirely ──
-        if (finalAddonType === 'serveraddon' && streamUrl) {
+        if (finalAddonType === 'serveraddon') {
             const params: any = {
                 query: item.title || item.name || '',
                 type: 'addon',
-                movieUrl: item.url || item.movieUrl || item.link || item.source || '',
+                movieUrl: streamUrl,
                 title: item.title || item.name,
                 poster: posterUrl,
             };
@@ -102,10 +104,13 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
         }
 
         // ── tmdbaddon / stremioaddon with standard IDs → TMDB details page ──
+        const finalUrl = item._addonUrl || item.stremioAddonUrl;
+        const finalManifest = item._addonManifestStr || item.stremioAddonManifest;
+
         if (Platform.isTV) {
-            router.push({ pathname: '/(tv)/details/[type]/[id]', params: { id: itemId, type: mediaType } });
+            router.push({ pathname: '/(tv)/details/[type]/[id]', params: { id: itemId, type: mediaType, ...(finalUrl ? { url: finalUrl, manifest: finalManifest } : {}) } });
         } else {
-            router.push({ pathname: '/(mobile)/details/[type]/[id]', params: { id: itemId, type: mediaType } });
+            router.push({ pathname: '/(mobile)/details/[type]/[id]', params: { id: itemId, type: mediaType, ...(finalUrl ? { url: finalUrl, manifest: finalManifest } : {}) } });
         }
     };
 
@@ -118,21 +123,21 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
                         style={[
                             styles.posterContainer,
                             {
-                                backgroundColor: '#000',
-                                borderColor: focused ? currentColors.primary : 'rgba(255,255,255,0.1)',
-                                borderWidth: 2,
+                                backgroundColor: '#0E0D17',
+                                borderColor: focused ? currentColors.glow : 'rgba(255,255,255,0.2)',
+                                borderWidth: 1,
                             },
                             focused && {
                                 shadowColor: currentColors.primary,
-                                shadowOffset: { width: 0, height: 15 },
-                                shadowOpacity: 0.5,
-                                shadowRadius: 20,
+                                shadowOffset: { width: 0, height: 10 },
+                                shadowOpacity: 0.8,
+                                shadowRadius: 15,
                                 elevation: 20,
                             },
                         ]}
                     >
                         {posterUrl ? (
-                            <Image source={{ uri: posterUrl }} style={styles.poster} />
+                            <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} />
                         ) : (
                             <View style={styles.placeholder}>
                                 <MaterialIcons name="movie" size={width * 0.3} color={currentColors.textSecondary} />
@@ -169,7 +174,7 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
     return (
         <TouchableOpacity style={[styles.container, { width }, style]} onPress={handlePress} activeOpacity={0.8}>
             <View style={[styles.posterContainer, { backgroundColor: currentColors.card }]}>
-                {posterUrl ? <Image source={{ uri: posterUrl }} style={styles.poster} /> : (
+                {posterUrl ? <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} /> : (
                     <View style={styles.placeholder}>
                         <MaterialIcons name="movie" size={width * 0.3} color={currentColors.textSecondary} />
                     </View>
@@ -204,7 +209,7 @@ const styles = StyleSheet.create({
     container: { marginBottom: 12 },
     posterContainer: {
         aspectRatio: Platform.isTV ? 16 / 9 : 2 / 3,
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: 'hidden',
         position: 'relative',
         elevation: 5,
@@ -224,11 +229,11 @@ const styles = StyleSheet.create({
     title: { fontSize: 13, fontFamily: 'Outfit_600SemiBold' },
     year: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
     tvOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, paddingTop: 20 },
-    tvTitle: { color: '#fff', fontSize: 16, fontWeight: '900', fontFamily: 'Outfit_800ExtraBold', letterSpacing: -0.3 },
+    tvTitle: { color: '#fff', fontSize: 16, fontFamily: 'PlayfairDisplay_600SemiBold', letterSpacing: -0.3 },
     tvMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 },
-    tvYear: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Outfit_500Medium' },
+    tvYear: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' },
     dotSeparator: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
-    tvMediaType: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: 'bold', fontFamily: 'Outfit_700Bold', letterSpacing: 0.5 }
+    tvMediaType: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.5 }
 });
 
 export default React.memo(MovieCard, (prev, next) => {

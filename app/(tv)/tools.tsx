@@ -4,8 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const hexAlpha = (hex: string, alpha: number) => {
     const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
@@ -16,162 +15,162 @@ const TOOLS = [
     {
         id: 'favourites',
         name: 'Favourites',
-        icon: 'heart-multiple',
+        icon: 'heart-multiple-outline',
         route: '/(tv)/favourites',
-        description: 'Open saved movies, shows and channels',
-        gradient: ['#ec4899', '#f43f5e'] as const,
+        description: 'Browse and revisit your saved movies, shows and channels',
     },
     {
         id: 'iptv',
         name: 'IPTV Player',
-        icon: 'television-classic',
+        icon: 'television-play',
         route: '/(tv)/iptv',
-        description: 'Watch live TV channels from M3U playlists',
-        gradient: ['#667eea', '#764ba2'] as const,
+        description: 'Watch live TV channels from M3U or Xtreme Codes playlists',
     },
     {
         id: 'network',
         name: 'Network Stream',
         icon: 'cast-connected',
         route: '/(tv)/network-stream',
-        description: 'Stream video from any URL or network source',
-        gradient: ['#f093fb', '#f5576c'] as const,
+        description: 'Stream video from any URL or network source directly',
     },
     {
         id: 'downloader',
         name: 'Video Downloader',
-        icon: 'download-circle',
+        icon: 'tray-arrow-down',
         route: '/(tv)/video-downloader',
-        description: 'Download videos for offline viewing',
-        gradient: ['#4facfe', '#00f2fe'] as const,
+        description: 'Download videos for offline viewing at any time',
     },
     {
         id: 'local',
         name: 'Local Videos',
-        icon: 'folder-play',
+        icon: 'folder-play-outline',
         route: '/(tv)/local-videos',
-        description: 'Browse and play videos from your storage',
-        gradient: ['#f6d365', '#fda085'] as const,
+        description: 'Browse and play videos stored on your device',
     },
     {
         id: 'watchparty',
-        name: 'Join WatchParty',
-        icon: 'party-popper',
+        name: 'Watch Party',
+        icon: 'account-group-outline',
         route: '/(tv)/join-watchparty',
-        description: 'Watch together with friends in real-time',
-        gradient: ['#a78bfa', '#7c3aed'] as const,
+        description: 'Watch together with friends in real-time, in sync',
     },
-];
+] as const;
+
+const COLS = 2;
 
 export default function TVToolsScreen() {
     const { theme } = useSettingsStore();
     const c = Colors[theme] || Colors.dark;
-    const gradients = c.gradients || { primary: [c.primary, c.primary] };
     const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
     const router = useRouter();
 
-    const SIDEBAR_WIDTH = 86;
+    const SIDEBAR_W = 86;
     const H_PAD = 44;
-    const GAP = 20;
-    const COLS = 3;
-    const usableW = SCREEN_W - SIDEBAR_WIDTH - H_PAD * 2;
+    const GAP = 14;
+    const usableW = SCREEN_W - SIDEBAR_W - H_PAD * 2;
     const cardW = (usableW - GAP * (COLS - 1)) / COLS;
-    const cardH = Math.min((SCREEN_H - 200) / 2 - GAP, 240);
 
-    // Split tools into rows of 3
-    const rows: (typeof TOOLS)[] = [];
+    const rows: (typeof TOOLS[number][])[] = [];
     for (let i = 0; i < TOOLS.length; i += COLS) {
-        rows.push(TOOLS.slice(i, i + COLS));
+        rows.push(TOOLS.slice(i, i + COLS) as any);
     }
 
     return (
         <View style={styles.container}>
-            {/* ── Header ──────────────────────────────── */}
+            {/* ── Header ─────────────────────────── */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <Text style={[styles.headerTitle, { color: c.text }]}>Tools</Text>
-                    <View style={[styles.headerDot, { backgroundColor: c.primary }]} />
+                    <View style={[styles.headerIconWrap, { backgroundColor: hexAlpha(c.primary, 0.12) }]}>
+                        <MaterialCommunityIcons name="hammer-wrench" size={22} color={c.primary} />
+                    </View>
+                    <View>
+                        <Text style={[styles.headerTitle, { color: c.text }]}>Tools</Text>
+                        <Text style={[styles.headerSubtitle, { color: c.textSecondary }]}>
+                            {TOOLS.length} utilities available
+                        </Text>
+                    </View>
                 </View>
-                <View style={[styles.headerBadge, { backgroundColor: hexAlpha(c.primary, 0.1) }]}>
-                    <Text style={[styles.headerBadgeText, { color: c.primary }]}>
-                        {TOOLS.length} AVAILABLE
-                    </Text>
-                </View>
+                <View style={[styles.dividerLine, { backgroundColor: hexAlpha(c.text, 0.06) }]} />
             </View>
 
-            {/* ── Grid ────────────────────────────────── */}
-            <View style={[styles.grid, { paddingHorizontal: H_PAD }]}>
+            {/* ── Grid ───────────────────────────── */}
+            <View style={[styles.grid, { paddingHorizontal: H_PAD, gap: GAP }]}>
                 {rows.map((row, rowIdx) => (
-                    <View
-                        key={rowIdx}
-                        style={[
-                            styles.row,
-                            { gap: GAP },
-                            // Center the last row if it has fewer items
-                            row.length < COLS && { justifyContent: 'flex-start' },
-                        ]}
-                    >
+                    <View key={rowIdx} style={[styles.row, { gap: GAP }]}>
                         {row.map((tool, colIdx) => {
                             const index = rowIdx * COLS + colIdx;
                             return (
                                 <TVFocusable
                                     key={tool.id}
-                                    style={[styles.card, { width: cardW, height: cardH }]}
+                                    style={[styles.card, { width: cardW }]}
                                     onPress={() => router.push(tool.route as any)}
                                     hasTVPreferredFocus={index === 0}
                                     nativeID={`tv-tool-${tool.id}`}
-                                    focusedScale={1.05}
-                                    disableFocusEffect={true} // Handling custom focus effect below
+                                    focusedScale={1.03}
+                                    focusedBorderColor={c.primary}
+                                    autoFlex={false}
+                                    disableFocusEffect={true}
                                 >
                                     {({ focused }: any) => (
                                         <View style={[
-                                            StyleSheet.absoluteFill,
                                             styles.cardInner,
                                             {
-                                                backgroundColor: focused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
-                                                borderColor: focused ? '#fff' : 'rgba(255,255,255,0.08)',
-                                                borderWidth: focused ? 2 : 1.5,
-                                                transform: [{ scale: focused ? 1.05 : 1 }]
-                                            },
-                                            focused && {
-                                                shadowColor: tool.gradient[0],
-                                                shadowOffset: { width: 0, height: 10 },
-                                                shadowOpacity: 0.3,
-                                                shadowRadius: 20,
-                                                elevation: 15,
+                                                backgroundColor: focused
+                                                    ? hexAlpha(c.primary, 0.1)
+                                                    : hexAlpha(c.card, 0.5),
+                                                borderColor: focused
+                                                    ? hexAlpha(c.primary, 0.6)
+                                                    : hexAlpha(c.text, 0.07),
+                                                transform: [{ scale: focused ? 1.03 : 1 }],
                                             }
                                         ]}>
-                                            {/* Accent Gradient */}
-                                            <LinearGradient
-                                                colors={[tool.gradient[0] + '15', 'transparent']}
-                                                start={{ x: 0, y: 0 }}
-                                                end={{ x: 1, y: 1 }}
-                                                style={StyleSheet.absoluteFill}
-                                            />
+                                            {/* Left accent bar */}
+                                            {focused && (
+                                                <View style={[styles.accentBar, { backgroundColor: c.primary }]} />
+                                            )}
 
-                                            <View style={styles.cardBody}>
-                                                <View style={styles.cardTop}>
-                                                    <View style={[styles.iconCircle, { backgroundColor: tool.gradient[0] + '15' }]}>
-                                                        <MaterialCommunityIcons
-                                                            name={tool.icon as any}
-                                                            size={34}
-                                                            color={tool.gradient[0]}
-                                                        />
-                                                    </View>
-                                                    {focused && (
-                                                        <View style={[styles.activeIndicator, { backgroundColor: tool.gradient[0] }]} />
-                                                    )}
-                                                </View>
-
-                                                <View style={styles.cardBottom}>
-                                                    <Text style={[styles.cardTitle, { color: c.text }]} numberOfLines={1}>
-                                                        {tool.name}
-                                                    </Text>
-                                                    <Text style={[styles.cardDesc, { color: c.textSecondary }]} numberOfLines={2}>
-                                                        {tool.description}
-                                                    </Text>
-                                                </View>
+                                            {/* Icon */}
+                                            <View style={[
+                                                styles.iconWrap,
+                                                {
+                                                    backgroundColor: focused
+                                                        ? hexAlpha(c.primary, 0.15)
+                                                        : hexAlpha(c.text, 0.05),
+                                                }
+                                            ]}>
+                                                <MaterialCommunityIcons
+                                                    name={tool.icon as any}
+                                                    size={26}
+                                                    color={focused ? c.primary : c.textSecondary}
+                                                />
                                             </View>
+
+                                            {/* Text */}
+                                            <View style={styles.cardText}>
+                                                <Text
+                                                    style={[
+                                                        styles.cardTitle,
+                                                        { color: focused ? c.text : c.text }
+                                                    ]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {tool.name}
+                                                </Text>
+                                                <Text
+                                                    style={[styles.cardDesc, { color: c.textSecondary }]}
+                                                    numberOfLines={2}
+                                                >
+                                                    {tool.description}
+                                                </Text>
+                                            </View>
+
+                                            {/* Arrow */}
+                                            <MaterialCommunityIcons
+                                                name="chevron-right"
+                                                size={20}
+                                                color={focused ? c.primary : hexAlpha(c.text, 0.2)}
+                                                style={styles.arrow}
+                                            />
                                         </View>
                                     )}
                                 </TVFocusable>
@@ -190,107 +189,98 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
 
-    /* ── Header ────────────────────────────── */
+    /* ── Header ────────────────────────── */
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: 60,
+        paddingTop: 56,
         paddingHorizontal: 44,
-        paddingBottom: 24,
+        paddingBottom: 20,
+        gap: 20,
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
+    },
+    headerIconWrap: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 32,
-        fontFamily: 'Outfit_800ExtraBold',
-        letterSpacing: -0.5,
+        fontSize: 28,
+        fontFamily: 'Inter_700Bold',
+        letterSpacing: -0.3,
     },
-    headerDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginTop: 6,
+    headerSubtitle: {
+        fontSize: 13,
+        fontFamily: 'Inter_400Regular',
+        marginTop: 2,
+        opacity: 0.6,
     },
-    headerBadge: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-    },
-    headerBadgeText: {
-        fontSize: 12,
-        fontFamily: 'Outfit_700Bold',
-        letterSpacing: 1,
+    dividerLine: {
+        height: 1,
+        borderRadius: 1,
     },
 
-    /* ── Grid ──────────────────────────────── */
+    /* ── Grid ──────────────────────────── */
     grid: {
         flex: 1,
-        justifyContent: 'flex-start',
-        gap: 20,
     },
     row: {
         flexDirection: 'row',
     },
 
-    /* ── Card ──────────────────────────────── */
+    /* ── Card ──────────────────────────── */
     card: {
-        borderRadius: 24,
-        overflow: 'visible', // Allow shadow to show
+        borderRadius: 16,
+        overflow: 'visible',
     },
     cardInner: {
-        borderRadius: 24,
-        overflow: 'hidden',
-        borderWidth: 1.5,
-    },
-    activeIndicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    cardBody: {
-        flex: 1,
-        paddingHorizontal: 22,
-        paddingTop: 16,
-        paddingBottom: 18,
-        justifyContent: 'space-between',
-    },
-    cardTop: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderRadius: 16,
+        borderWidth: 1.5,
+        paddingVertical: 18,
+        paddingHorizontal: 20,
+        gap: 16,
+        overflow: 'hidden',
+        position: 'relative',
     },
-    iconCircle: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
+    accentBar: {
+        position: 'absolute',
+        left: 0,
+        top: '15%',
+        bottom: '15%',
+        width: 3,
+        borderRadius: 2,
+    },
+    iconWrap: {
+        width: 50,
+        height: 50,
+        borderRadius: 13,
         justifyContent: 'center',
         alignItems: 'center',
+        flexShrink: 0,
     },
-    arrowWrap: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    cardBottom: {
+    cardText: {
+        flex: 1,
         gap: 4,
     },
     cardTitle: {
-        fontSize: 22,
-        fontFamily: 'Outfit_700Bold',
-        letterSpacing: -0.2,
+        fontSize: 17,
+        fontFamily: 'Inter_600SemiBold',
+        letterSpacing: -0.1,
     },
     cardDesc: {
         fontSize: 13,
-        fontFamily: 'Outfit_500Medium',
+        fontFamily: 'Inter_400Regular',
         lineHeight: 18,
-        opacity: 0.5,
+        opacity: 0.65,
+    },
+    arrow: {
+        flexShrink: 0,
+        opacity: 0.8,
     },
 });

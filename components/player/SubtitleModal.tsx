@@ -214,7 +214,7 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
                                 <View style={[styles.tracksSection, shouldUseHorizontalLayout() && { flex: 1.2 }]}>
                                     <View style={styles.sectionHeader}>
                                         <Text style={[styles.sectionTitle, { color: activeColors.textSecondary }]}>Select Track</Text>
-                                        {/* {onImportSubtitle && (
+                                        {onImportSubtitle && (
                                             <TVFocusable
                                                 autoFlex={false}
                                                 style={[styles.importBtn, { backgroundColor: activeColors.primary + '20' }]}
@@ -228,7 +228,7 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
                                                     </View>
                                                 )}
                                             </TVFocusable>
-                                        )} */}
+                                        )}
                                     </View>
 
                                     <ScrollView

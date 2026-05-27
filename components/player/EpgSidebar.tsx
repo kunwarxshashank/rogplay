@@ -9,10 +9,10 @@ import {
     FlatList,
     ScrollView,
     Platform,
-    Image,
     ActivityIndicator,
     TextInput,
 } from 'react-native';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
@@ -411,7 +411,7 @@ const EpgSidebar = React.memo(function EpgSidebar({
                 } : {})}
             >
                 {item.imageUrl ? (
-                    <Image
+                    <OptimizedImage
                         source={{ uri: item.imageUrl }}
                         style={styles.channelLogo}
                         resizeMode="contain"

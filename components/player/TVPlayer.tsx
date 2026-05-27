@@ -479,7 +479,7 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
 
             <SubtitleModal
                 visible={subtitleModalVisible}
-                textTracks={allTextTracks}
+                textTracks={[...allTextTracks, ...importedSubtitles]}
                 selectedTextTrack={selectedTextTrack}
                 subtitleDelay={subtitleDelay}
                 onSelectText={(index) => setSelectedTextTrack(index)}
@@ -515,6 +515,7 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
                         bgPlay={bgPlay}
                         duration={duration}
                         importedSubtitles={importedSubtitles}
+                        allTextTracks={allTextTracks}
                         selectedAudioTrack={selectedAudioTrack}
                         selectedVideoTrack={selectedVideoTrack}
                         selectedTextTrack={selectedTextTrack}

@@ -416,7 +416,7 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
 
             <SubtitleModal
                 visible={subtitleModalVisible}
-                textTracks={allTextTracks}
+                textTracks={[...allTextTracks, ...importedSubtitles]}
                 selectedTextTrack={selectedTextTrack}
                 subtitleDelay={subtitleDelay}
                 onSelectText={(index) => {
@@ -472,6 +472,7 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
                             bgPlay={bgPlay}
                             duration={duration}
                             importedSubtitles={importedSubtitles}
+                            allTextTracks={allTextTracks}
                             selectedAudioTrack={selectedAudioTrack}
                             selectedVideoTrack={selectedVideoTrack}
                             selectedTextTrack={selectedTextTrack}
@@ -622,7 +623,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     topBar: { flexDirection: 'row', alignItems: 'center', marginTop: Platform.OS === 'android' ? 10 : 30 },
-    iconButton: { padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 },
+    iconButton: { padding: 8, backgroundColor: 'transparent', borderRadius: 8 },
     titleText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12, flex: 1 },
     headerLogo: { width: 32, height: 32, marginLeft: 12, borderRadius: 4 },
     topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },

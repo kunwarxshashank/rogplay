@@ -24,6 +24,7 @@ interface VideoWrapperProps {
     resizeMode: any;
     bgPlay: boolean;
     importedSubtitles: any[];
+    allTextTracks: any[];
     selectedAudioTrack: number;
     selectedVideoTrack: number;
     selectedTextTrack: number;
@@ -37,7 +38,7 @@ interface VideoWrapperProps {
 }
 
 const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoWrapper(props, ref) {
-    const { streamUrl, headersData, drmData, newDrmType, isPlaying, playbackSpeed, volume, isMute, resizeMode, bgPlay, importedSubtitles, selectedAudioTrack, selectedVideoTrack, selectedTextTrack, onProgress, onBuffer, onLoad, onError, onTextTracks, style, duration } = props;
+    const { streamUrl, headersData, drmData, newDrmType, isPlaying, playbackSpeed, volume, isMute, resizeMode, bgPlay, importedSubtitles, allTextTracks, selectedAudioTrack, selectedVideoTrack, selectedTextTrack, onProgress, onBuffer, onLoad, onError, onTextTracks, style, duration } = props;
 
     const internalRef = useRef<any>(null);
     const { isVlcRequired, isDetecting } = useStreamType(streamUrl, headersData);
@@ -85,6 +86,29 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         ":clock-jitter=0",
         ":no-osd",
     ], []);
+
+    const selectedTextTrackProps = React.useMemo(() => {
+        if (selectedTextTrack === -1) {
+            return { type: SelectedTrackType.DISABLED };
+        }
+
+        const importedOffset = allTextTracks.length;
+        if (selectedTextTrack >= importedOffset) {
+            const importedIndex = selectedTextTrack - importedOffset;
+            const importedTrack = importedSubtitles[importedIndex];
+            if (importedTrack?.title) {
+                return {
+                    type: SelectedTrackType.TITLE,
+                    value: importedTrack.title,
+                };
+            }
+        }
+
+        return {
+            type: SelectedTrackType.INDEX,
+            value: selectedTextTrack,
+        };
+    }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
 
     useImperativeHandle(ref, () => ({
         seek: (seconds: number) => {
@@ -189,7 +213,7 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
 
     return (
         <Video
-            key={`${streamUrl}-${importedSubtitles.length}`}
+            key={streamUrl}
             focusable={false}
             ref={internalRef}
             source={{
@@ -222,14 +246,12 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                 type: SelectedVideoTrackType.INDEX,
                 value: selectedVideoTrack
             }}
-            selectedTextTrack={{
-                type: SelectedTrackType.INDEX,
-                value: selectedTextTrack,
-            }}
+            selectedTextTrack={selectedTextTrackProps}
             onError={(e: any) => {
-                console.error('ExoPlayer Error', e);
-                setPlaybackError(`Playback error: ${e?.error?.errorString || 'Unknown error'}`);
-                onError && onError(`Playback error: ${e?.error?.errorString || 'Unknown error'}`);
+                console.error('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });
+                const errMsg = e?.error?.errorString || e?.message || 'Unknown error';
+                setPlaybackError(`Playback error: ${errMsg}`);
+                onError && onError(`Playback error: ${errMsg}`);
             }}
         />
     );

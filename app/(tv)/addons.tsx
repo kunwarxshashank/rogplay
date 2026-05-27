@@ -125,7 +125,7 @@ export default function TVAddonsScreen() {
 
     const handleOpenAddon = (item: any) => {
         setActiveCinemaAddon(item.url || item.source);
-        router.push('/');
+        router.push('/cinema');
     };
 
     const filteredAddons = useMemo(() => {

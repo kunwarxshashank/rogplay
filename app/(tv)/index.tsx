@@ -47,6 +47,8 @@ export default function TVHomeScreen() {
                 key: `catalog_${index}_${c.name}`,
                 title: c.name,
                 type: c.type === 'series' || c.type === 'tv' ? 'tv' : 'movie',
+                addonType: addontype,
+                catalogRawType: c.type,
                 fetchFunction: (page?: number) => {
                     const p = page || 1;
                     const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
@@ -64,6 +66,8 @@ export default function TVHomeScreen() {
                 fetchFunction={item.fetchFunction}
                 type={item.type}
                 paginated
+                addonType={item.addonType}
+                catalogRawType={item.catalogRawType}
             />
         ),
         []

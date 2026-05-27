@@ -4,12 +4,19 @@ import {
     Outfit_400Regular,
     Outfit_500Medium,
     Outfit_600SemiBold,
-    Outfit_700Bold
+    Outfit_700Bold,
+    Outfit_800ExtraBold
 } from '@expo-google-fonts/outfit';
 import {
     Inter_400Regular,
     Inter_600SemiBold
 } from '@expo-google-fonts/inter';
+import {
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold
+} from '@expo-google-fonts/playfair-display';
 import { Stack, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -26,7 +33,7 @@ import { useAddonsStore } from '@/store/addonsStore';
 import { useRouter, useSegments } from 'expo-router';
 import { AppUpdateModal } from '@/components/AppUpdateModal';
 import { AppToast } from '@/components/AppToast';
-
+import * as NavigationBar from 'expo-navigation-bar';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,8 +43,13 @@ export default function RootLayout() {
         Outfit_500Medium,
         Outfit_600SemiBold,
         Outfit_700Bold,
+        Outfit_800ExtraBold,
         Inter_400Regular,
         Inter_600SemiBold,
+        PlayfairDisplay_400Regular,
+        PlayfairDisplay_500Medium,
+        PlayfairDisplay_600SemiBold,
+        PlayfairDisplay_700Bold,
     });
 
     const pathname = usePathname();
@@ -52,6 +64,13 @@ export default function RootLayout() {
             SplashScreen.hideAsync();
         }
     }, [loaded, error]);
+
+    // change navigation bar color
+    useEffect(() => {
+        NavigationBar.setBackgroundColorAsync('transparent');
+        NavigationBar.setButtonStyleAsync('light');
+    }, []);
+
 
     useEffect(() => {
         const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;

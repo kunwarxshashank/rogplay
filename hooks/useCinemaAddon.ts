@@ -40,7 +40,7 @@ export function useCinemaAddon() {
         const isStremio = (addon.manifest && addon.manifest.id && addon.manifest.resources) ||
             (addon.type === 'stremio' || activeCinemaAddon.endsWith('manifest.json'));
 
-        const addonType = addon.addontype || (isStremio ? 'stremio' : 'serveraddon');
+        const addonType = addon.addontype || (addon.manifest?.addontype) || (isStremio ? 'stremio' : 'serveraddon');
         const rawCatalogs = addon.catalogs || (addon.manifest?.catalogs) || [];
         const searchcatalog = addon.searchcatalog || (addon.manifest?.searchcatalog) || [];
         const slidercatalog = addon.slidercatalog || (addon.manifest?.slidercatalog) || null;
@@ -48,6 +48,27 @@ export function useCinemaAddon() {
         const baseUrl = (addon.source || addon.url || activeCinemaAddon).replace(/\/manifest\.json$/i, '');
         const stremioManifestUrl = addon.url || (addon.source ? addon.source : `${baseUrl}/manifest.json`);
         const addonManifestStr = addon.manifest ? JSON.stringify(addon.manifest) : '';
+        const idPrefixes = addon.manifest?.idPrefixes || addon.idPrefixes || [];
+
+        let finalSearchCatalog = [...searchcatalog];
+        if (addonType === 'stremio' && addon.manifest?.catalogs) {
+            const stremioSearchCatalogs = addon.manifest.catalogs
+                .filter((c: any) => (c.type === 'movie' || c.type === 'series') && c.extra?.some((e: any) => e.name === 'search'))
+                .map((c: any) => ({
+                    id: c.id,
+                    name: c.name || `Search ${c.type}`,
+                    type: c.type,
+                    searchurl: `${baseUrl}/catalog/${c.type}/${c.id}/search=\${search}.json`
+                }));
+
+            // Avoid duplicates if some were already manual configurations
+            const existingUrls = finalSearchCatalog.map((s: any) => s.searchurl);
+            stremioSearchCatalogs.forEach((sc: any) => {
+                if (!existingUrls.includes(sc.searchurl)) {
+                    finalSearchCatalog.push(sc);
+                }
+            });
+        }
 
         const mappedCatalogs = rawCatalogs.map((c: any) => {
             if (addonType === 'stremio' && !c.url) {
@@ -72,11 +93,12 @@ export function useCinemaAddon() {
             addon,
             settings,
             catalogs: mappedCatalogs,
-            searchcatalog,
+            searchcatalog: finalSearchCatalog,
             slidercatalog,
             addontype: addonType,
             addonUrl: stremioManifestUrl,
             addonManifest: addonManifestStr,
+            idPrefixes,
         };
     }, [addons, activeCinemaAddon]);
 
@@ -148,6 +170,7 @@ export async function fetchAddonCatalog(catalogUrl: string, page: number = 1, ad
                 poster_path: item.poster_path || item.poster || item.logo || item.background || item.image || item.thumbnail || item.thumb,
                 media_type: (item.media_type === 'tv' || item.type === 'series' || item.type === 'tv' || item.kind === 'tv' || item.kind === 'series') ? 'tv' : 'movie',
                 // Attach the addon info here so it's available to the item when rendering
+                addonType: addonType,
                 _addonUrl: addonMeta?.url || catalogUrl,
                 _addonManifestStr: addonMeta?.manifestStr || '',
             };

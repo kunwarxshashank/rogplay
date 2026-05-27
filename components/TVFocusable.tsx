@@ -66,15 +66,16 @@ export function TVFocusable({
     autoFlex = true,
 }: TVFocusableProps) {
     const [focused, setFocused] = useState(false);
-    const scale = useRef(new Animated.Value(1)).current;
+    const scaleRef = useRef<Animated.Value | null>(Platform.isTV && !disableFocusEffect ? new Animated.Value(1) : null);
+    const scale = scaleRef.current ?? 1;
     const theme = useSettingsStore((state) => state.theme);
     const currentColors = useMemo(() => Colors[theme] || Colors.dark, [theme]);
     const borderColor = focusedBorderColor || currentColors.primary;
 
     const handleFocus = useCallback(() => {
         setFocused(true);
-        if (!disableFocusEffect) {
-            Animated.spring(scale, {
+        if (!disableFocusEffect && scaleRef.current) {
+            Animated.spring(scaleRef.current, {
                 toValue: focusedScale,
                 useNativeDriver: true,
                 friction: 5,
@@ -85,8 +86,8 @@ export function TVFocusable({
 
     const handleBlur = useCallback(() => {
         setFocused(false);
-        if (!disableFocusEffect) {
-            Animated.spring(scale, {
+        if (!disableFocusEffect && scaleRef.current) {
+            Animated.spring(scaleRef.current, {
                 toValue: 1,
                 useNativeDriver: true,
                 friction: 5,

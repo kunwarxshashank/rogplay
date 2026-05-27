@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrendingSlider from '@/components/cinema/TrendingSlider';
@@ -36,6 +36,7 @@ export function Cinema() {
 
     const { addons, activeCinemaAddon, setActiveCinemaAddon, isLoading, isHydrated } = useAddonsStore();
     const addonConfig = useCinemaAddon();
+    const { cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider, cinemaFilters } = useSettingsStore();
 
     // Set default addon to tmdbaddon if not set and available
     useEffect(() => {
@@ -48,6 +49,24 @@ export function Cinema() {
             }
         }
     }, [isHydrated, addons, activeCinemaAddon, setActiveCinemaAddon]);
+
+    // Fallback if addon has no catalogs but tt/tmdb prefixes
+    useEffect(() => {
+        if (isHydrated && !isLoading && addonConfig) {
+            const { catalogs, idPrefixes } = addonConfig;
+            if ((!catalogs || catalogs.length === 0) && idPrefixes) {
+                const hasTmdbPrefix = idPrefixes.some((p: string) => ['tt', 'tmdb'].includes(p.toLowerCase()));
+                if (hasTmdbPrefix) {
+                    const tmdb = addons.find(a => a.addontype === 'tmdbaddon');
+                    if (tmdb) {
+                        setActiveCinemaAddon(tmdb.source || tmdb.url);
+                    }
+
+                    router.push('/search');
+                }
+            }
+        }
+    }, [isHydrated, isLoading, addonConfig, addons, setActiveCinemaAddon, router]);
 
     const handleSearch = useCallback(() => {
         if (searchQuery.trim()) {
@@ -72,6 +91,7 @@ export function Cinema() {
             (activeFilter === 'Movies' || activeFilter === 'Bollywood' ? 'movie' : 'all'),
         [activeFilter]);
 
+
     const sections = useMemo(() => {
         if (!addonConfig || appliedFilters) return [];
 
@@ -80,15 +100,13 @@ export function Cinema() {
         // Settings from Addon
         const { settings, catalogs, addontype } = addonConfig;
 
-        if (settings.showslider) list.push({ id: 'trending', type: 'slider' });
-        if (settings.showottsection) list.push({ id: 'ott', type: 'ott' });
-        list.push({ id: 'continue', type: 'continue' });
+        if (cinemaHomeSlider && settings.showslider) list.push({ id: 'trending', type: 'slider' });
+        if (cinemaPlatforms && settings.showottsection) list.push({ id: 'ott', type: 'ott' });
+        if (cinemaContinueWatching) list.push({ id: 'continue', type: 'continue' });
 
         // Add dynamically fetched catalogs
         if (catalogs && catalogs.length > 0) {
             catalogs.forEach((c: any, index: number) => {
-                // If the user selects a top level tab (Movies/Series) we could filter catalogs here, 
-                // but usually cinema shows all config catalogs.
                 const matchesTab = activeFilter === 'All' ||
                     (activeFilter === 'Movies' && c.type === 'movie') ||
                     (activeFilter === 'TV Shows' && (c.type === 'tv' || c.type === 'series'));
@@ -103,9 +121,6 @@ export function Cinema() {
                         type: mappedType,
                         fetch: (page?: number) => {
                             const p = page || 1;
-                            // Use base URL for page 1, pagination URL for subsequent pages.
-                            // Stremio skip URLs (e.g. /skip=0.json) can 404 on first load
-                            // on some addons, returning empty results.
                             const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
                             return fetchAddonCatalog(url, p, addontype, { url: c._addonUrl, manifestStr: c._addonManifestStr });
                         },
@@ -117,7 +132,7 @@ export function Cinema() {
         }
 
         return list;
-    }, [activeFilter, appliedFilters, handleOTTSelect, addonConfig]);
+    }, [activeFilter, appliedFilters, handleOTTSelect, addonConfig, cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider]);
 
     const renderSection = useCallback(({ item }: { item: any }) => {
         switch (item.type) {
@@ -234,7 +249,7 @@ export function Cinema() {
                         returnKeyType="search"
                     />
                 </View>
-                {addonConfig?.settings?.showfilter && (
+                {addonConfig?.settings?.showfilter && cinemaFilters && (
                     <TouchableOpacity
                         style={[styles.filterBtn, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}
                         onPress={() => setIsFilterVisible(!isFilterVisible)}
@@ -246,7 +261,7 @@ export function Cinema() {
             </View>
 
             {/* Filter */}
-            {addonConfig?.settings?.showfilter && (
+            {addonConfig?.settings?.showfilter && cinemaFilters && (
                 <CinemaFilter
                     visible={isFilterVisible}
                     onClose={() => setIsFilterVisible(false)}

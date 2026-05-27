@@ -11,11 +11,15 @@ const TabItem = React.memo(({ focused, name, activeColor, inactiveColor, iconFam
     return <IconComponent name={name} size={28} color={focused ? activeColor : inactiveColor} />;
 });
 
+
 const BackHandlerManager = () => {
     const pathname = usePathname();
     const { confirmExit } = useSettingsStore();
 
+    
+
     useEffect(() => {
+        
         const backAction = () => {
             // Only confirm exit if we are on the Home screen (or base tabs route)
             // and the setting is enabled.
@@ -58,24 +62,28 @@ export default function TabLayout() {
 
     const screenOptions = React.useMemo(() => ({
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarStyle: {
             position: 'absolute' as const,
-            backgroundColor: 'rgba(6, 9, 18, 0.6)',
+            backgroundColor: '#000',
             borderTopWidth: 0,
+            borderTopColor: 'transparent',
+            shadowColor: 'transparent',
             height: 85,
             paddingBottom: Platform.OS === 'ios' ? 30 : 5,
             paddingTop: 5,
             elevation: 0,
         },
         tabBarBackground: () => (
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarActiveTintColor: currentColors.primary,
         tabBarInactiveTintColor: currentColors.textSecondary,
         tabBarItemStyle: {
             justifyContent: 'center' as const,
             alignItems: 'center' as const,
+            backgroundColor: 'transparent',
+            borderRadius: 0,
         },
         lazy: true,
         freezeOnBlur: true,
@@ -121,6 +129,7 @@ export default function TabLayout() {
     ), [currentColors]);
 
     const settingsIcon = React.useCallback(({ focused }: any) => (
+        
         <TabItem
             focused={focused}
             name="settings-outline"
@@ -139,6 +148,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Home',
                         tabBarIcon: homeIcon,
+                        
                     }}
                 />
                 <Tabs.Screen

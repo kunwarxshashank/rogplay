@@ -55,6 +55,12 @@ export default function SettingsScreen() {
             action: () => router.push('/settings/playback')
         },
         {
+            title: "Cinema",
+            icon: 'movie',
+            description: 'Cinema Page Settings',
+            action: () => router.push('/settings/cinema')
+        },
+        {
             title: "Maintenance",
             icon: 'build',
             description: 'Updates, backup and cache',

@@ -10,6 +10,7 @@ import { TVFocusable } from '@/components/TVFocusable';
 import { useSettingsStore } from '@/store/settingsStore';
 import { MovieCardSkeleton, GridSkeleton } from '@/components/Skeleton';
 import MovieCard from '@/components/cinema/MovieCard';
+import MovieList from '@/components/cinema/MovieList';
 
 import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
 
@@ -34,14 +35,40 @@ function useSearchLogic() {
 
         setLoading(true);
         try {
-            let data = [];
-            if (addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
-                const searchUrl = addonConfig.searchcatalog[0].searchurl.replace('${search}', encodeURIComponent(searchQuery));
-                data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
-            } else {
-                data = await searchMulti(searchQuery);
+            let groupedData = [];
+
+            const isTmdbAddon = addonConfig?.addontype === 'tmdbaddon';
+
+            // For tmdbaddon, skip the searchcatalog loop — only use TMDB directly
+            if (!isTmdbAddon && addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
+                const promises = addonConfig.searchcatalog.map(async (cat: any) => {
+                    const searchUrl = cat.searchurl.replace('${search}', encodeURIComponent(searchQuery));
+                    const data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
+                    return { title: cat.name || 'Catalog Search', data: data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv') };
+                });
+                const catResults = await Promise.all(promises);
+                groupedData.push(...catResults.filter(g => g.data.length > 0));
             }
-            setResults(data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv'));
+
+            // Determine if TMDB search should also run
+            let shouldShowTmdb = isTmdbAddon; // always true for tmdbaddon
+            if (!isTmdbAddon) {
+                if (!addonConfig) {
+                    shouldShowTmdb = true;
+                } else if (addonConfig.addontype === 'stremio') {
+                    const prefixes = addonConfig.idPrefixes || [];
+                    shouldShowTmdb = prefixes.some((p: string) => ['imdb', 'tmdb', 'tt'].includes(p.toLowerCase()));
+                }
+            }
+
+            if (shouldShowTmdb) {
+                const tmdbData = await searchMulti(searchQuery);
+                const filteredTmdb = tmdbData.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv');
+                if (filteredTmdb.length > 0) {
+                    groupedData.push({ title: 'Search Results', data: filteredTmdb, isTmdb: true });
+                }
+            }
+            setResults(groupedData);
         } catch (error) {
             console.error('Search error:', error);
         } finally {
@@ -49,17 +76,18 @@ function useSearchLogic() {
         }
     };
 
-    return { query, setQuery, results, loading, handleSearch, router, activeColors };
+    return { query, setQuery, results, loading, handleSearch, router, activeColors, addonConfig };
 }
 
 export function SearchMobile() {
-    const { query, setQuery, results, loading, handleSearch, router, activeColors } = useSearchLogic();
+    const { query, setQuery, results, loading, handleSearch, router, activeColors, addonConfig } = useSearchLogic();
 
     const numColumns = 3;
     const renderItem = ({ item }: { item: any }) => (
         <MovieCard
             item={item}
             showType
+            addonType={addonConfig?.addontype}
             style={{ flex: 1 / 3, margin: 4 }}
             width={undefined}
         />
@@ -95,9 +123,15 @@ export function SearchMobile() {
             ) : (
                 <FlatList
                     data={results}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => `${item.media_type}-${item.id}`}
-                    numColumns={3}
+                    renderItem={({ item }) => (
+                        <MovieList
+                            title={item.title}
+                            fetchFunction={async () => item.data}
+                            mode="horizontal"
+                            addonType={item.isTmdb ? undefined : addonConfig?.addontype}
+                        />
+                    )}
+                    keyExtractor={(item, index) => `${item.title}-${index}`}
                     contentContainerStyle={styles.list}
                     ListEmptyComponent={
                         <View style={styles.empty}>
@@ -114,17 +148,8 @@ export function SearchMobile() {
 }
 
 export function SearchTV() {
-    const { query, setQuery, results, loading, handleSearch, router, activeColors } = useSearchLogic();
+    const { query, setQuery, results, loading, handleSearch, router, activeColors, addonConfig } = useSearchLogic();
     const [isFocused, setIsFocused] = useState(false);
-
-    const renderItem = ({ item }: { item: any }) => (
-        <MovieCard
-            item={item}
-            showType
-            style={{ margin: 15, width: 180 }}
-            width={180}
-        />
-    );
 
     return (
         <View style={[styles.container, { backgroundColor: activeColors.background, flexDirection: 'row' }]}>
@@ -161,9 +186,15 @@ export function SearchTV() {
                 ) : (
                     <FlatList
                         data={results}
-                        renderItem={renderItem}
-                        keyExtractor={(item) => `${item.media_type}-${item.id}`}
-                        numColumns={5}
+                        renderItem={({ item }) => (
+                            <MovieList
+                                title={item.title}
+                                fetchFunction={async () => item.data}
+                                mode="horizontal"
+                                addonType={item.isTmdb ? undefined : addonConfig?.addontype}
+                            />
+                        )}
+                        keyExtractor={(item, index) => `${item.title}-${index}`}
                         contentContainerStyle={[styles.list, { paddingBottom: 50 }]}
                         key={'tv-search'}
                         ListEmptyComponent={

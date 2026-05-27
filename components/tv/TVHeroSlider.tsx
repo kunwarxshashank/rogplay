@@ -3,11 +3,11 @@ import {
     View,
     Text,
     StyleSheet,
-    Image,
     Animated,
     FlatList,
     useWindowDimensions,
 } from 'react-native';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getTrending } from '@/services/tmdb';
 import { Colors } from '@/constants/Colors';
@@ -37,13 +37,6 @@ export default function TVHeroSlider() {
         loadData();
     }, []);
 
-    // Auto-scroll
-    useEffect(() => {
-        if (trending.length <= 1) return;
-        startAutoScroll();
-        return () => stopAutoScroll();
-    }, [trending.length, startAutoScroll, stopAutoScroll]);
-
     const stopAutoScroll = React.useCallback(() => {
         if (autoScrollTimer.current) {
             clearInterval(autoScrollTimer.current);
@@ -59,6 +52,13 @@ export default function TVHeroSlider() {
             setActiveIndex(nextIndex);
         }, AUTO_SCROLL_INTERVAL);
     }, [activeIndex, trending.length, stopAutoScroll]);
+
+    // Auto-scroll
+    useEffect(() => {
+        if (trending.length <= 1) return;
+        startAutoScroll();
+        return () => stopAutoScroll();
+    }, [trending.length, startAutoScroll, stopAutoScroll]);
 
     const loadData = React.useCallback(async () => {
         try {
@@ -105,7 +105,7 @@ export default function TVHeroSlider() {
             return (
                 <View style={[styles.slide, { width: SLIDE_W, height: HERO_H }]}>
                     {/* Background image */}
-                    <Image
+                    <OptimizedImage
                         source={{ uri: backdropUrl }}
                         style={styles.backdrop}
                         resizeMode="cover"
@@ -114,7 +114,7 @@ export default function TVHeroSlider() {
                     {/* Gradient overlays for cinematic depth */}
                     {/* Left edge fade — deep for text readability */}
                     <LinearGradient
-                        colors={['rgba(0,0,0,0.95)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.3)', 'transparent']}
+                        colors={['rgba(14,13,23,0.95)', 'rgba(14,13,23,0.75)', 'rgba(14,13,23,0.3)', 'transparent']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 0.7, y: 0 }}
                         style={styles.gradientOverlay}
@@ -122,7 +122,7 @@ export default function TVHeroSlider() {
 
                     {/* Bottom fade — anchors content */}
                     <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.95)', '#000']}
+                        colors={['transparent', 'rgba(14,13,23,0.4)', 'rgba(14,13,23,0.95)', '#0E0D17']}
                         start={{ x: 0, y: 0.3 }}
                         end={{ x: 0, y: 1 }}
                         style={styles.gradientOverlay}
@@ -130,7 +130,7 @@ export default function TVHeroSlider() {
 
                     {/* Top subtle vignette */}
                     <LinearGradient
-                        colors={['rgba(0,0,0,0.4)', 'transparent']}
+                        colors={['rgba(14,13,23,0.4)', 'transparent']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 0, y: 0.15 }}
                         style={styles.gradientOverlay}
@@ -251,6 +251,10 @@ export default function TVHeroSlider() {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={(item) => item.id.toString()}
+                initialNumToRender={Math.min(6, trending.length)}
+                maxToRenderPerBatch={6}
+                windowSize={3}
+                removeClippedSubviews={true}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                     { useNativeDriver: false }
@@ -292,7 +296,7 @@ export default function TVHeroSlider() {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#000',
+        backgroundColor: '#0E0D17',
         overflow: 'hidden',
     },
     slide: {
@@ -335,15 +339,15 @@ const styles = StyleSheet.create({
         letterSpacing: 3,
     },
     title: {
-        fontSize: 56,
+        fontSize: 64,
         color: '#fff',
-        fontFamily: 'Outfit_800ExtraBold',
-        lineHeight: 64,
+        fontFamily: 'PlayfairDisplay_700Bold',
+        lineHeight: 72,
         marginBottom: 18,
-        textShadowColor: 'rgba(0,0,0,0.9)',
-        textShadowOffset: { width: 0, height: 3 },
-        textShadowRadius: 12,
-        letterSpacing: -0.5,
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowOffset: { width: 0, height: 4 },
+        textShadowRadius: 16,
+        letterSpacing: 0,
     },
     metaRow: {
         flexDirection: 'row',
@@ -381,7 +385,8 @@ const styles = StyleSheet.create({
         gap: 14,
     },
     watchBtnWrap: {
-        borderRadius: 14,
+        borderRadius: 4,
+        overflow: 'hidden',
     },
     watchBtn: {
         flexDirection: 'row',
@@ -390,7 +395,7 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingHorizontal: 32,
         paddingVertical: 14,
-        borderRadius: 14,
+        borderRadius: 4,
     },
     watchBtnText: {
         fontSize: 17,
@@ -398,7 +403,8 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
     infoBtnWrap: {
-        borderRadius: 14,
+        borderRadius: 4,
+        overflow: 'hidden',
     },
     infoBtn: {
         flexDirection: 'row',
@@ -407,7 +413,7 @@ const styles = StyleSheet.create({
         gap: 8,
         paddingHorizontal: 24,
         paddingVertical: 14,
-        borderRadius: 14,
+        borderRadius: 4,
         borderWidth: 1,
     },
     infoBtnText: {
