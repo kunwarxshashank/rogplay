@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -8,6 +8,10 @@ import MovieList from '@/components/cinema/MovieList';
 import { TVSearchBar } from '@/components/tv/TVSearchBar';
 import { GridSkeleton, MovieCardSkeleton } from '@/components/Skeleton';
 import { Platform } from 'react-native';
+import ContinueWatchingSection from '@/components/cinema/ContinueWatchingSection';
+import { getTrending } from '@/services/tmdb';
+
+import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
 
 export default function TVSearchScreen() {
     const { query } = useLocalSearchParams();
@@ -17,6 +21,8 @@ export default function TVSearchScreen() {
     const [searchQuery, setSearchQuery] = useState(query as string || '');
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const addonConfig = useCinemaAddon();
 
     useEffect(() => {
         if (searchQuery) {
@@ -29,8 +35,31 @@ export default function TVSearchScreen() {
         if (text.length > 2) {
             setLoading(true);
             try {
-                const data = await searchMulti(text);
-                setResults(data);
+                let groupedData: any[] = [];
+                if (addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
+                    const promises = addonConfig.searchcatalog.map(async (cat: any) => {
+                        const searchUrl = cat.searchurl.replace('${search}', encodeURIComponent(text));
+                        const data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
+                        return { title: cat.name || 'Catalog Search', data: data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv') };
+                    });
+                    const catResults = await Promise.all(promises);
+                    groupedData.push(...catResults.filter(g => g.data && g.data.length > 0));
+                }
+
+                let shouldShowTmdb = true;
+                if (addonConfig && addonConfig.addontype === 'stremio') {
+                    const prefixes = addonConfig.idPrefixes || [];
+                    shouldShowTmdb = prefixes.some((p: string) => ['imdb', 'tmdb', 'tt'].includes(p.toLowerCase()));
+                }
+
+                if (!addonConfig || shouldShowTmdb) {
+                    const tmdbData = await searchMulti(text);
+                    const filteredTmdb = tmdbData.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv');
+                    if (filteredTmdb.length > 0) {
+                        groupedData.push({ title: 'TMDB Search', data: filteredTmdb, isTmdb: true });
+                    }
+                }
+                setResults(groupedData);
             } catch (error) {
                 console.error(error);
             } finally {
@@ -52,6 +81,11 @@ export default function TVSearchScreen() {
         return results;
     };
 
+    const fetchCuratedForYou = async (page?: number) => {
+        const response = await getTrending('week');
+        return response?.results || [];
+    };
+
     const numColumns = Platform.isTV ? 5 : 3;
 
     return (
@@ -71,17 +105,42 @@ export default function TVSearchScreen() {
                         />
                     </View>
                 ) : results.length > 0 ? (
-                    <MovieList
-                        key={searchQuery}
-                        title={`Results for "${searchQuery}"`}
-                        fetchFunction={fetchSearchResults}
-                        mode="grid"
-                    />
+                    <View style={{ flex: 1 }}>
+                        <FlatList
+                            data={results}
+                            keyExtractor={(item, index) => `${item.title}-${index}`}
+                            renderItem={({ item }) => (
+                                <MovieList
+                                    title={item.title}
+                                    fetchFunction={async () => item.data}
+                                    mode="horizontal"
+                                    addonType={item.isTmdb ? undefined : addonConfig?.addontype}
+                                />
+                            )}
+                            contentContainerStyle={{ paddingBottom: 50 }}
+                        />
+                    </View>
                 ) : (
-                    <View style={styles.emptyState}>
-                        <Text style={[styles.emptyText, { color: currentColors.textSecondary }]}>
-                            {searchQuery ? 'No results found' : 'Start typing to search...'}
-                        </Text>
+                    <View style={styles.suggestionsContainer}>
+                        {searchQuery ? (
+                            <View style={styles.emptyState}>
+                                <Text style={[styles.emptyText, { color: currentColors.textSecondary }]}>
+                                    No results found
+                                </Text>
+                            </View>
+                        ) : (
+                            <>
+                                <ContinueWatchingSection />
+                                <View style={styles.curatedWrapper}>
+                                    <MovieList
+                                        title="Curated For You"
+                                        fetchFunction={fetchCuratedForYou}
+                                        type="movie"
+                                        addonType={addonConfig?.addontype}
+                                    />
+                                </View>
+                            </>
+                        )}
                     </View>
                 )}
             </View>
@@ -110,5 +169,13 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 18,
+        fontFamily: 'Inter_400Regular',
+    },
+    suggestionsContainer: {
+        flex: 1,
+        marginTop: 10,
+    },
+    curatedWrapper: {
+        marginTop: 20,
     }
 });

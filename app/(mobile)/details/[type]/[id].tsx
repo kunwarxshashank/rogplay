@@ -30,7 +30,7 @@ export default function DetailsScreen() {
 
     useEffect(() => {
         if (id && type) {
-            getDetails(type as 'movie' | 'tv', Number(id)).then(setDetails).catch(console.error);
+            getDetails(type as 'movie' | 'tv', id as string).then(setDetails).catch(console.error);
         }
     }, [id, type]);
 
@@ -68,6 +68,7 @@ export default function DetailsScreen() {
                 title: details.title || details.name,
                 poster: details.poster_path,
                 backdrop: details.backdrop_path,
+                ...(type === 'tv' && { season: 1, episode: 1 }),
             }
         });
     };
@@ -101,6 +102,13 @@ export default function DetailsScreen() {
                         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                             <MaterialIcons name="arrow-back" size={24} color="#fff" />
                         </TouchableOpacity>
+                        <TouchableOpacity onPress={handleToggleFavorite} style={styles.favIconButton}>
+                            <MaterialIcons
+                                name={favoriteActive ? 'favorite' : 'favorite-border'}
+                                size={22}
+                                color={favoriteActive ? '#ff6b8a' : '#fff'}
+                            />
+                        </TouchableOpacity>
                     </SafeAreaView>
                 </ImageBackground>
 
@@ -128,7 +136,7 @@ export default function DetailsScreen() {
                         ))}
                     </View>
 
-                    <TouchableOpacity style={styles.playButton} onPress={handleWatch}>
+                    {type === 'movie' && (<TouchableOpacity style={styles.playButton} onPress={handleWatch}>
                         <LinearGradient
                             colors={[currentColors.primary, currentColors.primary + '80']}
                             style={styles.playButtonGradient}
@@ -137,21 +145,9 @@ export default function DetailsScreen() {
                             <MaterialIcons name="play-arrow" size={30} color="#fff" />
                             <Text style={styles.playButtonText}>Watch Now</Text>
                         </LinearGradient>
-                    </TouchableOpacity>
+                    </TouchableOpacity>)}
 
-                    <TouchableOpacity
-                        style={[styles.favoriteButton, { borderColor: currentColors.primary }]}
-                        onPress={handleToggleFavorite}
-                    >
-                        <MaterialIcons
-                            name={favoriteActive ? 'favorite' : 'favorite-border'}
-                            size={22}
-                            color={currentColors.primary}
-                        />
-                        <Text style={[styles.favoriteButtonText, { color: currentColors.primary }]}>
-                            {favoriteActive ? 'Remove Favourite' : 'Add to Favourites'}
-                        </Text>
-                    </TouchableOpacity>
+
 
                     <Text style={[styles.overview, { color: currentColors.textSecondary }]}>
                         {truncateDescription(details.overview, 50)}
@@ -212,6 +208,14 @@ const styles = StyleSheet.create({
     },
     headerSafeArea: {
         marginHorizontal: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    favIconButton: {
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center', alignItems: 'center',
     },
     backButton: {
         width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center'
@@ -279,21 +283,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         elevation: 5,
     },
-    favoriteButton: {
-        marginTop: -16,
-        marginBottom: 28,
-        borderRadius: 14,
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        gap: 8,
-    },
-    favoriteButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-    },
+
     playButtonGradient: {
         flexDirection: 'row',
         justifyContent: 'center',

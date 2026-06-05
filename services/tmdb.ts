@@ -96,8 +96,21 @@ export const searchMulti = async (query: string) => {
     return results.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0));
 };
 
-export const getDetails = async (type: 'movie' | 'tv', id: number) => {
-    const response = await cachedGet(`/${type}/${id}`, {
+export const getDetails = async (type: 'movie' | 'tv', id: number | string) => {
+    let tmdbId = id;
+    if (String(id).startsWith('tt')) {
+        try {
+            const findRes = await cachedGet(`/find/${id}`, { params: { external_source: 'imdb_id' } });
+            const results = type === 'movie' ? findRes.data.movie_results : findRes.data.tv_results;
+            if (results && results.length > 0) {
+                tmdbId = results[0].id;
+            }
+        } catch (e) {
+            console.error('Failed to resolve IMDb ID to TMDB ID:', e);
+        }
+    }
+
+    const response = await cachedGet(`/${type}/${tmdbId}`, {
         params: {
             append_to_response: 'credits,videos,similar',
         },
@@ -110,8 +123,19 @@ export const getExternalIds = async (type: 'movie' | 'tv', id: number | string) 
     return response.data;
 };
 
-export const getSeasonDetails = async (tvId: number, seasonNumber: number) => {
-    const response = await cachedGet(`/tv/${tvId}/season/${seasonNumber}`);
+export const getSeasonDetails = async (tvId: number | string, seasonNumber: number) => {
+    let tmdbId = tvId;
+    if (String(tvId).startsWith('tt')) {
+        try {
+            const findRes = await cachedGet(`/find/${tvId}`, { params: { external_source: 'imdb_id' } });
+            if (findRes.data.tv_results && findRes.data.tv_results.length > 0) {
+                tmdbId = findRes.data.tv_results[0].id;
+            }
+        } catch (e) {
+            console.error('Failed to resolve IMDb ID to TMDB ID for season:', e);
+        }
+    }
+    const response = await cachedGet(`/tv/${tmdbId}/season/${seasonNumber}`);
     return response.data;
 };
 

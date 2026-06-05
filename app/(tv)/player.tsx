@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import TVPlayer from '@/components/player/TVPlayer';
@@ -47,13 +47,11 @@ export default function TVPlayerScreen() {
         return currentChannels;
     }, [channelsParam, currentChannels]);
 
-    // Ensure URL is present
+    useEffect(() => {
+        if (!url) router.back();
+    }, [url, router]);
+
     if (!url) {
-        // Handle error or redirect back
-        // For now just return empty view or redirect
-        React.useEffect(() => {
-            if (!url) router.back();
-        }, [url]);
         return <View style={styles.container} />;
     }
 

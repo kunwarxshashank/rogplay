@@ -48,8 +48,8 @@ export function TVSearchBar({ onSearch, nativeID, nextFocusDown, hasTVPreferredF
                 style={[
                     styles.searchBar,
                     {
-                        backgroundColor: focused ? currentColors.card : currentColors.background,
-                        borderColor: focused ? currentColors.primary : 'rgba(255,255,255,0.1)',
+                        backgroundColor: focused ? 'rgba(21, 19, 34, 0.8)' : 'rgba(14, 13, 23, 0.6)',
+                        borderColor: focused ? currentColors.glow : 'rgba(255,255,255,0.2)',
                         transform: [{ scale: focused ? 1.02 : 1 }]
                     }
                 ]}
@@ -87,13 +87,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 2,
+        borderRadius: 8,
+        borderWidth: 1,
         gap: 12,
     },
     input: {
         flex: 1,
         fontSize: 16,
-        fontFamily: 'Outfit_500Medium',
+        fontFamily: 'Inter_400Regular',
     },
 });

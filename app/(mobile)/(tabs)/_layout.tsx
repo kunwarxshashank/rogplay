@@ -5,17 +5,22 @@ import { Colors } from '@/constants/Colors';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSettingsStore } from '@/store/settingsStore';
 import { BlurView } from 'expo-blur';
+import MiniPlayer from '@/components/player/MiniPlayer';
 
 const TabItem = React.memo(({ focused, name, activeColor, inactiveColor, iconFamily = 'MaterialIcons' }: any) => {
     const IconComponent = iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
     return <IconComponent name={name} size={28} color={focused ? activeColor : inactiveColor} />;
 });
 
+
 const BackHandlerManager = () => {
     const pathname = usePathname();
     const { confirmExit } = useSettingsStore();
 
+
+
     useEffect(() => {
+
         const backAction = () => {
             // Only confirm exit if we are on the Home screen (or base tabs route)
             // and the setting is enabled.
@@ -58,24 +63,28 @@ export default function TabLayout() {
 
     const screenOptions = React.useMemo(() => ({
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarStyle: {
             position: 'absolute' as const,
-            backgroundColor: 'rgba(6, 9, 18, 0.6)',
+            backgroundColor: 'transparent',
             borderTopWidth: 0,
+            borderTopColor: 'transparent',
+            shadowColor: 'transparent',
             height: 85,
             paddingBottom: Platform.OS === 'ios' ? 30 : 5,
             paddingTop: 5,
             elevation: 0,
         },
         tabBarBackground: () => (
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarActiveTintColor: currentColors.primary,
         tabBarInactiveTintColor: currentColors.textSecondary,
         tabBarItemStyle: {
             justifyContent: 'center' as const,
             alignItems: 'center' as const,
+            backgroundColor: 'transparent',
+            borderRadius: 0,
         },
         lazy: true,
         freezeOnBlur: true,
@@ -95,6 +104,15 @@ export default function TabLayout() {
         <TabItem
             focused={focused}
             name="movie-filter"
+            activeColor={currentColors.primary}
+            inactiveColor={currentColors.textSecondary}
+        />
+    ), [currentColors]);
+
+    const localMusicIcon = React.useCallback(({ focused }: any) => (
+        <TabItem
+            focused={focused}
+            name="library-music"
             activeColor={currentColors.primary}
             inactiveColor={currentColors.textSecondary}
         />
@@ -121,6 +139,7 @@ export default function TabLayout() {
     ), [currentColors]);
 
     const settingsIcon = React.useCallback(({ focused }: any) => (
+
         <TabItem
             focused={focused}
             name="settings-outline"
@@ -139,6 +158,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Home',
                         tabBarIcon: homeIcon,
+
                     }}
                 />
                 <Tabs.Screen
@@ -146,6 +166,13 @@ export default function TabLayout() {
                     options={{
                         title: 'Cinema',
                         tabBarIcon: cinemaIcon,
+                    }}
+                />
+                <Tabs.Screen
+                    name="local-music"
+                    options={{
+                        title: 'Music',
+                        tabBarIcon: localMusicIcon,
                     }}
                 />
                 <Tabs.Screen
@@ -170,6 +197,7 @@ export default function TabLayout() {
                     }}
                 />
             </Tabs>
+            <MiniPlayer />
         </>
     );
 }

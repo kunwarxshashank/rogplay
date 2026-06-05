@@ -1,22 +1,20 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Platform } from 'react-native';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import TrendingSlider from '@/components/cinema/TrendingSlider';
 import OTTSection from '@/components/cinema/OTTSection';
 import MovieList from '@/components/cinema/MovieList';
-import {
-    getPopularMovies, getPopularTV, getTrending,
-    getLatestMovies, getOnAirTV, getAnime, getBollywoodMovies, getKDrama,
-    discoverContent, discoverAllContent
-} from '@/services/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import CinemaFilter, { FilterState } from '@/components/cinema/CinemaFilter';
 import ContinueWatchingSection from '@/components/cinema/ContinueWatchingSection';
+import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
+import { useAddonsStore } from '@/store/addonsStore';
 
-// --- Mobile Component (Original) ---
 export function Cinema() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
@@ -30,9 +28,47 @@ export function Cinema() {
         sort_by: 'popularity.desc',
         country: '',
     });
+
+    // UI state for addon changing
+    const [showAddonPicker, setShowAddonPicker] = useState(false);
+
     const router = useRouter();
     const { theme } = useSettingsStore();
     const currentColors = Colors[theme] || Colors.dark;
+
+    const { addons, activeCinemaAddon, setActiveCinemaAddon, isLoading, isHydrated } = useAddonsStore();
+    const addonConfig = useCinemaAddon();
+    const { cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider, cinemaFilters } = useSettingsStore();
+
+    // Set default addon to tmdbaddon if not set and available
+    useEffect(() => {
+        if (isHydrated && addons.length > 0 && !activeCinemaAddon) {
+            const tmdb = addons.find(a => a.addontype === 'tmdbaddon');
+            if (tmdb) {
+                setActiveCinemaAddon(tmdb.source || tmdb.url);
+            } else {
+                setActiveCinemaAddon(addons[0].source || addons[0].url);
+            }
+        }
+    }, [isHydrated, addons, activeCinemaAddon, setActiveCinemaAddon]);
+
+    // Fallback if addon has no catalogs but tt/tmdb prefixes
+    useEffect(() => {
+        if (isHydrated && !isLoading && addonConfig) {
+            const { catalogs, idPrefixes } = addonConfig;
+            if ((!catalogs || catalogs.length === 0) && idPrefixes) {
+                const hasTmdbPrefix = idPrefixes.some((p: string) => ['tt', 'tmdb'].includes(p.toLowerCase()));
+                if (hasTmdbPrefix) {
+                    const tmdb = addons.find(a => a.addontype === 'tmdbaddon');
+                    if (tmdb) {
+                        setActiveCinemaAddon(tmdb.source || tmdb.url);
+                    }
+
+                    router.push('/search');
+                }
+            }
+        }
+    }, [isHydrated, isLoading, addonConfig, addons, setActiveCinemaAddon, router]);
 
     const handleSearch = useCallback(() => {
         if (searchQuery.trim()) {
@@ -57,47 +93,52 @@ export function Cinema() {
             (activeFilter === 'Movies' || activeFilter === 'Bollywood' ? 'movie' : 'all'),
         [activeFilter]);
 
+
     const sections = useMemo(() => {
-        if (appliedFilters) return [];
+        if (!addonConfig || appliedFilters) return [];
 
         const list = [];
-        if (activeFilter === 'All') {
-            list.push({ id: 'trending', type: 'trending' });
-            list.push({ id: 'ott', type: 'ott' });
-            list.push({ id: 'continue', type: 'continue' });
-        }
 
-        if (activeFilter === 'All' || activeFilter === 'Movies') {
-            list.push({ id: 'latest_movies', title: 'Latest Movies', type: 'movie', fetch: getLatestMovies });
-        }
-        if (activeFilter === 'All' || activeFilter === 'TV Shows') {
-            list.push({ id: 'latest_tv', title: 'Latest TV Shows', type: 'tv', fetch: getOnAirTV });
-        }
-        if (activeFilter === 'All' || activeFilter === 'Movies') {
-            list.push({ id: 'pop_movies', title: 'Popular Movies', type: 'movie', fetch: getPopularMovies });
-        }
-        if (activeFilter === 'All' || activeFilter === 'TV Shows') {
-            list.push({ id: 'pop_tv', title: 'Popular TV Shows', type: 'tv', fetch: getPopularTV });
-        }
-        if (activeFilter === 'All' || activeFilter === 'Anime') {
-            list.push({ id: 'anime', title: 'Anime', type: 'tv', fetch: getAnime });
-        }
-        if (activeFilter === 'All' || activeFilter === 'Bollywood' || activeFilter === 'Movies') {
-            list.push({ id: 'bollywood', title: 'Bollywood', type: 'movie', fetch: getBollywoodMovies });
-        }
-        if (activeFilter === 'All' || activeFilter === 'K-Drama' || activeFilter === 'TV Shows') {
-            list.push({ id: 'kdrama', title: 'K-Drama', type: 'tv', fetch: getKDrama });
-        }
-        if (activeFilter === 'All') {
-            list.push({ id: 'trending_day', title: 'Trending Now', type: 'movie', fetch: () => getTrending('day') });
+        // Settings from Addon
+        const { settings, catalogs, addontype } = addonConfig;
+
+        if (cinemaHomeSlider && settings.showslider) list.push({ id: 'trending', type: 'slider' });
+        if (cinemaPlatforms && settings.showottsection) list.push({ id: 'ott', type: 'ott' });
+        if (cinemaContinueWatching) list.push({ id: 'continue', type: 'continue' });
+
+        // Add dynamically fetched catalogs
+        if (catalogs && catalogs.length > 0) {
+            catalogs.forEach((c: any, index: number) => {
+                const matchesTab = activeFilter === 'All' ||
+                    (activeFilter === 'Movies' && c.type === 'movie') ||
+                    (activeFilter === 'TV Shows' && (c.type === 'tv' || c.type === 'series'));
+
+                if (matchesTab) {
+                    const catalogRawType = c.type;
+                    const mappedType = (catalogRawType === 'series' || catalogRawType === 'tv') ? 'tv' : (catalogRawType === 'movie' ? 'movie' : 'addon');
+
+                    list.push({
+                        id: `catalog_${index}_${c.name}`,
+                        title: c.name,
+                        type: mappedType,
+                        fetch: (page?: number) => {
+                            const p = page || 1;
+                            const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
+                            return fetchAddonCatalog(url, p, addontype, { url: c._addonUrl, manifestStr: c._addonManifestStr });
+                        },
+                        addonType: addontype,
+                        catalogRawType
+                    });
+                }
+            });
         }
 
         return list;
-    }, [activeFilter, appliedFilters, handleOTTSelect]);
+    }, [activeFilter, appliedFilters, handleOTTSelect, addonConfig, cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider]);
 
     const renderSection = useCallback(({ item }: { item: any }) => {
         switch (item.type) {
-            case 'trending': return <TrendingSlider />;
+            case 'slider': return <TrendingSlider />;
             case 'ott': return <OTTSection onSelect={handleOTTSelect} />;
             case 'continue': return <ContinueWatchingSection />;
             default: return (
@@ -106,83 +147,160 @@ export function Cinema() {
                     type={item.type}
                     fetchFunction={item.fetch}
                     paginated={true}
+                    addonType={item.addonType}
+                    catalogRawType={item.catalogRawType}
                 />
             );
         }
     }, [handleOTTSelect]);
 
+    if (!isHydrated || isLoading) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={currentColors.primary} />
+            </SafeAreaView>
+        );
+    }
+
+    // Fallback: no addons at all (should not happen since TMDB is built-in)
+    if (addons.length === 0) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={currentColors.primary} />
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background }]} edges={['top']}>
-            <View style={styles.headerTitleRow}>
-                <Text style={[styles.categoryTitle, { color: currentColors.text }]}>
-                    {activeFilter === 'All' ? 'Cinema' : activeFilter}
-                </Text>
-                <View style={[styles.titleDot, { backgroundColor: currentColors.primary }]} />
-            </View>
-
-            <View style={styles.header}>
-                <View style={[styles.searchBar, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}>
-                    <Ionicons name="search-outline" size={20} color={currentColors.textSecondary} />
-                    <TextInput
-                        style={[styles.searchInput, { color: currentColors.text }]}
-                        placeholder="Search movies, tv shows..."
-                        placeholderTextColor={currentColors.textSecondary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearch}
-                        returnKeyType="search"
-                    />
-                </View>
-                <TouchableOpacity
-                    style={[styles.filterBtn, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}
-                    onPress={() => setIsFilterVisible(!isFilterVisible)}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="options-outline" size={20} color={currentColors.text} />
-                </TouchableOpacity>
-            </View>
-
-            <CinemaFilter
-                visible={isFilterVisible}
-                onClose={() => setIsFilterVisible(false)}
-                onApply={handleApplyFilters}
-                onReset={handleResetFilters}
-                selectedFilters={selectedFilters}
-                setSelectedFilters={setSelectedFilters}
-                type={contentType === 'all' ? 'movie' : contentType}
+        <View style={[styles.container, { backgroundColor: currentColors.background }]}>
+            {/* Dark Luxury Gradient */}
+            <LinearGradient
+                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                locations={[0, 0.25, 1]}
+                style={StyleSheet.absoluteFill}
             />
-
-            {appliedFilters ? (
-                <View style={{ flex: 1 }}>
-                    <MovieList
-                        title="Filtered Results"
-                        type={contentType}
-                        fetchFunction={useCallback((page?: number) => {
-                            const filtersWithPage = { ...appliedFilters, page };
-                            if (contentType === 'all') {
-                                return discoverAllContent(filtersWithPage);
-                            }
-                            return discoverContent(contentType, filtersWithPage);
-                        }, [appliedFilters, contentType])}
-                        mode="grid"
-                        paginated={true}
-                    />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                {/* Header + Addon Picker Header */}
+                <View style={[styles.headerTitleRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <Text style={[styles.categoryTitle, { color: currentColors.text }]}>
+                            {activeFilter === 'All' ? 'Cinema' : activeFilter}
+                        </Text>
+                        <View style={[styles.titleDot, { backgroundColor: currentColors.primary }]} />
+                    </View>
+                    <TouchableOpacity onPress={() => setShowAddonPicker(!showAddonPicker)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: currentColors.primary, fontFamily: 'Outfit_500Medium', marginRight: 4 }}>
+                            {addonConfig?.addon?.title || 'Providers'}
+                        </Text>
+                        <Ionicons name={showAddonPicker ? "chevron-up" : "chevron-down"} size={16} color={currentColors.primary} />
+                    </TouchableOpacity>
                 </View>
-            ) : (
-                <FlatList
-                    data={sections}
-                    renderItem={renderSection}
-                    keyExtractor={item => item.id}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.content}
-                    initialNumToRender={3}
-                    windowSize={5}
-                    maxToRenderPerBatch={2}
-                    removeClippedSubviews={Platform.OS === 'android'}
-                    ListHeaderComponent={<View style={{ height: 10 }} />}
-                />
-            )}
-        </SafeAreaView>
+
+                {showAddonPicker && (
+                    <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                            {addons.map((a, i) => {
+                                const addSource = a.source || a.url;
+                                const isSelected = activeCinemaAddon === addSource;
+                                return (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={{
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 6,
+                                            borderRadius: 20,
+                                            borderWidth: 1,
+                                            borderColor: isSelected ? currentColors.primary : 'rgba(255,255,255,0.1)',
+                                            backgroundColor: 'transparent',
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            overflow: 'hidden'
+                                        }}
+                                        onPress={() => {
+                                            setActiveCinemaAddon(addSource);
+                                            setShowAddonPicker(false);
+                                        }}
+                                    >
+                                        <BlurView intensity={isSelected ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />
+                                        {isSelected && <View style={[StyleSheet.absoluteFill, { backgroundColor: currentColors.primary + '20' }]} />}
+                                        <Text style={{ color: isSelected ? currentColors.primary : currentColors.text, fontFamily: 'Outfit_500Medium', fontSize: 13, zIndex: 1 }}>
+                                            {a.title || 'Addon'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
+
+                <View style={styles.header}>
+                    <View style={[styles.searchBar, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <Ionicons name="search-outline" size={20} color={currentColors.textSecondary} style={{ zIndex: 1 }} />
+                        <TextInput
+                            style={[styles.searchInput, { color: currentColors.text, zIndex: 1 }]}
+                            placeholder="Search movies, tv shows..."
+                            placeholderTextColor={currentColors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                            returnKeyType="search"
+                        />
+                    </View>
+                    {addonConfig?.settings?.showfilter && cinemaFilters && (
+                        <TouchableOpacity
+                            style={[styles.filterBtn, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}
+                            onPress={() => setIsFilterVisible(!isFilterVisible)}
+                            activeOpacity={0.7}
+                        >
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <Ionicons name="options-outline" size={20} color={currentColors.text} style={{ zIndex: 1 }} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Filter */}
+                {addonConfig?.settings?.showfilter && cinemaFilters && (
+                    <CinemaFilter
+                        visible={isFilterVisible}
+                        onClose={() => setIsFilterVisible(false)}
+                        onApply={handleApplyFilters}
+                        onReset={handleResetFilters}
+                        selectedFilters={selectedFilters}
+                        setSelectedFilters={setSelectedFilters}
+                        type={contentType === 'all' ? 'movie' : contentType}
+                    />
+                )}
+
+                {appliedFilters ? (
+                    <View style={{ flex: 1, paddingHorizontal: 20 }}>
+                        <Text style={{ color: currentColors.text, paddingVertical: 10 }}>Filter functionality requires global search API support which may not be mapped for custom addons.</Text>
+                    </View>
+                ) : !activeCinemaAddon || !addonConfig || !addonConfig.catalogs || addonConfig.catalogs.length === 0 ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 }}>
+                        <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
+                        <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
+                            Please choose Any Provider to Explore
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={sections}
+                        renderItem={renderSection}
+                        keyExtractor={item => item.id}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.content}
+                        initialNumToRender={3}
+                        windowSize={5}
+                        maxToRenderPerBatch={2}
+                        removeClippedSubviews={Platform.OS === 'android'}
+                        ListHeaderComponent={<View style={{ height: 10 }} />}
+                    />
+                )}
+            </SafeAreaView>
+        </View>
     );
 }
 
@@ -191,75 +309,18 @@ export default function CinemaScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    headerTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        paddingHorizontal: 20,
-        marginTop: 10,
-    },
-    titleDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginLeft: 4,
-    },
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    searchBar: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        height: 52,
-        borderWidth: 1,
-    },
-    searchInput: {
-        flex: 1,
-        marginLeft: 10,
-        fontSize: 15,
-        fontFamily: 'Outfit_500Medium',
-    },
-    filterBtn: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-    },
-    content: {
-        paddingBottom: 120,
-    },
-    categoryTitle: {
-        fontSize: 32,
-        fontFamily: 'Outfit_700Bold',
-    },
-    categoriesContainer: {
-        marginBottom: 10,
-    },
-    categoriesScroll: {
-        paddingHorizontal: 20,
-        gap: 10,
-    },
-    categoryTab: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 14,
-        minWidth: 80,
-        alignItems: 'center',
-    },
-    categoryTabText: {
-        fontSize: 13,
-        fontFamily: 'Outfit_600SemiBold',
-    }
+    // Keep styles equivalent to original file
+    container: { flex: 1 },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'baseline', paddingHorizontal: 20, marginTop: 10 },
+    titleDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 4 },
+    header: { paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, height: 52, borderWidth: 1, backgroundColor: 'rgba(255, 255, 255, 0.03)' },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 15, fontFamily: 'Outfit_500Medium' },
+    filterBtn: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255, 255, 255, 0.03)' },
+    content: { paddingBottom: 120 },
+    categoryTitle: { fontSize: 32, fontFamily: 'Outfit_700Bold' },
+    categoriesContainer: { marginBottom: 10 },
+    categoriesScroll: { paddingHorizontal: 20, gap: 10 },
+    categoryTab: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, minWidth: 80, alignItems: 'center' },
+    categoryTabText: { fontSize: 13, fontFamily: 'Outfit_600SemiBold' }
 });
-

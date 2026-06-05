@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     FlatList,
     TouchableOpacity,
-    Image,
     TextInput,
     Platform,
     ActivityIndicator,
@@ -18,6 +17,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { TVSearchBar } from './tv/TVSearchBar';
 import { TVFocusable } from './TVFocusable';
 import { GridSkeleton, MovieCardSkeleton } from './Skeleton';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ export default function CatalogBrowser({
     const activeColors = Colors[theme] || Colors.dark;
 
     // ─── Category Tab ──────────────────────────────────
-    const renderCategoryTab = ({ item }: { item: BrowserCategory }) => {
+    const renderCategoryTab = useCallback(({ item }: { item: BrowserCategory }) => {
         const isSelected = selectedCategoryId === item.id;
         return (
             <TVFocusable
@@ -134,17 +134,17 @@ export default function CatalogBrowser({
                 </View>
             </TVFocusable>
         );
-    };
+    }, [selectedCategoryId, onSelectCategory, activeColors]);
 
     // ─── Item Card ─────────────────────────────────────
-    const renderItem = ({ item }: { item: BrowserItem }) => {
+    const renderItem = useCallback(({ item }: { item: BrowserItem }) => {
         const isLive = item.isLive || isLiveMode;
         const favorite = isItemFavorite?.(item) || false;
 
         const cardInner = (
             <View style={styles.posterContainer}>
                 {item.imageUrl ? (
-                    <Image
+                    <OptimizedImage
                         source={{ uri: item.imageUrl }}
                         style={isLive ? styles.channelLogo : styles.poster}
                         resizeMode={isLive ? 'contain' : 'cover'}
@@ -199,7 +199,7 @@ export default function CatalogBrowser({
                 ) : null}
             </TVFocusable>
         );
-    };
+    }, [onItemPress, onToggleFavorite, isItemFavorite, isLiveMode, activeColors]);
 
     // ─── Render ────────────────────────────────────────
     return (
@@ -207,7 +207,7 @@ export default function CatalogBrowser({
             {/* Optional background image */}
             {backgroundImage ? (
                 <View style={StyleSheet.absoluteFill}>
-                    <Image
+                    <OptimizedImage
                         source={{ uri: backgroundImage }}
                         style={StyleSheet.absoluteFill}
                         resizeMode="cover"
@@ -243,7 +243,10 @@ export default function CatalogBrowser({
                         keyExtractor={(item) => item.id}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.categoryList}
-                        removeClippedSubviews={false}
+                        removeClippedSubviews={true}
+                        initialNumToRender={8}
+                        maxToRenderPerBatch={8}
+                        windowSize={5}
                     />
                 </View>
             )}
@@ -290,6 +293,10 @@ export default function CatalogBrowser({
                     key="grid-3"
                     contentContainerStyle={styles.list}
                     onEndReached={onEndReached}
+                    initialNumToRender={9}
+                    maxToRenderPerBatch={9}
+                    windowSize={5}
+                    removeClippedSubviews={true}
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={
                         loadingMore ? (

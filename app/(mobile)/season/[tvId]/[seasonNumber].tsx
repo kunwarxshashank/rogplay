@@ -33,7 +33,7 @@ export default function SeasonDetailsScreen() {
 
     const loadSeasonDetails = async () => {
         try {
-            const data = await getSeasonDetails(Number(tvId), Number(seasonNumber));
+            const data = await getSeasonDetails(tvId as string, Number(seasonNumber));
             setSeasonInfo(data);
             setEpisodes(data.episodes || []);
         } catch (error) {
@@ -97,10 +97,10 @@ export default function SeasonDetailsScreen() {
                 </View>
             </View>
             <View style={styles.episodeInfo}>
-                <Text style={[styles.episodeTitle, { color: currentColors.text }]} numberOfLines={2}>
+                <Text style={[styles.episodeTitle, { color: currentColors.text }]} numberOfLines={1}>
                     {item.name}
                 </Text>
-                <Text style={[styles.episodeOverview, { color: hexAlpha(currentColors.text, 0.6) }]} numberOfLines={2}>
+                <Text style={[styles.episodeOverview, { color: hexAlpha(currentColors.text, 0.6) }]} numberOfLines={1}>
                     {item.overview || 'No description available for this episode.'}
                 </Text>
                 <View style={styles.episodeMeta}>

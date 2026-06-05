@@ -129,27 +129,20 @@ const MobilePlayerBottomBar = React.memo(function MobilePlayerBottomBar({
                     <TouchableOpacity onPress={() => setIsMute(!isMute)} style={styles.iconButton}>
                         <MaterialIcons name={isMute ? "volume-off" : "volume-up"} size={24} color="white" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setSettingsModalVisible(true)} style={styles.badge}>
-                        <MaterialIcons name="video-settings" size={20} color="white" />
+                    <TouchableOpacity onPress={() => setSettingsModalVisible(true)} style={styles.iconButton}>
+                        <MaterialIcons name="video-settings" size={22} color="white" />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => setSubtitleModalVisible(true)} style={styles.badge}>
-                        <MaterialIcons name="subtitles" size={20} color="white" />
+                    <TouchableOpacity onPress={() => setSubtitleModalVisible(true)} style={styles.iconButton}>
+                        <MaterialIcons name="subtitles" size={22} color="white" />
                     </TouchableOpacity>
 
-                    {isPremium ? (
+                    {isPremium && (
                         <TouchableOpacity
                             onPress={() => setWatchPartyModalVisible(true)}
                             style={[styles.badge, watchPartyActive && styles.watchPartyActiveBadge]}
                         >
                             <MaterialCommunityIcons name="party-popper" size={18} color={watchPartyActive ? '#a78bfa' : 'white'} />
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity onPress={() => setWatchPartyModalVisibleLocked(true)} style={[styles.badge, styles.wpLockedBadge]}>
-                            <MaterialCommunityIcons name="party-popper" size={18} color="#6b7280" />
-                            <View style={styles.lockBadge}>
-                                <MaterialIcons name="lock" size={10} color="#fbbf24" />
-                            </View>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -247,6 +240,7 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
         drmData, headersData, newDrmType,
         streamUrl, isReady, setIsReady,
         importedSubtitles,
+        isFetchingSubtitles,
         playbackError, setPlaybackError,
         watchPartyModalVisible, setWatchPartyModalVisible,
         handleChannelSelect,
@@ -416,9 +410,10 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
 
             <SubtitleModal
                 visible={subtitleModalVisible}
-                textTracks={allTextTracks}
+                textTracks={[...allTextTracks, ...importedSubtitles]}
                 selectedTextTrack={selectedTextTrack}
                 subtitleDelay={subtitleDelay}
+                isFetchingSubtitles={isFetchingSubtitles}
                 onSelectText={(index) => {
                     setSelectedTextTrack(index);
                     resetHideTimeout();
@@ -472,6 +467,7 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
                             bgPlay={bgPlay}
                             duration={duration}
                             importedSubtitles={importedSubtitles}
+                            allTextTracks={allTextTracks}
                             selectedAudioTrack={selectedAudioTrack}
                             selectedVideoTrack={selectedVideoTrack}
                             selectedTextTrack={selectedTextTrack}
@@ -622,7 +618,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     topBar: { flexDirection: 'row', alignItems: 'center', marginTop: Platform.OS === 'android' ? 10 : 30 },
-    iconButton: { padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 },
+    iconButton: { padding: 8, backgroundColor: 'transparent', borderRadius: 8 },
     titleText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12, flex: 1 },
     headerLogo: { width: 32, height: 32, marginLeft: 12, borderRadius: 4 },
     topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -637,7 +633,7 @@ const styles = StyleSheet.create({
     leftActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     rightActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     badge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 5 },
-    badgeText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+    badgeText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
     loaderContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
     bufferingText: { color: 'white', fontSize: 16, fontWeight: 'bold', marginTop: 10 },
     gestureIndicator: { position: 'absolute', top: '50%', marginTop: -60, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 12, width: 60 },

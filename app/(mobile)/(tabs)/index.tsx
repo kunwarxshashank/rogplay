@@ -14,6 +14,7 @@ import {
     ScrollView
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
+import { LinearGradient } from 'expo-linear-gradient';
 // @ts-ignore
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -217,6 +218,14 @@ export function Home() {
 
     return (
         <View style={[styles.container, { backgroundColor: '#000' }]}>
+            {/* Dark Luxury Gradient */}
+            <LinearGradient
+                colors={[currentColors.primary + '30', '#000000FA', '#000000']}
+                locations={[0, 0.25, 1]}
+                style={StyleSheet.absoluteFill}
+            />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {renderHeader()}
 
@@ -749,7 +758,6 @@ const styles = StyleSheet.create({
     // New Styles inspired by image
     headerArea: {
         paddingTop: 10,
-        backgroundColor: '#000',
     },
     headerMain: {
         flexDirection: 'row',
@@ -828,6 +836,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         padding: 16,
         alignItems: 'center',
+        marginHorizontal: 12,
+        marginBottom: 8,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 3,
     },
     videoThumbWrapper: {
         width: 120,
@@ -897,6 +914,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         padding: 16,
         alignItems: 'center',
+        marginHorizontal: 12,
+        marginBottom: 8,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 3,
     },
     folderIconWrapper: {
         width: 60,

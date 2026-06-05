@@ -51,6 +51,7 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
     // Animation refs
     const glowOpacity = useRef(new Animated.Value(0)).current;
     const logoScale = useRef(new Animated.Value(1)).current;
+    const sidebarWidth = useRef(new Animated.Value(86)).current;
 
     if (!Platform.isTV) return null;
 
@@ -60,7 +61,8 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
         onSidebarFocusChange?.(true);
         Animated.parallel([
             Animated.timing(glowOpacity, { toValue: 1, duration: 180, useNativeDriver: false }),
-            Animated.spring(logoScale, { toValue: 1.08, useNativeDriver: true, friction: 7 }),
+            Animated.spring(logoScale, { toValue: 1.08, useNativeDriver: false, friction: 7 }),
+            Animated.spring(sidebarWidth, { toValue: 240, useNativeDriver: false, friction: 8 }),
         ]).start();
     }, []);
 
@@ -70,7 +72,8 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
         onSidebarFocusChange?.(false);
         Animated.parallel([
             Animated.timing(glowOpacity, { toValue: 0, duration: 180, useNativeDriver: false }),
-            Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, friction: 7 }),
+            Animated.spring(logoScale, { toValue: 1, useNativeDriver: false, friction: 7 }),
+            Animated.timing(sidebarWidth, { toValue: 86, duration: 250, useNativeDriver: false }),
         ]).start();
     }, []);
 
@@ -84,7 +87,7 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
         .filter((e: any) => NAV_ITEMS.some(n => n.route === e.route.name));
 
     return (
-        <View style={styles.sidebar}>
+        <Animated.View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: 'rgba(14, 13, 23, 0.85)' }]}>
             {/* ── Top gradient wash ─────────────────── */}
             <LinearGradient
                 colors={[hexAlpha(c.primary, 0.06), 'transparent']}
@@ -128,6 +131,7 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                 onPress={() => {
                                     const ev = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                                     if (!isActive && !ev.defaultPrevented) navigation.navigate(route.name);
+                                    onItemBlur(); // collapse rail back to icon-only on select
                                 }}
                                 onFocus={() => onItemFocus(route.name)}
                                 onBlur={() => onItemBlur()}
@@ -165,7 +169,7 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                 ) : (
                                     <View style={styles.iconOuter}>
                                         {isFocused && (
-                                            <View style={[styles.iconGlow, { backgroundColor: hexAlpha(c.primary, 0.15) }]} />
+                                            <View style={[styles.iconGlow, { backgroundColor: hexAlpha(c.glow, 0.45) }]} />
                                         )}
                                         <MaterialCommunityIcons
                                             name={(isHighlight ? navConf.focusIcon : navConf.icon) as any}
@@ -175,17 +179,23 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                     </View>
                                 )}
 
-                                {/* Label — always visible but subtle */}
-                                <Text style={[
-                                    styles.navLabel,
-                                    {
-                                        color: isHighlight ? c.primary : c.textSecondary,
-                                        opacity: isFocused ? 1 : isActive ? 0.9 : 0.5,
-                                        fontFamily: isHighlight ? 'Outfit_700Bold' : 'Outfit_500Medium',
-                                    }
-                                ]} numberOfLines={1}>
-                                    {navConf.label}
-                                </Text>
+                                {/* Label — visible when sidebar is expanded */}
+                                {isSidebarFocused && (
+                                    <Animated.Text style={[
+                                        styles.navLabel,
+                                        {
+                                            color: isFocused ? c.primary : c.textSecondary,
+                                            opacity: 1,
+                                            fontFamily: 'Inter_600SemiBold',
+                                            fontSize: 15,
+                                            marginLeft: 14,
+                                            flex: 1,
+                                            textAlign: 'left',
+                                        }
+                                    ]} numberOfLines={1}>
+                                        {navConf.label}
+                                    </Animated.Text>
+                                )}
                             </Pressable>
                         );
                     })}
@@ -194,7 +204,7 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
 
 
             </View>
-        </View>
+        </Animated.View>
     );
 }
 
@@ -266,10 +276,11 @@ const styles = StyleSheet.create({
     },
     navItem: {
         width: '100%',
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
-        paddingHorizontal: 4,
+        paddingHorizontal: 16,
         borderRadius: 14,
         borderWidth: 1.5,
         borderColor: 'transparent',

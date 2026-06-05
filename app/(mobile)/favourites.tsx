@@ -60,6 +60,21 @@ export default function MobileFavouritesScreen() {
             return;
         }
 
+        if (item.kind === 'music') {
+            const tracks = JSON.stringify([{
+                id: item.id,
+                title: item.title,
+                artist: item.subtitle || '',
+                poster: item.imageUrl,
+                url: item.streamUrl || '',
+            }]);
+            router.push({
+                pathname: '/music-player',
+                params: { tracks, index: '0', addonUrl: item.browserUrl || '', addonManifest: item.browserManifest || '' },
+            });
+            return;
+        }
+
         if (item.streamUrl) {
             const params: any = {
                 url: encodeURIComponent(item.streamUrl),

@@ -10,7 +10,9 @@ import { PlaylistItem } from '@/services/playlistParser';
 import { EpgProgram } from '@/services/epgParser';
 import { TextTrackType, DRMType } from 'react-native-video';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { useAuthStore } from '@/store/authStore';
+import { fetchOpenSubtitles } from '@/services/subtitles';
 
 export interface UsePlayerLogicProps {
     url: string;
@@ -113,6 +115,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
     const [streamUrl, setStreamUrl] = useState("");
     const [isReady, setIsReady] = useState(false);
     const [importedSubtitles, setImportedSubtitles] = useState<any[]>([]);
+    const [isFetchingSubtitles, setIsFetchingSubtitles] = useState(false);
     const [playbackError, setPlaybackError] = useState<string | null>(null);
     const [watchPartyModalVisible, setWatchPartyModalVisible] = useState(false);
 
@@ -150,7 +153,8 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         setActiveHeaders(headers || null);
     }, [url, title, channelId, channelLogo, drmkeys, drmtype, referer, origin, cookie, userAgent, headers]);
 
-    const { autoRotate, forceLandscape, autoSubtitles } = useSettingsStore();
+    const forceLandscape = useSettingsStore(s => s.forceLandscape);
+    const autoSubtitles = useSettingsStore(s => s.autoSubtitles);
 
     const hideTimeout = useRef<any>(null);
 
@@ -158,11 +162,11 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         if (hideTimeout.current) clearTimeout(hideTimeout.current);
         setControlsVisibleSync(true);
         hideTimeout.current = setTimeout(() => {
-            if (isPlaying) {
+            if (isPlaying && !subtitleModalVisible && !settingsModalVisible && !speedModalVisible && !epgSidebarVisible && !watchPartyModalVisible) {
                 setControlsVisibleSync(false);
             }
         }, 5000);
-    }, [isPlaying]);
+    }, [isPlaying, subtitleModalVisible, settingsModalVisible, speedModalVisible, epgSidebarVisible, watchPartyModalVisible]);
 
     useEffect(() => {
         resetHideTimeout();
@@ -312,7 +316,10 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
     }, []);
 
     const lastStateUpdateRef = useRef(0);
-    const onProgress = useCallback((data: any, isVlc: boolean = false) => {
+    // Use refs for callbacks so VideoWrapper (React.memo) gets stable references
+    const onProgressRef = useRef<(data: any, isVlc?: boolean) => void>(() => {});
+
+    onProgressRef.current = (data: any, isVlc: boolean = false) => {
         let currentMs = 0;
         let totalMs = 0;
         let newBufferProgress = 0;
@@ -329,26 +336,20 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
             }
         }
 
-        // --- Performance Fix: Throttle state updates ---
         const now = Date.now();
         const diffAbs = Math.abs(currentMs - positionRef.current);
-        const positionChanged = diffAbs > 100; // Only update if changed by more than 100ms
+        const positionChanged = diffAbs > 100;
 
-        // Update state if: 
-        // 1. More than 500ms has passed since last state update AND position moved
-        // 2. OR there's a significant jump (seek) > 1s
         if ((now - lastStateUpdateRef.current > 500 && positionChanged) || diffAbs > 1000) {
             setPosition(currentMs);
             setBufferProgress(newBufferProgress);
             if (isVlc && totalMs && totalMs !== durationRef.current) setDuration(totalMs);
             lastStateUpdateRef.current = now;
 
-            // Universal fallback: if progress is moving, hide buffering indicator
             if (isBuffering && currentMs > 0) {
                 setIsBuffering(false);
             }
         } else {
-            // Even if we don't update state, always update the ref for internal logic
             positionRef.current = currentMs;
         }
 
@@ -387,17 +388,26 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
             positionMs: currentMs,
             durationMs: totalMs,
         });
-    }, [sourceType, activeUrl, contentType, tmdbId, season, episode, activeTitle, title, activeHeaders, activeUserAgent, activeReferer, activeOrigin, activeCookie, activeDrmKeys, activeDrmType, poster, backdrop, removeItem, upsertItem]);
+    };
 
+    const onProgress = useCallback((data: any, isVlc: boolean = false) => {
+        onProgressRef.current(data, isVlc);
+    }, []);
 
-    const onBuffer = useCallback(({ isBuffering: buffering }: { isBuffering: boolean }) => {
+    const onBufferRef = useRef<(arg: { isBuffering: boolean }) => void>(() => {});
+    onBufferRef.current = ({ isBuffering: buffering }: { isBuffering: boolean }) => {
         setIsBuffering(buffering);
         if (!buffering) {
             setBufferProgress(0);
         }
+    };
+
+    const onBuffer = useCallback((data: { isBuffering: boolean }) => {
+        onBufferRef.current(data);
     }, []);
 
-    const onLoad = useCallback((videoInfo: any, isVlc: boolean = false) => {
+    const onLoadRef = useRef<(videoInfo: any, isVlc?: boolean) => void>(() => {});
+    onLoadRef.current = (videoInfo: any, isVlc: boolean = false) => {
         const audioTracks = videoInfo.audioTracks || [];
         const videoTracks = videoInfo.videoTracks || [];
         const textTracks = videoInfo.textTracks || [];
@@ -425,12 +435,42 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         if (autoSubtitles && textTracks.length > 0 && selectedTextTrack === -1) {
             setSelectedTextTrack(0);
         }
-    }, [safeResumeMs, autoSubtitles, selectedTextTrack]);
+    };
+
+    const onLoad = useCallback((videoInfo: any, isVlc: boolean = false) => {
+        onLoadRef.current(videoInfo, isVlc);
+    }, []);
 
     useEffect(() => {
         hasAppliedResumeRef.current = false;
         lastProgressSaveSecondRef.current = 0;
     }, [activeUrl]);
+
+    // ─── Fetch subtitles from OpenSubtitle addon ──────────────────────────
+    useEffect(() => {
+        if (!tmdbId || sourceType !== 'cinema') return;
+        setImportedSubtitles([]);
+        setIsFetchingSubtitles(true);
+
+        fetchOpenSubtitles({
+            tmdbId,
+            contentType,
+            season,
+            episode,
+        }).then(tracks => {
+            const newTracks = tracks.map(t => ({
+                title: t.title,
+                language: t.language,
+                uri: t.uri,
+                type: t.uri?.toLowerCase().endsWith('.vtt') ? TextTrackType.VTT : TextTrackType.SUBRIP,
+            }));
+            setImportedSubtitles(newTracks);
+        }).catch(err => {
+            console.warn('Failed to fetch OpenSubtitles:', err);
+        }).finally(() => {
+            setIsFetchingSubtitles(false);
+        });
+    }, [tmdbId, contentType, season, episode, sourceType]);
 
     const handleRotate = useCallback(async () => {
         const orientation = await ScreenOrientation.getOrientationAsync();
@@ -458,17 +498,35 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
 
             if (!result.canceled) {
                 const asset = result.assets[0];
+                // Normalize/copy URIs (Android content:// URIs may be inaccessible to ExoPlayer)
+                let normalizedUri = asset.uri;
+                try {
+                    if (Platform.OS === 'android' && normalizedUri && normalizedUri.startsWith('content://')) {
+                        const fileName = asset.name || `subtitle-${Date.now()}`;
+                        const dest = FileSystem.cacheDirectory + fileName;
+                        await FileSystem.copyAsync({ from: normalizedUri, to: dest });
+                        normalizedUri = dest;
+                    } else if (normalizedUri && !normalizedUri.startsWith('file://') && normalizedUri.startsWith('/')) {
+                        normalizedUri = `file://${normalizedUri}`;
+                    }
+                } catch (copyErr) {
+                    console.warn('Subtitle copy to cache failed, using original uri', copyErr, asset.uri);
+                    // fallback: keep original uri
+                }
+
                 const newSubtitle = {
-                    title: asset.name,
+                    title: asset.name || 'subtitle',
                     language: 'en',
-                    type: asset.name.toLowerCase().endsWith('.vtt') ? TextTrackType.VTT : TextTrackType.SUBRIP,
-                    uri: asset.uri,
+                    type: asset.name?.toLowerCase().endsWith('.vtt') ? TextTrackType.VTT : TextTrackType.SUBRIP,
+                    uri: normalizedUri,
                 };
                 setImportedSubtitles(prev => {
                     const updated = [...prev, newSubtitle];
                     const newIndex = allTextTracks.length + updated.length - 1;
+                    const totalTracks = allTextTracks.length + updated.length;
+                    const safeIndex = Math.max(0, Math.min(totalTracks - 1, newIndex));
                     setTimeout(() => {
-                        setSelectedTextTrack(newIndex);
+                        setSelectedTextTrack(safeIndex);
                     }, 500);
                     return updated;
                 });
@@ -516,6 +574,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         drmData, headersData, newDrmType,
         streamUrl, isReady, setIsReady,
         importedSubtitles, setImportedSubtitles,
+        isFetchingSubtitles,
         playbackError, setPlaybackError,
         watchPartyModalVisible, setWatchPartyModalVisible,
         handleChannelSelect,

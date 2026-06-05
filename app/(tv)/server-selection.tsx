@@ -19,17 +19,20 @@ export default function TVServerSelectionScreen() {
     const { results, loading, searchStreams } = useStreamSources();
 
     useEffect(() => {
-
+        const resolvedType = (Array.isArray(type) ? type[0] : type || 'movie') as any;
+        const resolvedMovieUrl = Array.isArray(movieUrl) ? movieUrl[0] : movieUrl as string;
         searchStreams(
             Array.isArray(title) ? title[0] : title || '',
             Array.isArray(id) ? id[0] : id,
             Array.isArray(season) ? season[0] : season,
             Array.isArray(episode) ? episode[0] : episode,
-            (Array.isArray(type) ? type[0] : type || 'movie') as any,
-            Array.isArray(movieUrl) ? movieUrl[0] : movieUrl as string,
-            Array.isArray(movieData) ? movieData[0] : movieData as string
+            resolvedType,
+            resolvedType === 'addon' ? undefined : resolvedMovieUrl,
+            Array.isArray(movieData) ? movieData[0] : movieData as string,
+            resolvedType === 'addon' ? resolvedMovieUrl : undefined  // serverAddonUrl
         );
     }, [id, type, title, season, episode, movieUrl, movieData]);
+
 
     const handlePlay = (item: StreamResult) => {
         const videoParams: any = {

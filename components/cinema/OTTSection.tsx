@@ -13,10 +13,12 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
     return (
         <View style={styles.container}>
             <View style={styles.headerRow}>
+
                 <View style={styles.titleSection}>
                     <Text style={[styles.headerTitle, { color: currentColors.text }]}>Platforms</Text>
                     <View style={[styles.indicator, { backgroundColor: currentColors.primary }]} />
                 </View>
+
                 {/* <TouchableOpacity>
                     <Text style={[styles.seeAll, { color: currentColors.primary }]}>See all</Text>
                 </TouchableOpacity> */}

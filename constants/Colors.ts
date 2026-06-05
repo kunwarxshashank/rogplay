@@ -20,16 +20,23 @@ const baseDark = {
 export const Colors: any = {
     dark: {
         ...baseDark,
-        primary: '#6366f1', // Indigo
-        accent: '#8b5cf6', // Violet
-        glow: 'rgba(99, 102, 241, 0.3)',
+        background: '#0E0D17', // Deep obsidian base
+        surface: '#151322', // Card background slightly lighter obsidian
+        card: '#1A1829', // Card color
+        cardOverlay: 'rgba(26, 24, 41, 0.7)',
+        blurBackground: 'rgba(14, 13, 23, 0.5)',
+        tvBackground: '#0E0D17',
+        border: 'rgba(255, 255, 255, 0.2)', // 20% opacity for micro-borders
+        primary: '#6366f1', // Stellar-indigo
+        accent: '#818cf8', // Lighter indigo
+        glow: 'rgba(99, 102, 241, 0.4)', // Slightly stronger glow
         tint: '#6366f1',
         tabIconSelected: '#6366f1',
         gradients: {
-            primary: ['#6366f1', '#a855f7'],
-            surface: ['#1e293b', '#0f172a'],
-            fade: ['transparent', '#060912'],
-            premium: ['#f59e0b', '#fbbf24', '#f59e0b'],
+            primary: ['#6366f1', '#4338ca'],
+            surface: ['rgba(26, 24, 41, 0.8)', 'rgba(14, 13, 23, 0.95)'],
+            fade: ['transparent', '#0E0D17'],
+            premium: ['#818cf8', '#6366f1', '#4338ca'],
         }
     },
     dark_red: {

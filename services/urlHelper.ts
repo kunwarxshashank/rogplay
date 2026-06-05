@@ -51,7 +51,7 @@ export async function getStreamType(
     // Try Content-Type detection via HEAD request
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(new DOMException('Request timed out', 'TimeoutError')), 5000);
 
         const response = await fetch(url, {
             method: 'HEAD',

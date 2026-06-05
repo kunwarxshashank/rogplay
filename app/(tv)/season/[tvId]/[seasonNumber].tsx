@@ -34,7 +34,7 @@ export default function TVSeasonScreen() {
     const fetchSeason = async () => {
         setLoading(true);
         try {
-            const data = await getSeasonDetails(Number(tvId), Number(seasonNumber));
+            const data = await getSeasonDetails(tvId as string, Number(seasonNumber));
             setSeasonData(data);
         } catch (error) {
             console.error(error);

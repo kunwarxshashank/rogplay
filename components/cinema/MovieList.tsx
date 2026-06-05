@@ -14,9 +14,11 @@ interface MovieListProps {
     type?: 'movie' | 'tv' | 'all';
     mode?: 'horizontal' | 'grid';
     paginated?: boolean;
+    addonType?: string;
+    catalogRawType?: string | undefined;
 }
 
-function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated = false }: MovieListProps) {
+function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated = false, addonType, catalogRawType }: MovieListProps) {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -32,6 +34,13 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
             isMounted.current = false;
         };
     }, []);
+
+    // Keep a ref to the latest fetchFunction so reference changes from
+    // parent re-renders (e.g. Zustand store updates) don't trigger a reload.
+    const fetchFunctionRef = React.useRef(fetchFunction);
+    useEffect(() => {
+        fetchFunctionRef.current = fetchFunction;
+    });
 
     const isGrid = mode === 'grid';
     const numColumns = Platform.isTV ? 5 : 3;
@@ -62,7 +71,7 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
         else setLoadingMore(true);
 
         try {
-            const result = await fetchFunction(pageNum);
+            const result = await fetchFunctionRef.current(pageNum);
             let newItems: any[] = [];
             let totalPages = 1;
 
@@ -97,7 +106,9 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
                 setLoadingMore(false);
             }
         }
-    }, [fetchFunction, title]);
+        // Only re-create loadData when title changes (genuinely different catalog).
+        // fetchFunction is accessed via ref so reference churn doesn't matter.
+    }, [title]);
 
     useEffect(() => {
         setPage(1);
@@ -115,14 +126,16 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
 
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
-            <MovieCard
-                item={item}
-                type={(item.media_type || type) as 'movie' | 'tv'}
-                width={isGrid ? undefined : cardWidth}
-                style={itemStyle}
-            />
+                <MovieCard
+                    item={item}
+                    type={(item.media_type || type) as 'movie' | 'tv'}
+                    addonType={addonType}
+                    catalogTypeRaw={catalogRawType}
+                    width={isGrid ? undefined : cardWidth}
+                    style={itemStyle}
+                />
         ),
-        [cardWidth, isGrid, itemStyle, type]
+        [cardWidth, isGrid, itemStyle, type, addonType, catalogRawType]
     );
 
     const renderFooter = useCallback(() => {

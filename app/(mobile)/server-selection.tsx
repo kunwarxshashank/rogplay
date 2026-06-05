@@ -25,10 +25,12 @@ export default function ContentListScreen() {
             season as string,
             episode as string,
             (type as any) || 'movie',
-            movieUrl as string,
-            movieData as string
+            type === 'addon' ? undefined : movieUrl as string,
+            movieData as string,
+            type === 'addon' ? movieUrl as string : undefined  // serverAddonUrl for DesiHub-style
         );
     }, [query, tmdb, type, movieUrl, movieData]);
+
 
     const theme = useSettingsStore(state => state.theme);
     const activeColors = Colors[theme] || Colors.dark;

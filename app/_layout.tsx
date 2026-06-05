@@ -4,16 +4,23 @@ import {
     Outfit_400Regular,
     Outfit_500Medium,
     Outfit_600SemiBold,
-    Outfit_700Bold
+    Outfit_700Bold,
+    Outfit_800ExtraBold
 } from '@expo-google-fonts/outfit';
 import {
     Inter_400Regular,
     Inter_600SemiBold
 } from '@expo-google-fonts/inter';
+import {
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold
+} from '@expo-google-fonts/playfair-display';
 import { Stack, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -26,7 +33,9 @@ import { useAddonsStore } from '@/store/addonsStore';
 import { useRouter, useSegments } from 'expo-router';
 import { AppUpdateModal } from '@/components/AppUpdateModal';
 import { AppToast } from '@/components/AppToast';
-
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import * as NavigationBar from 'expo-navigation-bar';
+import { initializeFirebase } from '@/services/firebase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,22 +45,39 @@ export default function RootLayout() {
         Outfit_500Medium,
         Outfit_600SemiBold,
         Outfit_700Bold,
+        Outfit_800ExtraBold,
         Inter_400Regular,
         Inter_600SemiBold,
+        PlayfairDisplay_400Regular,
+        PlayfairDisplay_500Medium,
+        PlayfairDisplay_600SemiBold,
+        PlayfairDisplay_700Bold,
     });
 
     const pathname = usePathname();
     const segments = useSegments();
     const router = useRouter();
+    const [initialIntentProcessed, setInitialIntentProcessed] = useState(false);
     const { isAuthenticated } = useAuthStore();
     const { theme: currentThemeName } = useSettingsStore();
     const currentColors = Colors[currentThemeName] || Colors.dark;
 
     useEffect(() => {
-        if (loaded || error) {
+        if ((loaded || error) && initialIntentProcessed) {
             SplashScreen.hideAsync();
         }
-    }, [loaded, error]);
+    }, [loaded, error, initialIntentProcessed]);
+
+    // change navigation bar color
+    useEffect(() => {
+        NavigationBar.setBackgroundColorAsync('transparent');
+        NavigationBar.setButtonStyleAsync('light');
+    }, []);
+
+    // Initialize Firebase
+    useEffect(() => {
+        initializeFirebase();
+    }, []);
 
     useEffect(() => {
         const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -79,13 +105,22 @@ export default function RootLayout() {
 
     // Handle incoming links (Intents)
     useEffect(() => {
+        let cancelled = false;
         const getPlayerPath = () => Platform.isTV ? '/(tv)/player' : '/(mobile)/player';
 
-        const handleUrl = (url: string) => {
-            if (!url) return;
+        const done = () => {
+            if (!cancelled) setInitialIntentProcessed(true);
+        };
+
+        const handleUrl = (url: string, isInitial: boolean) => {
+            if (!url) {
+                if (isInitial) done();
+                return;
+            }
 
             // Ignore internal Expo Development Client URLs
             if (url.includes('expo-development-client')) {
+                if (isInitial) done();
                 return;
             }
 
@@ -102,12 +137,14 @@ export default function RootLayout() {
                     useAddonsStore.getState().addAddon(addonUrl)
                         .then(() => {
                             console.log('Addon added successfully from deep link');
-                            router.push('/(tabs)/addons');
+                            router.push(Platform.isTV ? '/(tv)/addons' : '/(mobile)/addons');
                         })
                         .catch(err => {
                             console.error('Failed to add addon from deep link:', err);
-                            // If it fails (maybe already exists), still navigate to see it
-                            router.push('/(tabs)/addons');
+                            router.push(Platform.isTV ? '/(tv)/addons' : '/(mobile)/addons');
+                        })
+                        .finally(() => {
+                            if (isInitial) done();
                         });
                     return;
                 }
@@ -119,6 +156,7 @@ export default function RootLayout() {
                         pathname: getPlayerPath() as any,
                         params: parsed.queryParams as any
                     });
+                    if (isInitial) done();
                     return;
                 }
             }
@@ -126,6 +164,7 @@ export default function RootLayout() {
             // 2. Handle play:// links (replace with http://)
             if (url.startsWith('play://')) {
                 const videoUrl = url.replace('play://', 'https://');
+                console.log(`Playing intent url: ${url}`)
                 const filename = videoUrl.split('/').pop()?.split('?')[0] || 'External Stream';
 
                 router.push({
@@ -135,6 +174,7 @@ export default function RootLayout() {
                         title: decodeURIComponent(filename)
                     }
                 });
+                if (isInitial) done();
                 return;
             }
 
@@ -164,19 +204,28 @@ export default function RootLayout() {
                     }
                 });
             }
+
+            if (isInitial) done();
         };
 
         // Check initial URL
         Linking.getInitialURL().then(url => {
-            if (url) handleUrl(url);
+            if (url) {
+                handleUrl(url, true);
+            } else {
+                done();
+            }
         });
 
         // Listen for new URLs while app is running
         const subscription = Linking.addEventListener('url', (event) => {
-            handleUrl(event.url);
+            handleUrl(event.url, false);
         });
 
-        return () => subscription.remove();
+        return () => {
+            cancelled = true;
+            subscription.remove();
+        };
     }, [loaded]);
 
     useEffect(() => {
@@ -245,31 +294,33 @@ export default function RootLayout() {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <ThemeProvider value={theme}>
-                <View style={{ flex: 1, flexDirection: 'row', backgroundColor: currentColors.background }}>
-                    <View style={{ flex: 1 }}>
-                        <Stack
-                            screenOptions={{
-                                headerShown: false,
-                                contentStyle: { backgroundColor: currentColors.background },
-                                headerStyle: { backgroundColor: currentColors.background },
-                                headerTintColor: currentColors.text,
-                            }}
-                        >
-                            <Stack.Screen name="(mobile)" options={{ headerShown: false }} />
-                            <Stack.Screen name="(tv)" options={{ headerShown: false }} />
-                            <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-                            <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
-                            <Stack.Screen name="(auth)/tvlogin" options={{ headerShown: false }} />
-                            <Stack.Screen name="index" options={{ headerShown: false }} />
-                            <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-                        </Stack>
+            <ErrorBoundary>
+                <ThemeProvider value={theme}>
+                    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: currentColors.background }}>
+                        <View style={{ flex: 1 }}>
+                            <Stack
+                                screenOptions={{
+                                    headerShown: false,
+                                    contentStyle: { backgroundColor: currentColors.background },
+                                    headerStyle: { backgroundColor: currentColors.background },
+                                    headerTintColor: currentColors.text,
+                                }}
+                            >
+                                <Stack.Screen name="(mobile)" options={{ headerShown: false }} />
+                                <Stack.Screen name="(tv)" options={{ headerShown: false }} />
+                                <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+                                <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
+                                <Stack.Screen name="(auth)/tvlogin" options={{ headerShown: false }} />
+                                <Stack.Screen name="index" options={{ headerShown: false }} />
+                                <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+                            </Stack>
+                        </View>
                     </View>
-                </View>
-                <AppUpdateModal />
-                <AppToast />
-                <StatusBar style="light" />
-            </ThemeProvider>
+                    <AppUpdateModal />
+                    <AppToast />
+                    <StatusBar style="light" />
+                </ThemeProvider>
+            </ErrorBoundary>
         </GestureHandlerRootView>
     );
 }

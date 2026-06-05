@@ -141,9 +141,12 @@ export default function TVLoginScreen() {
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background }]}>
             <LinearGradient
-                colors={currentColors.gradients.surface}
+                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                locations={[0, 0.25, 1]}
                 style={StyleSheet.absoluteFill}
             />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
 
             <View style={styles.contentWrapper}>
                 {/* Header Section */}
@@ -247,12 +250,13 @@ export default function TVLoginScreen() {
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    style={[styles.googleButton, { backgroundColor: currentColors.card, borderWidth: 1, borderColor: currentColors.border }]}
+                                    style={[styles.googleButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}
                                     onPress={handleGuestLogin}
                                     activeOpacity={0.8}
                                 >
-                                    <MaterialCommunityIcons name="account-off" size={24} color={currentColors.text} style={{ marginRight: 16 }} />
-                                    <Text style={[styles.googleButtonText, { color: currentColors.text }]}>Continue as Guest</Text>
+                                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <MaterialCommunityIcons name="account-off" size={24} color={currentColors.text} style={{ marginRight: 16, zIndex: 1 }} />
+                                    <Text style={[styles.googleButtonText, { color: currentColors.text, zIndex: 1 }]}>Continue as Guest</Text>
                                 </TouchableOpacity>
 
                                 {error && (

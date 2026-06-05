@@ -24,6 +24,7 @@ interface VideoWrapperProps {
     resizeMode: any;
     bgPlay: boolean;
     importedSubtitles: any[];
+    allTextTracks: any[];
     selectedAudioTrack: number;
     selectedVideoTrack: number;
     selectedTextTrack: number;
@@ -37,7 +38,7 @@ interface VideoWrapperProps {
 }
 
 const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoWrapper(props, ref) {
-    const { streamUrl, headersData, drmData, newDrmType, isPlaying, playbackSpeed, volume, isMute, resizeMode, bgPlay, importedSubtitles, selectedAudioTrack, selectedVideoTrack, selectedTextTrack, onProgress, onBuffer, onLoad, onError, onTextTracks, style, duration } = props;
+    const { streamUrl, headersData, drmData, newDrmType, isPlaying, playbackSpeed, volume, isMute, resizeMode, bgPlay, importedSubtitles, allTextTracks, selectedAudioTrack, selectedVideoTrack, selectedTextTrack, onProgress, onBuffer, onLoad, onError, onTextTracks, style, duration } = props;
 
     const internalRef = useRef<any>(null);
     const { isVlcRequired, isDetecting } = useStreamType(streamUrl, headersData);
@@ -86,6 +87,54 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         ":no-osd",
     ], []);
 
+    const selectedTextTrackProps = React.useMemo(() => {
+        if (selectedTextTrack === -1) {
+            return { type: SelectedTrackType.DISABLED };
+        }
+
+        const importedOffset = allTextTracks.length;
+        if (selectedTextTrack >= importedOffset) {
+            const importedIndex = selectedTextTrack - importedOffset;
+            const importedTrack = importedSubtitles[importedIndex];
+            if (importedTrack?.title) {
+                return {
+                    type: SelectedTrackType.TITLE,
+                    value: importedTrack.title,
+                };
+            }
+        }
+
+        return {
+            type: SelectedTrackType.INDEX,
+            value: selectedTextTrack,
+        };
+    }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
+
+    // Compute VLC-safe subtitle URI — never pass undefined, always a string
+    const vlcSubtitleUri = React.useMemo(() => {
+        if (selectedTextTrack < 0) return '';
+        const importedOffset = allTextTracks.length;
+        if (selectedTextTrack >= importedOffset) {
+            const importedIndex = selectedTextTrack - importedOffset;
+            const track = importedSubtitles[importedIndex];
+            return track?.uri || '';
+        }
+        return '';
+    }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
+
+    // Compute VLC text track ID for embedded tracks
+    const vlcTextTrackId = React.useMemo(() => {
+        if (selectedTextTrack < 0) return -1;
+        const importedOffset = allTextTracks.length;
+        if (selectedTextTrack < importedOffset) {
+            // Use the VLC SPU track id from allTextTracks
+            const track = allTextTracks[selectedTextTrack];
+            return track?.id ?? selectedTextTrack;
+        }
+        // External subtitle is loaded via subtitleUri, no embedded track to select
+        return -1;
+    }, [selectedTextTrack, allTextTracks]);
+
     useImperativeHandle(ref, () => ({
         seek: (seconds: number) => {
             if (isVlcRequired) {
@@ -104,6 +153,16 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
             }
         }
     }));
+
+    const videoSource = React.useMemo(() => ({
+        uri: streamUrl,
+        headers: headersData,
+        textTracks: importedSubtitles,
+        drm: drmData ? {
+            type: newDrmType,
+            licenseServer: drmData,
+        } : undefined
+    }), [streamUrl, headersData, importedSubtitles, drmData, newDrmType]);
 
     if (isDetecting || !streamUrl) {
         return (
@@ -151,20 +210,17 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                 playInBackground={bgPlay}
                 onProgress={(data: any) => {
                     onProgress(data, true);
-                    // Force hide buffer indicator if we have positive current time
                     if (data?.currentTime > 0) {
                         onBuffer({ isBuffering: false });
                     }
                 }}
                 onBuffering={(e: any) => {
-                    // Only update if it's actually buffering, often VLC sends false hits
                     if (e?.isBuffering) {
                         onBuffer({ isBuffering: true });
                     }
                 }}
                 onLoad={(data: any) => {
                     onLoad(data, true);
-                    // We only set buffering true if we haven't started playing yet
                     onBuffer({ isBuffering: true });
                 }}
                 onPlaying={() => onBuffer({ isBuffering: false })}
@@ -178,29 +234,17 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                     onError && onError(`Playback error: ${errStr || 'Unknown error'}`);
                 }}
                 audioTrack={selectedAudioTrack}
-                textTrack={selectedTextTrack}
-                subtitleUri={selectedTextTrack >= 0 && selectedTextTrack < importedSubtitles.length
-                    ? importedSubtitles[selectedTextTrack].uri
-                    : undefined
-                }
+                textTrack={vlcTextTrackId}
+                subtitleUri={vlcSubtitleUri}
             />
         );
     }
 
     return (
         <Video
-            key={`${streamUrl}-${importedSubtitles.length}`}
             focusable={false}
             ref={internalRef}
-            source={{
-                uri: streamUrl,
-                headers: headersData,
-                textTracks: importedSubtitles,
-                drm: drmData ? {
-                    type: newDrmType,
-                    licenseServer: drmData,
-                } : undefined
-            }}
+            source={videoSource}
             style={[styles.video, style]}
             paused={!isPlaying}
             rate={playbackSpeed}
@@ -222,14 +266,12 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                 type: SelectedVideoTrackType.INDEX,
                 value: selectedVideoTrack
             }}
-            selectedTextTrack={{
-                type: SelectedTrackType.INDEX,
-                value: selectedTextTrack,
-            }}
+            selectedTextTrack={selectedTextTrackProps}
             onError={(e: any) => {
-                console.error('ExoPlayer Error', e);
-                setPlaybackError(`Playback error: ${e?.error?.errorString || 'Unknown error'}`);
-                onError && onError(`Playback error: ${e?.error?.errorString || 'Unknown error'}`);
+                console.error('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });
+                const errMsg = e?.error?.errorString || e?.message || 'Unknown error';
+                setPlaybackError(`Playback error: ${errMsg}`);
+                onError && onError(`Playback error: ${errMsg}`);
             }}
         />
     );

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Switch, Dimensions } from 'react-na
 import { useSettingsStore, AppTheme } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import appConfigJson from '@/app.json';
 
@@ -48,11 +48,13 @@ export default function TVSettingsScreen() {
         longPressSpeedEnabled, doubleTapSeekEnabled,
         playbackGesturesEnabled, autoRotate,
         defaultScreen,
+        cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider, cinemaFilters, cinemaCardSize,
         setSetting
     } = useSettingsStore();
 
+    const [activeTab, setActiveTab] = React.useState('general');
+
     const c = Colors[theme] || Colors.dark;
-    const gradients = c.gradients || { primary: [c.primary, c.primary] };
 
     const settingsValues: any = {
         confirmExit, pipEnabled, resizeButtonEnabled,
@@ -60,223 +62,299 @@ export default function TVSettingsScreen() {
         playbackGesturesEnabled, autoRotate,
     };
 
-    const renderThemeCard = (item: typeof THEMES[0]) => {
-        const isActive = theme === item.id;
-        return (
-            <TVFocusable
-                key={item.id}
-                style={[
-                    styles.themeCard,
-                    { borderColor: isActive ? item.color : c.border },
-                    isActive && { borderWidth: 2 },
-                ]}
-                onPress={() => setSetting('theme', item.id)}
-                focusedScale={1.06}
-                focusedBorderColor={item.color}
-                nativeID={`tv-theme-${item.id}`}
-            >
-                <LinearGradient
-                    colors={[item.gradient[0] + '30', item.gradient[1] + '10', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                />
-                <View style={[styles.themeIconWrap, { backgroundColor: item.color + '20' }]}>
-                    <MaterialCommunityIcons name={item.icon} size={28} color={item.color} />
-                </View>
-                <Text style={[styles.themeName, { color: isActive ? item.color : c.text }]} numberOfLines={1}>
-                    {item.name}
-                </Text>
-                {isActive && (
-                    <View style={[styles.themeCheck, { backgroundColor: item.color }]}>
-                        <MaterialCommunityIcons name="check" size={14} color="#fff" />
-                    </View>
-                )}
-            </TVFocusable>
-        );
-    };
-
-    const renderToggle = (item: typeof PLAYER_SETTINGS[0], index: number) => {
+    const renderToggle = (item: typeof PLAYER_SETTINGS[0]) => {
         const value = settingsValues[item.key];
         return (
             <TVFocusable
                 key={item.key}
                 style={[
                     styles.toggleRow,
-                    { backgroundColor: hexAlpha(c.card, 0.8), borderColor: value ? hexAlpha(c.primary, 0.25) : c.border },
+                    { backgroundColor: hexAlpha(c.card, 0.4), borderColor: c.border },
                 ]}
                 onPress={() => toggleSetting(item.key as any)}
                 focusedScale={1.02}
+                focusedBorderColor={c.primary}
                 nativeID={`tv-setting-${item.key}`}
             >
-                <View style={[styles.toggleIconWrap, { backgroundColor: value ? hexAlpha(c.primary, 0.15) : hexAlpha(c.text, 0.05) }]}>
-                    <MaterialCommunityIcons name={item.icon} size={22} color={value ? c.primary : c.textSecondary} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={[styles.toggleIconWrap, { backgroundColor: hexAlpha(c.text, 0.05) }]}>
+                        <MaterialCommunityIcons name={item.icon} size={20} color={c.textSecondary} />
+                    </View>
+                    <View style={styles.toggleInfo}>
+                        <Text style={[styles.toggleLabel, { color: c.text }]}>{item.label}</Text>
+                        <Text style={[styles.toggleDesc, { color: c.textSecondary }]} numberOfLines={1}>{item.desc}</Text>
+                    </View>
+                    <Switch
+                        value={value}
+                        onValueChange={() => toggleSetting(item.key as any)}
+                        trackColor={{ false: 'rgba(255,255,255,0.1)', true: hexAlpha(c.primary, 0.5) }}
+                        thumbColor={value ? c.primary : '#94a3b8'}
+                        style={styles.switchSize}
+                    />
                 </View>
-                <View style={styles.toggleInfo}>
-                    <Text style={[styles.toggleLabel, { color: c.text }]}>{item.label}</Text>
-                    <Text style={[styles.toggleDesc, { color: c.textSecondary }]} numberOfLines={1}>{item.desc}</Text>
-                </View>
-                <Switch
-                    value={value}
-                    onValueChange={() => toggleSetting(item.key as any)}
-                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: hexAlpha(c.primary, 0.5) }}
-                    thumbColor={value ? c.primary : '#94a3b8'}
-                    style={styles.switchSize}
-                />
             </TVFocusable>
         );
     };
 
-    const renderDefaultScreen = (item: typeof DEFAULT_SCREENS[0]) => {
+    const renderThemeItem = (item: typeof THEMES[0]) => {
+        const isActive = theme === item.id;
+        return (
+            <TVFocusable
+                key={item.id}
+                style={[
+                    styles.compactCard,
+                    {
+                        backgroundColor: hexAlpha(c.card, 0.4),
+                        borderColor: isActive ? item.color : c.border
+                    },
+                ]}
+                onPress={() => setSetting('theme', item.id)}
+                focusedScale={1.03}
+                focusedBorderColor={item.color}
+                nativeID={`tv-theme-${item.id}`}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={[styles.compactIconWrap, { backgroundColor: item.color + '20' }]}>
+                        <MaterialCommunityIcons name={item.icon} size={20} color={item.color} />
+                    </View>
+                    <Text style={[styles.compactLabel, { color: isActive ? item.color : c.text }]} numberOfLines={1}>
+                        {item.name}
+                    </Text>
+                    {isActive && (
+                        <MaterialCommunityIcons name="check-circle" size={18} color={item.color} style={styles.compactCheck} />
+                    )}
+                </View>
+            </TVFocusable>
+        );
+    };
+
+    const renderDefaultScreenItem = (item: typeof DEFAULT_SCREENS[0]) => {
         const isActive = (defaultScreen || 'home') === item.id;
         return (
             <TVFocusable
                 key={item.id}
                 style={[
-                    styles.screenCard,
-                    { borderColor: isActive ? c.primary : c.border },
-                    isActive && { borderWidth: 2 },
+                    styles.compactCard,
+                    {
+                        backgroundColor: hexAlpha(c.card, 0.4),
+                        borderColor: isActive ? c.primary : c.border
+                    },
                 ]}
                 onPress={() => setSetting('defaultScreen', item.id)}
-                focusedScale={1.06}
+                focusedScale={1.03}
+                focusedBorderColor={c.primary}
                 nativeID={`tv-screen-${item.id}`}
             >
-                <LinearGradient
-                    colors={isActive
-                        ? [item.gradient[0] + '25', item.gradient[1] + '08', 'transparent']
-                        : ['transparent', 'transparent']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                />
-                <View style={[styles.screenIconWrap, { backgroundColor: isActive ? item.gradient[0] + '20' : hexAlpha(c.text, 0.05) }]}>
-                    <MaterialCommunityIcons
-                        name={item.icon as any}
-                        size={26}
-                        color={isActive ? item.gradient[0] : c.textSecondary}
-                    />
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={[styles.compactIconWrap, { backgroundColor: hexAlpha(c.text, 0.05) }]}>
+                        <MaterialCommunityIcons
+                            name={item.icon as any}
+                            size={20}
+                            color={isActive ? c.primary : c.textSecondary}
+                        />
+                    </View>
+                    <Text style={[
+                        styles.compactLabel,
+                        { color: isActive ? c.text : c.textSecondary },
+                    ]}>{item.name}</Text>
+                    {isActive && (
+                        <MaterialCommunityIcons name="check-circle" size={18} color={c.primary} style={styles.compactCheck} />
+                    )}
                 </View>
-                <Text style={[
-                    styles.screenName,
-                    { color: isActive ? c.text : c.textSecondary },
-                ]}>{item.name}</Text>
-                {isActive && (
-                    <View style={[styles.screenActiveDot, { backgroundColor: c.primary }]} />
-                )}
             </TVFocusable>
         );
     };
 
+    const SETTINGS_TABS = [
+        { id: 'general', label: 'General', icon: 'cogs' },
+        { id: 'cinema', label: 'Cinema', icon: 'movie-open' },
+        { id: 'playback', label: 'Playback', icon: 'play-circle-outline' },
+        { id: 'appearance', label: 'Appearance', icon: 'palette' },
+        { id: 'about', label: 'About', icon: 'information-outline' },
+    ];
+
     return (
         <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* ── Header ─────────────────────────────────── */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <View style={styles.headerIconWrap}>
-                            <LinearGradient
-                                colors={gradients.primary as any}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={StyleSheet.absoluteFill}
-                            />
-                            <MaterialCommunityIcons name="cog" size={24} color="#fff" />
-                        </View>
-                        <View>
-                            <Text style={[styles.headerTitle, { color: c.text }]}>Settings</Text>
-                            <Text style={[styles.headerSubtitle, { color: c.textSecondary }]}>
-                                Customize your experience
-                            </Text>
-                        </View>
+            <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                    <View style={styles.headerIconWrap}>
+                        <MaterialCommunityIcons name="cog" size={24} color={c.text} />
+                    </View>
+                    <View>
+                        <Text style={[styles.headerTitle, { color: c.text }]}>Settings</Text>
+                        <Text style={[styles.headerSubtitle, { color: c.textSecondary }]}>
+                            Customize Rogplay TV to your preference
+                        </Text>
                     </View>
                 </View>
+            </View>
 
-                {/* ── Two-Column Layout ──────────────────────── */}
-                <View style={styles.columns}>
+            <View style={styles.content}>
+                {/* ── LEFT PANE: TABS ──────────────────────── */}
+                <View style={styles.leftPane}>
+                    {SETTINGS_TABS.map(tab => {
+                        const isActive = activeTab === tab.id;
+                        return (
 
-                    {/* ── LEFT COLUMN ──────────────────────── */}
-                    <View style={styles.leftCol}>
+                            <TVFocusable
+                                key={tab.id}
+                                style={[
+                                    styles.tabItem,
+                                    isActive && { backgroundColor: hexAlpha(c.primary, 0.15) }
+                                ]}
+                                onPress={() => setActiveTab(tab.id)}
+                                focusedScale={1.03}
+                                focusedBorderColor={c.primary}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <MaterialCommunityIcons
+                                        name={tab.icon as any}
+                                        style={{ padding: 2, paddingRight: 5 }}
+                                        size={20}
+                                        color={isActive ? c.primary : c.textSecondary}
+                                    />
+                                    <Text style={[styles.tabLabel, { color: isActive ? c.primary : c.textSecondary }]}>
+                                        {tab.label}
+                                    </Text>
+                                </View>
+                            </TVFocusable>
+                        );
+                    })}
+                </View>
 
-                        {/* Appearance */}
+                {/* ── RIGHT PANE: CONTENT ────────────────────── */}
+                <ScrollView
+                    style={styles.rightPane}
+                    contentContainerStyle={styles.rightPaneContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {activeTab === 'general' && (
                         <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <MaterialCommunityIcons name="palette" size={18} color={c.primary} />
-                                <Text style={[styles.sectionTitle, { color: c.primary }]}>Appearance</Text>
+                            <Text style={[styles.sectionTitle, { color: c.text }]}>General</Text>
+                            <View style={styles.listContainer}>
+                                {PLAYER_SETTINGS.filter(item => item.key === 'confirmExit').map(item => renderToggle(item))}
                             </View>
-                            <View style={styles.themesGrid}>
-                                {THEMES.map(renderThemeCard)}
+
+                            <Text style={[styles.sectionTitle, { color: c.text, marginTop: 24 }]}>Default Screen</Text>
+                            <View style={styles.gridContainer}>
+                                {DEFAULT_SCREENS.map(renderDefaultScreenItem)}
                             </View>
                         </View>
+                    )}
 
-                        {/* Default Screen */}
+                    {activeTab === 'cinema' && (
                         <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <MaterialCommunityIcons name="home" size={18} color={c.primary} />
-                                <Text style={[styles.sectionTitle, { color: c.primary }]}>Default Screen</Text>
+                            <Text style={[styles.sectionTitle, { color: c.text }]}>Cinema</Text>
+                            <View style={styles.listContainer}>
+                                {([
+                                    { key: 'cinemaContinueWatching', label: 'Continue Watching', desc: 'Show resumable content row', icon: 'history', value: cinemaContinueWatching },
+                                    { key: 'cinemaPlatforms', label: 'Show Platforms', desc: 'OTT platforms row (TMDB addon)', icon: 'television-play', value: cinemaPlatforms },
+                                    { key: 'cinemaHomeSlider', label: 'Show Home Slider', desc: 'Trending hero slider at top', icon: 'image-multiple', value: cinemaHomeSlider },
+                                    { key: 'cinemaFilters', label: 'Show Filters', desc: 'Genre/year filter bar', icon: 'filter-variant', value: cinemaFilters },
+                                ] as const).map(item => (
+                                    <TVFocusable
+                                        key={item.key}
+                                        style={[styles.toggleRow, { backgroundColor: hexAlpha(c.card, 0.4), borderColor: c.border }]}
+                                        onPress={() => toggleSetting(item.key as any)}
+                                        focusedScale={1.02}
+                                        focusedBorderColor={c.primary}
+                                        nativeID={`tv-cinema-${item.key}`}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                            <View style={[styles.toggleIconWrap, { backgroundColor: hexAlpha(c.text, 0.05) }]}>
+                                                <MaterialCommunityIcons name={item.icon as any} size={20} color={c.textSecondary} />
+                                            </View>
+                                            <View style={styles.toggleInfo}>
+                                                <Text style={[styles.toggleLabel, { color: c.text }]}>{item.label}</Text>
+                                                <Text style={[styles.toggleDesc, { color: c.textSecondary }]} numberOfLines={1}>{item.desc}</Text>
+                                            </View>
+                                            <Switch
+                                                value={item.value}
+                                                onValueChange={() => toggleSetting(item.key as any)}
+                                                trackColor={{ false: 'rgba(255,255,255,0.1)', true: hexAlpha(c.primary, 0.5) }}
+                                                thumbColor={item.value ? c.primary : '#94a3b8'}
+                                                style={styles.switchSize}
+                                            />
+                                        </View>
+                                    </TVFocusable>
+                                ))}
                             </View>
-                            <View style={styles.screensGrid}>
-                                {DEFAULT_SCREENS.map(renderDefaultScreen)}
+
+                            <Text style={[styles.sectionTitle, { color: c.text, marginTop: 24 }]}>Card Size</Text>
+                            <View style={styles.gridContainer}>
+                                {(['small', 'medium', 'large'] as const).map(size => {
+                                    const isActive = cinemaCardSize === size;
+                                    const icons = { small: 'view-grid', medium: 'view-module', large: 'view-agenda' };
+                                    return (
+                                        <TVFocusable
+                                            key={size}
+                                            style={[styles.compactCard, { backgroundColor: hexAlpha(c.card, 0.4), borderColor: isActive ? c.primary : c.border }]}
+                                            onPress={() => setSetting('cinemaCardSize', size)}
+                                            focusedScale={1.03}
+                                            focusedBorderColor={c.primary}
+                                            nativeID={`tv-cardsize-${size}`}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                <View style={[styles.compactIconWrap, { backgroundColor: hexAlpha(c.text, 0.05) }]}>
+                                                    <MaterialCommunityIcons name={icons[size] as any} size={20} color={isActive ? c.primary : c.textSecondary} />
+                                                </View>
+                                                <Text style={[styles.compactLabel, { color: isActive ? c.primary : c.text }]}>
+                                                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                                                </Text>
+                                                {isActive && <MaterialCommunityIcons name="check-circle" size={18} color={c.primary} style={styles.compactCheck} />}
+                                            </View>
+                                        </TVFocusable>
+                                    );
+                                })}
                             </View>
-                            <Text style={[styles.screenHint, { color: c.textSecondary }]}>
-                                Choose the screen that opens when you start the app.
-                            </Text>
                         </View>
+                    )}
 
-                        {/* About */}
+                    {activeTab === 'playback' && (
                         <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <MaterialCommunityIcons name="information-outline" size={18} color={c.primary} />
-                                <Text style={[styles.sectionTitle, { color: c.primary }]}>About</Text>
+                            <Text style={[styles.sectionTitle, { color: c.text }]}>Playback</Text>
+                            <View style={styles.listContainer}>
+                                {PLAYER_SETTINGS.filter(item => item.key !== 'confirmExit').map(item => renderToggle(item))}
                             </View>
-                            <View style={[styles.aboutCard, { backgroundColor: hexAlpha(c.card, 0.8), borderColor: c.border }]}>
-                                <LinearGradient
-                                    colors={[c.primary + '08', 'transparent']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={StyleSheet.absoluteFill}
-                                />
+                        </View>
+                    )}
+
+                    {activeTab === 'appearance' && (
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: c.text }]}>Appearance</Text>
+                            <View style={styles.gridContainer}>
+                                {THEMES.map(renderThemeItem)}
+                            </View>
+                        </View>
+                    )}
+
+                    {activeTab === 'about' && (
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: c.text }]}>About</Text>
+                            <View style={[styles.aboutCard, { backgroundColor: hexAlpha(c.card, 0.4), borderColor: c.border }]}>
                                 <View style={styles.aboutRow}>
-                                    <View style={[styles.aboutLogoWrap, { backgroundColor: c.primary + '15' }]}>
-                                        <MaterialCommunityIcons name="play-box" size={28} color={c.primary} />
+                                    <View style={[styles.aboutLogoWrap, { backgroundColor: hexAlpha(c.primary, 0.1), borderColor: hexAlpha(c.primary, 0.2), borderWidth: 1 }]}>
+                                        <MaterialCommunityIcons name="play-box" size={32} color={c.primary} />
                                     </View>
                                     <View style={styles.aboutInfo}>
                                         <Text style={[styles.aboutAppName, { color: c.text }]}>RogPlay TV</Text>
-                                        <Text style={[styles.aboutVersion, { color: c.textSecondary }]}>{appConfigJson.expo.version} TV Edition</Text>
+                                        <Text style={[styles.aboutVersion, { color: c.textSecondary }]}>Version {appConfigJson.expo.version}</Text>
+                                        <Text style={[styles.aboutAuthor, { color: c.textSecondary }]}>© {new Date().getFullYear()} Rogplay TV. All rights reserved.</Text>
                                     </View>
                                 </View>
                             </View>
                         </View>
-                    </View>
-
-                    {/* ── RIGHT COLUMN ─────────────────────── */}
-                    <View style={styles.rightCol}>
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <MaterialCommunityIcons name="play-circle-outline" size={18} color={c.primary} />
-                                <Text style={[styles.sectionTitle, { color: c.primary }]}>Player</Text>
-                            </View>
-                            <View style={styles.togglesList}>
-                                {PLAYER_SETTINGS.map((item, index) => renderToggle(item, index))}
-                            </View>
-                        </View>
-                    </View>
-
-                </View>
-            </ScrollView>
+                    )}
+                </ScrollView>
+            </View>
         </View>
     );
 }
-
-const LEFT_COL_RATIO = 0.48;
-const RIGHT_COL_RATIO = 0.52;
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'transparent',
-    },
-    scrollContent: {
         paddingTop: 60,
         paddingHorizontal: 44,
         paddingBottom: 60,
@@ -286,8 +364,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 28,
+        marginBottom: 32,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -297,190 +374,154 @@ const styles = StyleSheet.create({
     headerIconWrap: {
         width: 44,
         height: 44,
-        borderRadius: 14,
-        overflow: 'hidden',
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
     },
     headerTitle: {
-        fontSize: 30,
-        fontFamily: 'Outfit_800ExtraBold',
-        letterSpacing: 0.3,
+        fontSize: 28,
+        fontFamily: 'Inter_700Bold',
+        letterSpacing: 0.2,
     },
     headerSubtitle: {
         fontSize: 14,
         marginTop: 2,
-        opacity: 0.8,
-        fontFamily: 'Outfit_500Medium',
+        opacity: 0.7,
+        fontFamily: 'Inter_400Regular',
     },
 
-    /* ── Columns ───────────────────────────── */
-    columns: {
+    /* ── Layout ───────────────────────────── */
+    content: {
+        flex: 1,
         flexDirection: 'row',
-        gap: 32,
+        gap: 40,
     },
-    leftCol: {
-        flex: LEFT_COL_RATIO,
+    leftPane: {
+        width: 180,
+        gap: 6,
     },
-    rightCol: {
-        flex: RIGHT_COL_RATIO,
+    rightPane: {
+        flex: 1,
     },
-
-    /* ── Sections ──────────────────────────── */
-    section: {
-        marginBottom: 28,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 14,
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontFamily: 'Outfit_700Bold',
-        textTransform: 'uppercase',
-        letterSpacing: 1.5,
+    rightPaneContent: {
+        paddingBottom: 40,
     },
 
-    /* ── Themes ─────────────────────────────── */
-    themesGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    themeCard: {
-        width: '30%',
-        paddingVertical: 14,
-        paddingHorizontal: 12,
-        borderRadius: 16,
-        alignItems: 'center',
-        borderWidth: 1,
-        backgroundColor: 'rgba(255,255,255,0.02)',
-        overflow: 'hidden',
-    },
-    themeIconWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    themeName: {
-        fontSize: 13,
-        fontFamily: 'Outfit_600SemiBold',
-        textAlign: 'center',
-    },
-    themeCheck: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    /* ── Player Toggles ────────────────────── */
-    togglesList: {
-        gap: 8,
-    },
-    toggleRow: {
+    /* ── Tabs ──────────────────────────────── */
+    tabItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
         paddingHorizontal: 14,
-        marginHorizontal: 14,
-        borderRadius: 14,
+        borderRadius: 12,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    tabLabel: {
+        fontSize: 15,
+        fontFamily: 'Inter_500Medium',
+    },
+
+    /* ── Sections ──────────────────────────── */
+    section: {
+        marginBottom: 24,
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontFamily: 'Inter_600SemiBold',
+        marginBottom: 16,
+    },
+
+    /* ── Lists & Grids ─────────────────────── */
+    listContainer: {
+        gap: 8,
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+
+    /* ── Toggle Row (Smaller Cards) ────────── */
+    toggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
         borderWidth: 1,
     },
     toggleIconWrap: {
-        width: 38,
-        height: 38,
-        borderRadius: 11,
+        width: 36,
+        height: 36,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 14,
     },
     toggleInfo: {
         flex: 1,
     },
     toggleLabel: {
-        fontSize: 16,
-        fontFamily: 'Outfit_600SemiBold',
+        fontSize: 15,
+        fontFamily: 'Inter_500Medium',
     },
     toggleDesc: {
-        fontSize: 11,
+        fontSize: 13,
         marginTop: 2,
-        opacity: 0.7,
-        fontFamily: 'Outfit_500Medium',
+        opacity: 0.6,
+        fontFamily: 'Inter_400Regular',
     },
     switchSize: {
-        transform: [{ scaleX: 1.0 }, { scaleY: 1.0 }],
-        marginLeft: 8,
-        marginRight: 8,
+        transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }],
+        marginLeft: 12,
     },
 
-    /* ── Default Screens ───────────────────── */
-    screensGrid: {
+    /* ── Compact Cards (Themes / Screens) ──── */
+    compactCard: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    screenCard: {
-        width: '22%',
-        paddingVertical: 16,
-        paddingHorizontal: 10,
-        borderRadius: 16,
         alignItems: 'center',
+        width: '48%', // 2 columns
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 12,
         borderWidth: 1,
-        backgroundColor: 'rgba(255,255,255,0.02)',
-        overflow: 'hidden',
     },
-    screenIconWrap: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
+    compactIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+
+        marginRight: 12,
     },
-    screenName: {
-        fontSize: 13,
-        fontFamily: 'Outfit_600SemiBold',
-        textAlign: 'center',
+    compactLabel: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Inter_500Medium',
     },
-    screenActiveDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginTop: 6,
-    },
-    screenHint: {
-        fontSize: 12,
-        marginTop: 10,
-        opacity: 0.7,
-        fontFamily: 'Outfit_400Regular',
+    compactCheck: {
+        marginLeft: 8,
     },
 
     /* ── About ─────────────────────────────── */
     aboutCard: {
         borderRadius: 16,
         borderWidth: 1,
-        padding: 16,
-        overflow: 'hidden',
+        padding: 24,
     },
     aboutRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        gap: 16,
     },
     aboutLogoWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
+        width: 64,
+        height: 64,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -488,13 +529,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     aboutAppName: {
-        fontSize: 18,
-        fontFamily: 'Outfit_700Bold',
+        fontSize: 22,
+        fontFamily: 'Inter_700Bold',
     },
     aboutVersion: {
+        fontSize: 14,
+        marginTop: 4,
+        fontFamily: 'Inter_500Medium',
+    },
+    aboutAuthor: {
         fontSize: 13,
-        marginTop: 3,
-        opacity: 0.7,
-        fontFamily: 'Outfit_400Regular',
+        marginTop: 12,
+        opacity: 0.5,
+        fontFamily: 'Inter_400Regular',
     },
 });

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
 import { getExternalIds } from '@/services/tmdb';
 
@@ -13,14 +13,24 @@ export interface StreamResult {
 }
 
 export function useStreamSources() {
-    const { addons } = useAddonsStore();
+    const addons = useAddonsStore(s => s.addons);
     const [results, setResults] = useState<StreamResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const abortRef = useRef<AbortController | null>(null);
+
+    // Cleanup AbortController on unmount
+    useEffect(() => {
+        return () => {
+            if (abortRef.current) {
+                abortRef.current.abort();
+                abortRef.current = null;
+            }
+        };
+    }, []);
 
     const addResults = (newItems: StreamResult[], cinemaSources: Set<string> = new Set()) => {
         setResults(prev => {
             const combined = [...prev, ...newItems];
-            // Deduplicate by URL
             const unique = combined.filter((v, i, a) => a.findIndex(t => (t.url === v.url)) === i);
             return unique.sort((a, b) => {
                 const aIsCinema = cinemaSources.has(a.source);
@@ -38,14 +48,23 @@ export function useStreamSources() {
         episode?: string | number,
         type: 'movie' | 'tv' | 'rogmovie' = 'movie',
         directUrl?: string,
-        movieData?: string
+        movieData?: string,
+        serverAddonUrl?: string
     ) => {
+        // Cancel previous request
+        if (abortRef.current) {
+            abortRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const signal = controller.signal;
+
         setLoading(true);
         setResults([]);
 
 
         //  ──────────────── ROG MOVIE ADDONS ────────────────
-        
+
         const isMovie = type === 'movie' || type === 'rogmovie';
 
 
@@ -64,6 +83,7 @@ export function useStreamSources() {
                 } else if (directUrl && directUrl !== 'undefined') {
                     const cleanUrl = directUrl.trim();
                     const response = await fetch(cleanUrl, {
+                        signal,
                         headers: {
                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36',
                             'Accept': 'application/json'
@@ -95,6 +115,34 @@ export function useStreamSources() {
             }], cinemaSourceNames);
         }
 
+        // ─── Server Addon: direct stream URL fetch (DesiHub-style) ──────────
+        if (serverAddonUrl && serverAddonUrl !== 'undefined' && serverAddonUrl.trim()) {
+            try {
+                const cleanUrl = serverAddonUrl.trim();
+                const res = await fetch(cleanUrl, {
+                    signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        const mapped: StreamResult[] = data
+                            .filter((s: any) => s.url)
+                            .map((s: any) => ({
+                                title: s.title || s.name || 'Stream',
+                                url: s.url,
+                                headers: s.headers,
+                                source: 'Server Addon',
+                                quality: s.quality || 'Auto'
+                            }));
+                        addResults(mapped, cinemaSourceNames);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch serveraddon stream URL:', e);
+            }
+        }
+
 
         // ─── Stremio Addons (movie/series with manifest) ────────
         const stremioAddons = addons.filter(addon => {
@@ -108,12 +156,14 @@ export function useStreamSources() {
 
         // ─── Resolve IMDb ID if needed for Stremio addons ───────
         let imdbId: string | null = null;
+        let isCustomStremioId = false;
+
         if (stremioAddons.length > 0 && tmdbId) {
             const tmdbStr = String(tmdbId);
             if (tmdbStr.startsWith('tt')) {
                 // Already an IMDb ID
                 imdbId = tmdbStr;
-            } else {
+            } else if (!isNaN(Number(tmdbStr))) {
                 // Fetch IMDb ID from TMDB API
                 try {
                     const tmdbType = isMovie ? 'movie' : 'tv';
@@ -123,6 +173,10 @@ export function useStreamSources() {
                 } catch (err) {
                     console.error('Failed to fetch IMDb ID from TMDB:', err);
                 }
+            } else {
+                // Custom Stremio ID like kisskh:123
+                imdbId = tmdbStr;
+                isCustomStremioId = true;
             }
         }
 
@@ -140,11 +194,18 @@ export function useStreamSources() {
                     streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}.json`;
                 } else {
                     // Series: format is imdbId:season:episode
-                    streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}:${season}:${episode}.json`;
+                    if (isCustomStremioId && (season === undefined || episode === undefined || imdbId.includes(':season='))) {
+                        // Some custom stream requests might just take imdbId straight or format it differently
+                        // But usually Stremio standard is imdbId:season:episode even for custom IDs
+                        streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}.json`;
+                    } else {
+                        streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}:${season}:${episode}.json`;
+                    }
                 }
 
                 console.log(`STREMIO FETCHING: ${streamUrl}`);
-                const res = await fetch(streamUrl);
+                if (signal.aborted) return;
+                const res = await fetch(streamUrl, { signal });
                 if (!res.ok) return;
 
                 const data = await res.json();
@@ -177,8 +238,9 @@ export function useStreamSources() {
         // ─── Fetch from cinema/mapping addons ───────────────────
         const cinemaPromises = cinemaAddons.map(async (addon) => {
             try {
+                if (signal.aborted) return;
                 console.log(`Checking addon: ${addon.title} (${addon.url})`);
-                const response = await fetch(addon.url);
+                const response = await fetch(addon.url, { signal });
                 const json = await response.json();
 
                 if (!Array.isArray(json)) return;
@@ -200,7 +262,7 @@ export function useStreamSources() {
                                 if (!fetchUrl) return;
 
                                 console.log(`CINEMA FETCHING: ${fetchUrl}`);
-                                const res = await fetch(fetchUrl);
+                                const res = await fetch(fetchUrl, { signal });
                                 if (!res.ok) return;
 
                                 const sourceData = await res.json();

@@ -42,7 +42,7 @@ export default function TVDetailsScreen() {
     const fetchDetails = async () => {
         setLoading(true);
         try {
-            const data = await getDetails(type as 'movie' | 'tv', Number(id));
+            const data = await getDetails(type as 'movie' | 'tv', id as string);
             setDetails(data);
         } catch (error) {
             console.error(error);

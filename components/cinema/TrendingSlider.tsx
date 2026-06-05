@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, Image, TouchableOpacity, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Animated, Platform } from 'react-native';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getTrending } from '@/services/tmdb';
 import { Colors } from '@/constants/Colors';
@@ -67,7 +68,7 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur, currentColo
                 },
                 isFocused && styles.focusMinimal
             ]}>
-                <Image
+                <OptimizedImage
                     source={{ uri: imageUrl }}
                     style={styles.poster}
                 />
@@ -209,7 +210,7 @@ function TrendingSlider({ fullScreen = false }: TrendingSliderProps) {
                         backgroundColor: currentColors.card
                     },
                 ]}>
-                    <Image
+                    <OptimizedImage
                         source={{ uri: `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${item.backdrop_path}` }}
                         style={styles.poster}
                     />
@@ -276,6 +277,10 @@ function TrendingSlider({ fullScreen = false }: TrendingSliderProps) {
                     { useNativeDriver: true }
                 )}
                 scrollEventThrottle={16}
+                initialNumToRender={Math.min(6, data.length)}
+                maxToRenderPerBatch={6}
+                windowSize={5}
+                removeClippedSubviews={true}
             />
         </View>
     );

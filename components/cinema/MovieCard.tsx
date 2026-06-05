@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Platform, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -10,89 +12,186 @@ import { TVFocusable } from '@/components/TVFocusable';
 interface MovieCardProps {
     item: any;
     type?: 'movie' | 'tv';
+    addonType?: string;
+    catalogTypeRaw?: string | undefined;
     width?: number;
     showType?: boolean;
     style?: any;
     onPress?: () => void;
 }
 
-function MovieCard({ item, type, width = 120, showType = false, style, onPress }: MovieCardProps) {
+function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showType = false, style, onPress }: MovieCardProps) {
     const router = useRouter();
     const theme = useSettingsStore((state) => state.theme);
     const currentColors = useMemo(() => Colors[theme] || Colors.dark, [theme]);
 
-    const mediaType = type || item.media_type || 'movie';
+    const mediaType = (type || item.media_type || 'movie') as 'movie' | 'tv';
+
     const posterUrl = useMemo(() => {
         const makeImageUrl = (path?: string) => {
             if (!path) return null;
+            if (typeof path !== 'string') return null;
             if (path.startsWith('http://') || path.startsWith('https://')) return path;
             return `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${path}`;
         };
 
-        if (Platform.isTV && item.backdrop_path) {
-            return makeImageUrl(item.backdrop_path);
-        }
-
-        if (item.poster_path) {
-            return makeImageUrl(item.poster_path);
-        }
-
+        if (Platform.isTV && item.backdrop_path) return makeImageUrl(item.backdrop_path);
+        if (item.poster_path) return makeImageUrl(item.poster_path);
+        if (item.poster) return makeImageUrl(item.poster);
+        if (item.logo) return makeImageUrl(item.logo);
+        if (item.image) return makeImageUrl(item.image);
+        if (item.thumbnail) return makeImageUrl(item.thumbnail);
         return null;
-    }, [item.backdrop_path, item.poster_path]);
+    }, [item.backdrop_path, item.poster_path, item.poster, item.logo, item.image, item.thumbnail]);
 
-    const handlePress = () => {
+    /**
+     * Detects if an ID is a custom Stremio ID (e.g. "kisskh:12572", "onetouchtv:456")
+     * as opposed to a TMDB numeric ID or IMDb "tt..." ID.
+     */
+    const isCustomStremioId = (id: string) => {
+        if (!id) return false;
+        if (id.startsWith('tt')) return false;           // IMDb ID
+        if (!isNaN(Number(id))) return false;             // Numeric TMDB ID
+        if (id.includes(':')) return true;               // e.g. kisskh:12572
+        // Check for non-numeric non-tt string IDs with known prefixes
+        return /^[a-zA-Z][a-zA-Z0-9]+/.test(id) && isNaN(Number(id));
+    };
+
+    const handlePress = async () => {
         if (onPress) {
             onPress();
             return;
         }
+
+        const itemId = item.id?.toString() || '';
+        const finalAddonType = addonType || item.addonType;
+        const streamUrl = item.url || item.movieUrl || item.link || item.source || '';
+
+        // ── music: route to music-player ──
+        if (finalAddonType === 'music') {
+            const baseUrl = item._addonUrl || '';
+            const manifestStr = item._addonManifestStr || '';
+
+            let trackUrl = streamUrl;
+            let trackHeaders = item.headers || {};
+
+            if (!trackUrl && baseUrl) {
+                try {
+                    const cleanBase = baseUrl.replace(/\/manifest\.json$/, '');
+                    const res = await fetch(`${cleanBase}/stream/movie/${itemId}.json`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const streams = data.streams || [];
+                        if (streams.length > 0) {
+                            trackUrl = streams[0].url || trackUrl;
+                            trackHeaders = streams[0].headers || trackHeaders;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch music stream:', e);
+                }
+            }
+
+            const params: any = {
+                tracks: JSON.stringify([{
+                    id: itemId,
+                    title: item.title || item.name || 'Unknown Track',
+                    artist: item.artist || item.subtitle || '',
+                    poster: posterUrl,
+                    url: trackUrl,
+                    headers: trackHeaders,
+                }]),
+                index: '0',
+                addonUrl: baseUrl,
+                addonManifest: manifestStr,
+            };
+            if (Platform.isTV) {
+                router.push({ pathname: '/(tv)/music-player', params });
+            } else {
+                router.push({ pathname: '/music-player', params });
+            }
+            return;
+        }
+
+        // ── serveraddon: items have a direct stream URL, skip details entirely ──
+        if (finalAddonType === 'serveraddon') {
+            const params: any = {
+                query: item.title || item.name || '',
+                type: 'addon',
+                movieUrl: streamUrl,
+                title: item.title || item.name,
+                poster: posterUrl,
+            };
+            if (Platform.isTV) {
+                router.push({ pathname: '/(tv)/server-selection', params });
+            } else {
+                router.push({ pathname: '/server-selection', params });
+            }
+            return;
+        }
+
+        // ── stremioaddon with custom ID (kisskh:xxx etc): use stremio-browser ──
+        if (finalAddonType === 'stremio' && isCustomStremioId(itemId)) {
+            const stremioAddonUrl = item._addonUrl || item.stremioAddonUrl || '';
+            const params: any = {
+                selectedItemId: itemId,
+                selectedItemType: item.type || catalogTypeRaw || mediaType,
+                title: item.title || item.name,
+                url: stremioAddonUrl,
+                manifest: item._addonManifestStr || ''
+            };
+            console.log('Routing to stremio-browser with url:', stremioAddonUrl);
+            if (Platform.isTV) {
+                router.push({ pathname: '/(tv)/stremio-browser', params });
+            } else {
+                router.push({ pathname: '/stremio-browser', params });
+            }
+            return;
+        }
+
+        // ── tmdbaddon / stremioaddon with standard IDs → TMDB details page ──
+        const finalUrl = item._addonUrl || item.stremioAddonUrl;
+        const finalManifest = item._addonManifestStr || item.stremioAddonManifest;
+
         if (Platform.isTV) {
-            router.push({
-                pathname: '/(tv)/details/[type]/[id]',
-                params: { id: item.id, type: mediaType }
-            });
+            router.push({ pathname: '/(tv)/details/[type]/[id]', params: { id: itemId, type: mediaType, ...(finalUrl ? { url: finalUrl, manifest: finalManifest } : {}) } });
         } else {
-            router.push({
-                pathname: '/details/[type]/[id]',
-                params: { id: item.id, type: mediaType }
-            });
+            router.push({ pathname: '/(mobile)/details/[type]/[id]', params: { id: itemId, type: mediaType, ...(finalUrl ? { url: finalUrl, manifest: finalManifest } : {}) } });
         }
     };
 
+
     if (Platform.isTV) {
         return (
-            <TVFocusable
-                style={[styles.container, { width }, style]}
-                onPress={handlePress}
-                focusedScale={1.1}
-            >
+            <TVFocusable style={[styles.container, { width }, style]} onPress={handlePress} focusedScale={1.1}>
                 {({ focused }: any) => (
-                    <View style={[
-                        styles.posterContainer,
-                        {
-                            backgroundColor: '#000',
-                            borderColor: focused ? currentColors.primary : 'rgba(255,255,255,0.1)',
-                            borderWidth: 2,
-                        },
-                        focused && {
-                            shadowColor: currentColors.primary,
-                            shadowOffset: { width: 0, height: 15 },
-                            shadowOpacity: 0.5,
-                            shadowRadius: 20,
-                            elevation: 20,
-                        }
-                    ]}>
+                    <View
+                        style={[
+                            styles.posterContainer,
+                            {
+                                backgroundColor: 'transparent',
+                                borderColor: focused ? currentColors.glow : 'rgba(255,255,255,0.2)',
+                                borderWidth: 1,
+                            },
+                            focused && {
+                                shadowColor: currentColors.primary,
+                                shadowOffset: { width: 0, height: 10 },
+                                shadowOpacity: 0.8,
+                                shadowRadius: 15,
+                                elevation: 20,
+                            },
+                        ]}
+                    >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         {posterUrl ? (
-                            <Image source={{ uri: posterUrl }} style={styles.poster} />
+                            <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} />
                         ) : (
                             <View style={styles.placeholder}>
                                 <MaterialIcons name="movie" size={width * 0.3} color={currentColors.textSecondary} />
                             </View>
                         )}
 
-                        <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.9)']}
-                            style={styles.gradient}
-                        />
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.9)']} style={styles.gradient} />
 
                         {item.vote_average > 0 && (
                             <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
@@ -107,9 +206,7 @@ function MovieCard({ item, type, width = 120, showType = false, style, onPress }
                             </Text>
                             <View style={styles.tvMeta}>
                                 {item.release_date || item.first_air_date ? (
-                                    <Text style={styles.tvYear}>
-                                        {(item.release_date || item.first_air_date).split('-')[0]}
-                                    </Text>
+                                    <Text style={styles.tvYear}>{(item.release_date || item.first_air_date).split('-')[0]}</Text>
                                 ) : null}
                                 <View style={styles.dotSeparator} />
                                 <Text style={styles.tvMediaType}>{mediaType.toUpperCase()}</Text>
@@ -122,24 +219,16 @@ function MovieCard({ item, type, width = 120, showType = false, style, onPress }
     }
 
     return (
-        <TouchableOpacity
-            style={[styles.container, { width }, style]}
-            onPress={handlePress}
-            activeOpacity={0.8}
-        >
-            <View style={[styles.posterContainer, { backgroundColor: currentColors.card }]}>
-                {posterUrl ? (
-                    <Image source={{ uri: posterUrl }} style={styles.poster} />
-                ) : (
+        <TouchableOpacity style={[styles.container, { width }, style]} onPress={handlePress} activeOpacity={0.8}>
+            <View style={[styles.posterContainer, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]}>
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                {posterUrl ? <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} /> : (
                     <View style={styles.placeholder}>
                         <MaterialIcons name="movie" size={width * 0.3} color={currentColors.textSecondary} />
                     </View>
                 )}
 
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']}
-                    style={styles.gradient}
-                />
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']} style={styles.gradient} />
 
                 {item.vote_average > 0 && (
                     <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
@@ -155,16 +244,9 @@ function MovieCard({ item, type, width = 120, showType = false, style, onPress }
                 )}
             </View>
             <View style={styles.info}>
-                <Text style={[
-                    styles.title,
-                    { color: currentColors.text },
-                ]} numberOfLines={1}>
-                    {item.title || item.name}
-                </Text>
+                <Text style={[styles.title, { color: currentColors.text }]} numberOfLines={1}>{item.title || item.name}</Text>
                 {item.release_date || item.first_air_date ? (
-                    <Text style={[styles.year, { color: currentColors.textSecondary }]}>
-                        {(item.release_date || item.first_air_date).split('-')[0]}
-                    </Text>
+                    <Text style={[styles.year, { color: currentColors.textSecondary }]}>{(item.release_date || item.first_air_date).split('-')[0]}</Text>
                 ) : null}
             </View>
         </TouchableOpacity>
@@ -172,12 +254,10 @@ function MovieCard({ item, type, width = 120, showType = false, style, onPress }
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginBottom: 12,
-    },
+    container: { marginBottom: 12 },
     posterContainer: {
         aspectRatio: Platform.isTV ? 16 / 9 : 2 / 3,
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: 'hidden',
         position: 'relative',
         elevation: 5,
@@ -186,110 +266,30 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 6,
     },
-    poster: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    placeholder: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    gradient: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '50%',
-    },
-    ratingBadge: {
-        position: 'absolute',
-        top: 8,
-        left: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-        gap: 2,
-    },
-    ratingText: {
-        color: '#fff',
-        fontSize: 11,
-        fontFamily: 'Inter_700Bold',
-    },
-    typeBadge: {
-        position: 'absolute',
-        bottom: 8,
-        right: 8,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    typeText: {
-        color: '#fff',
-        fontSize: 10,
-        fontFamily: 'Inter_700Bold',
-    },
-    info: {
-        marginTop: 8,
-        paddingHorizontal: 2,
-    },
-    title: {
-        fontSize: 13,
-        fontFamily: 'Outfit_600SemiBold',
-    },
-    year: {
-        fontSize: 11,
-        fontFamily: 'Inter_400Regular',
-        marginTop: 2,
-    },
-    tvOverlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 12,
-        paddingTop: 20,
-    },
-    tvTitle: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '900',
-        fontFamily: 'Outfit_800ExtraBold',
-        letterSpacing: -0.3,
-    },
-    tvMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-        gap: 8,
-    },
-    tvYear: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
-        fontFamily: 'Outfit_500Medium',
-    },
-    dotSeparator: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: 'rgba(255,255,255,0.4)',
-    },
-    tvMediaType: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 10,
-        fontWeight: 'bold',
-        fontFamily: 'Outfit_700Bold',
-        letterSpacing: 0.5,
-    }
+    poster: { width: '100%', height: '100%', resizeMode: 'cover' },
+    placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' },
+    ratingBadge: { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 2 },
+    ratingText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
+    typeBadge: { position: 'absolute', bottom: 8, right: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    typeText: { color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' },
+    info: { marginTop: 8, paddingHorizontal: 2 },
+    title: { fontSize: 13, fontFamily: 'Outfit_600SemiBold' },
+    year: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+    tvOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, paddingTop: 20 },
+    tvTitle: { color: '#fff', fontSize: 16, fontFamily: 'PlayfairDisplay_600SemiBold', letterSpacing: -0.3 },
+    tvMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 },
+    tvYear: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+    dotSeparator: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
+    tvMediaType: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.5 }
 });
 
 export default React.memo(MovieCard, (prev, next) => {
     return (
         prev.item?.id === next.item?.id &&
         prev.type === next.type &&
+        prev.addonType === next.addonType &&
+        prev.catalogTypeRaw === next.catalogTypeRaw &&
         prev.width === next.width &&
         prev.showType === next.showType &&
         prev.onPress === next.onPress

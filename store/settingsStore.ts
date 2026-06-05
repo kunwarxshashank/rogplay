@@ -19,6 +19,12 @@ interface SettingsState {
     autoSubtitles: boolean;
     forceLandscape: boolean;
     hasSeenAddonFTUE: boolean;
+    // Cinema settings
+    cinemaContinueWatching: boolean;
+    cinemaPlatforms: boolean;
+    cinemaHomeSlider: boolean;
+    cinemaFilters: boolean;
+    cinemaCardSize: 'small' | 'medium' | 'large';
     toggleSetting: (key: keyof SettingsState) => void;
     setSetting: (key: keyof SettingsState, value: any) => void;
     setHasSeenAddonFTUE: (val: boolean) => void;
@@ -40,6 +46,12 @@ export const useSettingsStore = create<SettingsState>()(
             autoSubtitles: true,
             forceLandscape: false,
             hasSeenAddonFTUE: false,
+            // Cinema defaults
+            cinemaContinueWatching: true,
+            cinemaPlatforms: true,
+            cinemaHomeSlider: true,
+            cinemaFilters: true,
+            cinemaCardSize: 'medium',
 
             toggleSetting: (key) => set((state: any) => {
                 if (key === 'theme') {

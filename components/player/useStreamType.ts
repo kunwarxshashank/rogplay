@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function useStreamType(url: string, headers: any = {}) {
     const [streamType, setStreamType] = useState<'hls' | 'mp4' | 'mkv' | 'unknown' | null>(null);
     const [isVlcRequired, setIsVlcRequired] = useState(false);
     const [isDetecting, setIsDetecting] = useState(true);
+    const headersKeyRef = useRef('');
+
+    const currentHeadersKey = typeof headers === 'object' && headers !== null
+        ? JSON.stringify(headers, Object.keys(headers).sort())
+        : String(headers);
 
     useEffect(() => {
         let isMounted = true;
+        headersKeyRef.current = currentHeadersKey;
 
         const detectType = async () => {
             if (!url) {
@@ -14,7 +20,6 @@ export function useStreamType(url: string, headers: any = {}) {
                 return;
             }
 
-            // Quick check based on URL extension
             if (url.includes('.m3u8')) {
                 if (isMounted) {
                     setStreamType('hls');
@@ -36,13 +41,12 @@ export function useStreamType(url: string, headers: any = {}) {
             if (url.includes('.mkv')) {
                 if (isMounted) {
                     setStreamType('mkv');
-                    setIsVlcRequired(true); // MKV generally needs VLC for better support
+                    setIsVlcRequired(true);
                     setIsDetecting(false);
                 }
                 return;
             }
 
-            // If URL has no obvious extension, perform a HEAD request to check Content-Type
             try {
                 const response = await fetch(url, {
                     method: 'HEAD',
@@ -59,11 +63,9 @@ export function useStreamType(url: string, headers: any = {}) {
                             setStreamType('mp4');
                             setIsVlcRequired(false);
                         } else if (contentType.includes('video/x-matroska') || contentType.includes('video/mkv') || contentType.includes('audio/eac3')) {
-                            console.log('using vlc');
                             setStreamType('mkv');
                             setIsVlcRequired(true);
                         } else if (contentType.includes('application/octet-stream')) {
-                            console.log('using vlc');
                             setIsVlcRequired(true);
                         }
                     } else {
@@ -73,7 +75,6 @@ export function useStreamType(url: string, headers: any = {}) {
                 }
             } catch (error) {
                 console.warn('Failed to detect stream type via HEAD request:', error);
-                // Fallback to Exoplayer on network check error
                 if (isMounted) {
                     setStreamType('unknown');
                     setIsVlcRequired(false);
@@ -91,7 +92,7 @@ export function useStreamType(url: string, headers: any = {}) {
         return () => {
             isMounted = false;
         };
-    }, [url, JSON.stringify(headers)]);
+    }, [url, currentHeadersKey]);
 
     return { streamType, isVlcRequired, isDetecting };
 }

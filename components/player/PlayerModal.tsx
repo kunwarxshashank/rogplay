@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -9,7 +8,6 @@ import {
     Dimensions,
     Platform,
     ScrollView,
-    FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -38,6 +36,86 @@ interface PlayerModalProps {
     onCancel: () => void;
 }
 
+interface TrackItemProps {
+    track: Track;
+    index: number;
+    type: 'audio' | 'video';
+    selectedIndex: number;
+    onSelect: (index: number) => void;
+    isTV: boolean;
+    width: number;
+    getResponsiveSize: (mobile: number, tablet: number, tv: number) => number;
+    activeColors: any;
+}
+
+const TrackItem = React.memo(function TrackItem({
+    track, index, type, selectedIndex, onSelect, isTV, width, getResponsiveSize, activeColors
+}: TrackItemProps) {
+    const isSelected = selectedIndex === index;
+
+    let displayText = '';
+    let subText = '';
+
+    if (type === 'audio') {
+        displayText = track.title || `Audio ${index + 1}`;
+        if (track.language) subText = track.language;
+    } else if (type === 'video') {
+        displayText = `${track.height}p`;
+        subText = `${track.width} x ${track.height}`;
+        if (track.bitrate) {
+            subText += ` • ${Math.round(track.bitrate / 1000)}kbps`;
+        }
+    }
+
+    return (
+        <TVFocusable
+            autoFlex={false}
+            style={[
+                styles.trackItem,
+                isSelected && { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '60' },
+                { minHeight: getResponsiveSize(44, 48, 52) }
+            ]}
+            onPress={() => onSelect(index)}
+            focusedBackgroundColor={activeColors.surface + '40'}
+            focusedBorderColor={activeColors.primary}
+        >
+            {({ focused }) => (
+                <View style={styles.trackContentRow}>
+                    <View style={styles.trackContent}>
+                        <Text style={[
+                            styles.trackText,
+                            { color: activeColors.text },
+                            isSelected && { color: activeColors.primary, fontWeight: 'bold' },
+                            focused && { color: activeColors.text, fontWeight: 'bold' },
+                            { fontSize: getResponsiveSize(13, 15, 17) }
+                        ]}>
+                            {displayText}
+                        </Text>
+                        {subText ? (
+                            <Text style={[
+                                styles.trackSubText,
+                                { color: activeColors.textSecondary },
+                                isSelected && { color: activeColors.primary + 'CC' },
+                                focused && { color: activeColors.textSecondary },
+                                { fontSize: getResponsiveSize(11, 13, 15) }
+                            ]}>
+                                {subText}
+                            </Text>
+                        ) : null}
+                    </View>
+                    {isSelected && (
+                        <MaterialIcons
+                            name="check-circle"
+                            size={getResponsiveSize(18, 20, 22)}
+                            color={activeColors.primary}
+                        />
+                    )}
+                </View>
+            )}
+        </TVFocusable>
+    );
+});
+
 const PlayerModal: React.FC<PlayerModalProps> = ({
     visible,
     audioTracks,
@@ -61,7 +139,6 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
         };
 
         const subscription = Dimensions.addEventListener('change', onChange);
-
         const { width, height } = Dimensions.get('window');
         setIsLandscape(width > height);
 
@@ -71,146 +148,30 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
     const { width, height } = screenData;
     const isTV = Platform.isTV;
 
-    const getResponsiveSize = (mobile: number, tablet: number, tv: number) => {
+    const getResponsiveSize = useCallback((mobile: number, tablet: number, tv: number) => {
         if (isTV) return tv;
         if (width >= 768) return tablet;
         return mobile;
-    };
+    }, [isTV, width]);
 
     const shouldUseHorizontalLayout = () => {
         return isTV || (isLandscape && width >= 768);
     };
 
-    const getMaxTrackListHeight = () => {
-        // Targets roughly 3.5 items visible at once
-        // Item minHeight (44/48/52) + marginBottom (6) + border/padding buffer
-        const itemHeight = getResponsiveSize(64, 72, 82);
-        return itemHeight * 3.5;
-    };
-
-    const TrackItem = ({ track, index, type, selectedIndex, onSelect }: { track: Track, index: number, type: 'audio' | 'video' | 'subtitle', selectedIndex: number, onSelect: (index: number) => void }) => {
-        const isSelected = selectedIndex === index;
-
-        let displayText = '';
-        let subText = '';
-
-        if (type === 'audio') {
-            displayText = track.title || `Audio ${index + 1}`;
-            if (track.language) subText = track.language;
-        } else if (type === 'video') {
-            displayText = `${track.height}p`;
-            subText = `${track.width} × ${track.height}`;
-            if (track.bitrate) {
-                subText += ` • ${Math.round(track.bitrate / 1000)}kbps`;
-            }
-        }
-
-        return (
-            <TVFocusable
-                autoFlex={false}
-                style={[
-                    styles.trackItem,
-                    isSelected && { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '60' },
-                    { minHeight: getResponsiveSize(44, 48, 52) }
-                ]}
-                onPress={() => onSelect(index)}
-                focusedBackgroundColor={activeColors.surface + '40'}
-                focusedBorderColor={activeColors.primary}
-            >
-                {({ focused }) => (
-                    <View style={styles.trackContentRow}>
-                        <View style={styles.trackContent}>
-                            <Text style={[
-                                styles.trackText,
-                                { color: activeColors.text },
-                                isSelected && { color: activeColors.primary, fontWeight: 'bold' },
-                                focused && { color: activeColors.text, fontWeight: 'bold' },
-                                { fontSize: getResponsiveSize(13, 15, 17) }
-                            ]}>
-                                {displayText}
-                            </Text>
-                            {subText ? (
-                                <Text style={[
-                                    styles.trackSubText,
-                                    { color: activeColors.textSecondary },
-                                    isSelected && { color: activeColors.primary + 'CC' },
-                                    focused && { color: activeColors.textSecondary },
-                                    { fontSize: getResponsiveSize(11, 13, 15) }
-                                ]}>
-                                    {subText}
-                                </Text>
-                            ) : null}
-                        </View>
-                        {isSelected && (
-                            <MaterialIcons
-                                name="check-circle"
-                                size={getResponsiveSize(18, 20, 22)}
-                                color={activeColors.primary}
-                            />
-                        )}
-                    </View>
-                )}
-            </TVFocusable>
-        );
-    };
-
-    const Section = ({ title, icon, color, tracks, selectedIndex, onSelect, type }: { title: string, icon: any, color: string, tracks: Track[], selectedIndex: number, onSelect: (index: number) => void, type: 'audio' | 'video' | 'subtitle' }) => {
-        const trackCount = tracks?.length || 0;
-        const isHorizontal = shouldUseHorizontalLayout();
-
-        return (
-            <View style={[
-                styles.section,
-                { backgroundColor: activeColors.surface, borderColor: activeColors.border },
-                isHorizontal && styles.horizontalSection
-            ]}>
-                <View style={styles.sectionHeader}>
-                    <MaterialIcons
-                        name={icon}
-                        size={getResponsiveSize(18, 20, 22)}
-                        color={color}
-                    />
-                    <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: activeColors.text }]}>
-                        {title}
-                    </Text>
-                    <View style={[styles.badge, { backgroundColor: color + '30' }]}>
-                        <Text style={[styles.badgeText, { fontSize: getResponsiveSize(10, 11, 12), color: color }]}>
-                            {trackCount}
-                        </Text>
-                    </View>
-                </View>
-
-                <FlatList
-                    style={[
-                        styles.tracksList,
-                        { maxHeight: getMaxTrackListHeight() },
-                        isHorizontal && { flex: 1 }
-                    ]}
-                    contentContainerStyle={styles.tracksContent}
-                    data={tracks || []}
-                    keyExtractor={(_, index) => `${type}-${index}`}
-                    renderItem={({ item, index }) => (
-                        <TrackItem
-                            track={item}
-                            index={index}
-                            type={type}
-                            selectedIndex={selectedIndex}
-                            onSelect={onSelect}
-                        />
-                    )}
-                    showsVerticalScrollIndicator={true}
-                    persistentScrollbar={Platform.isTV}
-                    removeClippedSubviews={false}
-                    nestedScrollEnabled={true}
-                    ListEmptyComponent={
-                        <View style={styles.emptyState}>
-                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No {title.toLowerCase()} tracks available</Text>
-                        </View>
-                    }
-                />
-            </View>
-        );
-    };
+    const renderTracks = (track: Track, index: number, type: 'audio' | 'video', selectedIndex: number, onSelect: (i: number) => void) => (
+        <TrackItem
+            key={`${type}-${index}`}
+            track={track}
+            index={index}
+            type={type}
+            selectedIndex={selectedIndex}
+            onSelect={onSelect}
+            isTV={isTV}
+            width={width}
+            getResponsiveSize={getResponsiveSize}
+            activeColors={activeColors}
+        />
+    );
 
     return (
         <Modal
@@ -266,21 +227,61 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
                         </View>
 
                         <View style={styles.contentContainer}>
-                            {shouldUseHorizontalLayout() ? (
-                                <View style={styles.horizontalLayout}>
-                                    <Section title="Audio" icon="audiotrack" color="#00C851" tracks={audioTracks} selectedIndex={selectedAudioTrack} onSelect={onSelectAudio} type="audio" />
-                                    <Section title="Video" icon="high-quality" color="#FF6B35" tracks={videoTracks} selectedIndex={selectedVideoTrack} onSelect={onSelectVideo} type="video" />
+                            <ScrollView
+                                style={styles.bodyScroll}
+                                showsVerticalScrollIndicator={true}
+                                contentContainerStyle={shouldUseHorizontalLayout() ? styles.horizontalBody : styles.verticalBody}
+                            >
+                                <View style={[
+                                    styles.section,
+                                    { backgroundColor: activeColors.surface, borderColor: activeColors.border },
+                                    shouldUseHorizontalLayout() && styles.horizontalSection
+                                ]}>
+                                    <View style={styles.sectionHeader}>
+                                        <MaterialIcons name="audiotrack" size={getResponsiveSize(18, 20, 22)} color="#00C851" />
+                                        <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: activeColors.text }]}>
+                                            Audio
+                                        </Text>
+                                        <View style={[styles.badge, { backgroundColor: '#00C85130' }]}>
+                                            <Text style={[styles.badgeText, { fontSize: getResponsiveSize(10, 11, 12), color: '#00C851' }]}>
+                                                {audioTracks?.length || 0}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {audioTracks && audioTracks.length > 0 ? (
+                                        audioTracks.map((track, idx) => renderTracks(track, idx, 'audio', selectedAudioTrack, onSelectAudio))
+                                    ) : (
+                                        <View style={styles.emptyState}>
+                                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No audio tracks available</Text>
+                                        </View>
+                                    )}
                                 </View>
-                            ) : (
-                                <ScrollView
-                                    style={styles.verticalLayout}
-                                    showsVerticalScrollIndicator={false}
-                                    contentContainerStyle={styles.verticalContent}
-                                >
-                                    <Section title="Audio" icon="audiotrack" color="#00C851" tracks={audioTracks} selectedIndex={selectedAudioTrack} onSelect={onSelectAudio} type="audio" />
-                                    <Section title="Video" icon="high-quality" color="#FF6B35" tracks={videoTracks} selectedIndex={selectedVideoTrack} onSelect={onSelectVideo} type="video" />
-                                </ScrollView>
-                            )}
+
+                                <View style={[
+                                    styles.section,
+                                    { backgroundColor: activeColors.surface, borderColor: activeColors.border },
+                                    shouldUseHorizontalLayout() && styles.horizontalSection
+                                ]}>
+                                    <View style={styles.sectionHeader}>
+                                        <MaterialIcons name="high-quality" size={getResponsiveSize(18, 20, 22)} color="#FF6B35" />
+                                        <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: activeColors.text }]}>
+                                            Video
+                                        </Text>
+                                        <View style={[styles.badge, { backgroundColor: '#FF6B3530' }]}>
+                                            <Text style={[styles.badgeText, { fontSize: getResponsiveSize(10, 11, 12), color: '#FF6B35' }]}>
+                                                {videoTracks?.length || 0}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {videoTracks && videoTracks.length > 0 ? (
+                                        videoTracks.map((track, idx) => renderTracks(track, idx, 'video', selectedVideoTrack, onSelectVideo))
+                                    ) : (
+                                        <View style={styles.emptyState}>
+                                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No video tracks available</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </ScrollView>
                         </View>
 
                         <View style={[styles.footer, { borderTopColor: activeColors.border }]}>
@@ -392,7 +393,7 @@ export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onS
                     {
                         width: isTV ? '55%' : (isLandscape ? '70%' : '85%'),
                         maxWidth: isTV ? 600 : 500,
-                        backgroundColor: '#121212', // Premium dark look from image
+                        backgroundColor: '#121212',
                         borderColor: 'rgba(255, 255, 255, 0.1)',
                     }
                 ]}>
@@ -543,15 +544,14 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: Platform.isTV ? 16 : 14,
     },
-    horizontalLayout: {
-        flexDirection: 'row',
+    bodyScroll: {
         flex: 1,
+    },
+    horizontalBody: {
+        flexDirection: 'row',
         gap: Platform.isTV ? 12 : 10,
     },
-    verticalLayout: {
-        flex: 1,
-    },
-    verticalContent: {
+    verticalBody: {
         flexGrow: 1,
     },
     section: {
@@ -578,22 +578,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         flex: 1,
     },
-    importBtn: {
-        borderRadius: 12,
-        marginRight: 8,
-        overflow: 'hidden',
-    },
-    importBtnContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-    },
-    importText: {
-        fontWeight: 'bold',
-    },
     badge: {
         paddingHorizontal: 6,
         paddingVertical: 2,
@@ -603,11 +587,6 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         fontWeight: '600',
-    },
-    tracksList: {
-    },
-    tracksContent: {
-        paddingBottom: 8,
     },
     trackContentRow: {
         flex: 1,

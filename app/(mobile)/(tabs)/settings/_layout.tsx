@@ -19,6 +19,7 @@ export default function SettingsLayout() {
             <Stack.Screen name="playback" options={{ headerShown: false }} />
             <Stack.Screen name="maintenance" options={{ headerShown: false }} />
             <Stack.Screen name="account" options={{ headerShown: false }} />
+            <Stack.Screen name="cinema" options={{ headerShown: false }} />
         </Stack>
     );
 }
