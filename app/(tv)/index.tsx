@@ -159,6 +159,14 @@ export default function TVHomeScreen() {
                 renderItem={renderSection}
                 keyExtractor={(item) => item.key}
                 ListHeaderComponent={ListHeader}
+                ListEmptyComponent={!activeCinemaAddon || !addonConfig || !addonConfig.catalogs || addonConfig.catalogs.length === 0 ? (
+                    <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+                        <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
+                        <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
+                            Please choose Any Provider to Explore
+                        </Text>
+                    </View>
+                ) : null}
                 ListFooterComponent={<View style={styles.bottomSpacer} />}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}

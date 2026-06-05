@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, TextI
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAddonsStore } from '@/store/addonsStore';
+import { useAddonsStore, TMDB_BUILTIN_SOURCE } from '@/store/addonsStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -97,6 +97,7 @@ function useAddonsLogic() {
     }, [addons, searchQuery, selectedFilter]);
 
     const handleOpenAddon = (item: any) => {
+        if (item.type === 'subtitles') return;
         setActiveCinemaAddon(item.url || item.source);
         router.push('/cinema');
     };
@@ -133,183 +134,210 @@ export function AddonsMobile() {
         return () => backSubscription.remove();
     }, [isFtueVisible, setHasSeenAddonFTUE]);
 
-    const renderItem = ({ item }: { item: any }) => (
-        <TouchableOpacity
-            style={[styles.card, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}
-            onPress={() => handleOpenAddon(item)}
-            activeOpacity={0.8}
-        >
-            <View style={styles.logoContainer}>
-                <Image
-                    source={{ uri: item.logo || 'https://via.placeholder.com/60' }}
-                    style={styles.logo}
-                />
-                {item.type === 'nsfw' && (
-                    <View style={styles.nsfwOverlay}>
-                        <MaterialIcons name="explicit" size={16} color="#fff" />
-                    </View>
-                )}
-            </View>
-            <View style={styles.info}>
-                <Text style={[styles.name, { color: activeColors.text }]}>{item.title}</Text>
-                <Text style={[styles.desc, { color: activeColors.textSecondary }]} numberOfLines={2}>{item.description}</Text>
-                <View style={[styles.badge,
-                item.type === 'livetv' ? { backgroundColor: 'rgba(234, 179, 8, 0.15)' } :
-                    item.type === 'movie' ? { backgroundColor: 'rgba(59, 130, 246, 0.15)' } :
-                        item.type === 'cinema' ? { backgroundColor: 'rgba(139, 92, 246, 0.15)' } :
-                            item.type === 'stremio' ? { backgroundColor: 'rgba(236, 72, 153, 0.15)' } :
-                                { backgroundColor: 'rgba(148, 163, 184, 0.15)' }
-                ]}>
-                    <Text style={[styles.badgeText,
-                    item.type === 'livetv' ? { color: '#eab308' } :
-                        item.type === 'movie' ? { color: '#3b82f6' } :
-                            item.type === 'cinema' ? { color: '#8b5cf6' } :
-                                item.type === 'stremio' ? { color: '#ec4899' } :
-                                    { color: activeColors.textSecondary }
-                    ]}>{item.type?.toUpperCase() || 'OTHER'}</Text>
-                </View>
-            </View>
-            <TouchableOpacity onPress={() => removeAddon(item.source)} style={styles.deleteBtn}>
-                <MaterialIcons name="delete-outline" size={24} color={activeColors.error} />
-            </TouchableOpacity>
-        </TouchableOpacity>
-    );
-
-    return (
-        <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]} edges={['top']}>
-            <View style={styles.header}>
-                <View>
-                    <View style={styles.titleRow}>
-                        <Text style={[styles.headerTitle, { color: activeColors.text }]}>Addons</Text>
-                        <View style={[styles.titleDot, { backgroundColor: activeColors.primary }]} />
-                    </View>
-                    <Text style={[styles.headerSubtitle, { color: activeColors.textSecondary }]}>{addons.length} Extensions Installed</Text>
-                    {isPremium && (
-                        <View style={styles.syncIndicator}>
-                            <MaterialIcons name="cloud-done" size={14} color={activeColors.success} />
-                            <Text style={[styles.syncText, { color: activeColors.success }]}>Cloud Sync Active</Text>
+    const renderItem = ({ item }: { item: any }) => {
+        const isBuiltin = item.source === TMDB_BUILTIN_SOURCE || item.isBuiltin;
+        return (
+            <TouchableOpacity
+                style={[styles.card, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}
+                onPress={() => handleOpenAddon(item)}
+                activeOpacity={0.8}
+            >
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={styles.logoContainer}>
+                    <Image
+                        source={{ uri: item.logo || 'https://via.placeholder.com/60' }}
+                        style={styles.logo}
+                    />
+                    {item.type === 'nsfw' && (
+                        <View style={styles.nsfwOverlay}>
+                            <MaterialIcons name="explicit" size={16} color="#fff" />
                         </View>
                     )}
                 </View>
-                <TouchableOpacity
-                    style={[styles.addBtn, { backgroundColor: activeColors.primary, shadowColor: activeColors.primary }]}
-                    onPress={() => setModalVisible(true)}
-                >
-                    <MaterialIcons name="add" size={24} color="#fff" />
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.toolbar}>
-                <View style={[styles.searchBar, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
-                    <MaterialIcons name="search" size={20} color={activeColors.textSecondary} />
-                    <TextInput
-                        style={[styles.searchInput, { color: activeColors.text }]}
-                        placeholder="Search addons..."
-                        placeholderTextColor={activeColors.textSecondary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                </View>
-            </View>
-
-            <View style={{ height: 48, marginBottom: 8 }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-                    {FILTERS.map(filter => (
-                        <TouchableOpacity
-                            key={filter}
-                            style={[
-                                styles.filterChip,
-                                { backgroundColor: activeColors.surface, borderColor: activeColors.border },
-                                selectedFilter === filter && { backgroundColor: activeColors.primary + '15', borderColor: activeColors.primary }
-                            ]}
-                            onPress={() => setSelectedFilter(filter)}
-                        >
-                            <Text style={[
-                                styles.filterText,
-                                { color: activeColors.textSecondary },
-                                selectedFilter === filter && { color: activeColors.primary }
-                            ]}>{filter}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            {isLoading && addons.length === 0 ? (
-                <ScrollView contentContainerStyle={styles.list}>
-                    {Array.from({ length: 5 }).map((_, index) => (
-                        <BrowserAddonSkeleton key={index} />
-                    ))}
-                </ScrollView>
-            ) : (
-                <FlatList
-                    data={filteredAddons}
-                    renderItem={renderItem}
-                    keyExtractor={(item, index) => `${item.source}-${index}`}
-                    contentContainerStyle={styles.list}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={[activeColors.primary]}
-                            tintColor={activeColors.primary}
-                        />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <MaterialIcons name="extension-off" size={64} color={activeColors.textSecondary + '40'} />
-                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No addons found</Text>
-                            <TouchableOpacity
-                                style={[styles.emptyBtn, { borderColor: activeColors.primary }]}
-                                onPress={() => setModalVisible(true)}
-                            >
-                                <Text style={{ color: activeColors.primary, fontWeight: '600' }}>Install Addon</Text>
-                            </TouchableOpacity>
+                <View style={styles.info}>
+                    <Text style={[styles.name, { color: activeColors.text }]}>{item.title}</Text>
+                    <Text style={[styles.desc, { color: activeColors.textSecondary }]} numberOfLines={2}>{item.description}</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                        <View style={[styles.badge,
+                        item.type === 'livetv' ? { backgroundColor: 'rgba(234, 179, 8, 0.15)' } :
+                            item.type === 'movie' ? { backgroundColor: 'rgba(59, 130, 246, 0.15)' } :
+                                item.type === 'cinema' ? { backgroundColor: 'rgba(139, 92, 246, 0.15)' } :
+                                    item.type === 'stremio' ? { backgroundColor: 'rgba(236, 72, 153, 0.15)' } :
+                                        { backgroundColor: 'rgba(148, 163, 184, 0.15)' }
+                        ]}>
+                            <Text style={[styles.badgeText,
+                            item.type === 'livetv' ? { color: '#eab308' } :
+                                item.type === 'movie' ? { color: '#3b82f6' } :
+                                    item.type === 'cinema' ? { color: '#8b5cf6' } :
+                                        item.type === 'stremio' ? { color: '#ec4899' } :
+                                            { color: activeColors.textSecondary }
+                            ]}>{item.type?.toUpperCase() || 'OTHER'}</Text>
                         </View>
-                    }
-                />
-            )}
-
-            <Modal visible={modalVisible} transparent animationType="fade">
-                <BlurView intensity={30} tint={theme.includes('light') ? 'light' : 'dark'} style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: activeColors.text }]}>Add Addon</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
-                                <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <TextInput
-                            style={[styles.input, { backgroundColor: activeColors.background, color: activeColors.text, borderColor: activeColors.border }]}
-                            placeholder="Enter Addon URL (JSON)"
-                            placeholderTextColor={activeColors.textSecondary}
-                            value={newUrl}
-                            onChangeText={setNewUrl}
-                            autoFocus
-                            autoCapitalize="none"
-                        />
-                        <Text style={[styles.hint, { color: activeColors.textSecondary }]}>Supported: JSON links, rogplay:// links</Text>
-
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
-                                {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
-                            </TouchableOpacity>
-                        </View>
+                        {isBuiltin && (
+                            <View style={[styles.badge, { backgroundColor: 'rgba(16,185,129,0.15)', flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
+                                <MaterialIcons name="verified" size={10} color="#10b981" />
+                                <Text style={[styles.badgeText, { color: '#10b981' }]}>BUILT-IN</Text>
+                            </View>
+                        )}
                     </View>
-                </BlurView>
-            </Modal>
+                </View>
+                {!isBuiltin && (
+                    <TouchableOpacity onPress={() => removeAddon(item.source)} style={styles.deleteBtn}>
+                        <MaterialIcons name="delete-outline" size={24} color={activeColors.error} />
+                    </TouchableOpacity>
+                )}
+            </TouchableOpacity>
+        );
+    };
 
-            {isFtueVisible && (
-                <Modal
-                    visible
-                    transparent
-                    animationType="none"
-                    onRequestClose={() => setHasSeenAddonFTUE(true)}
-                >
-                    <AddonsFTUE onDismiss={() => setHasSeenAddonFTUE(true)} />
+    return (
+        <View style={[styles.container, { backgroundColor: activeColors.background }]}>
+            {/* Dark Luxury Gradient */}
+            <LinearGradient
+                colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
+                locations={[0, 0.25, 1]}
+                style={StyleSheet.absoluteFill}
+            />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                <View style={styles.header}>
+                    <View>
+                        <View style={styles.titleRow}>
+                            <Text style={[styles.headerTitle, { color: activeColors.text }]}>Addons</Text>
+                            <View style={[styles.titleDot, { backgroundColor: activeColors.primary }]} />
+                        </View>
+                        <Text style={[styles.headerSubtitle, { color: activeColors.textSecondary }]}>{addons.length} Extensions Installed</Text>
+                        {isPremium && (
+                            <View style={styles.syncIndicator}>
+                                <MaterialIcons name="cloud-done" size={14} color={activeColors.success} />
+                                <Text style={[styles.syncText, { color: activeColors.success }]}>Cloud Sync Active</Text>
+                            </View>
+                        )}
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.addBtn, { backgroundColor: activeColors.primary, shadowColor: activeColors.primary }]}
+                        onPress={() => setModalVisible(true)}
+                    >
+                        <MaterialIcons name="add" size={24} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.toolbar}>
+                    <View style={[styles.searchBar, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <MaterialIcons name="search" size={20} color={activeColors.textSecondary} style={{ zIndex: 1 }} />
+                        <TextInput
+                            style={[styles.searchInput, { color: activeColors.text, zIndex: 1 }]}
+                            placeholder="Search addons..."
+                            placeholderTextColor={activeColors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
+                </View>
+
+                <View style={{ height: 48, marginBottom: 8 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                        {FILTERS.map(filter => (
+                            <TouchableOpacity
+                                key={filter}
+                                style={[
+                                    styles.filterChip,
+                                    { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+                                    selectedFilter === filter && { borderColor: activeColors.primary }
+                                ]}
+                                onPress={() => setSelectedFilter(filter)}
+                            >
+                                <BlurView intensity={selectedFilter === filter ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />
+                                {selectedFilter === filter && <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.primary + '20' }]} />}
+                                <Text style={[
+                                    styles.filterText,
+                                    { color: activeColors.textSecondary },
+                                    selectedFilter === filter && { color: activeColors.primary }
+                                ]}>{filter}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {isLoading && addons.length === 0 ? (
+                    <ScrollView contentContainerStyle={styles.list}>
+                        {Array.from({ length: 5 }).map((_, index) => (
+                            <BrowserAddonSkeleton key={index} />
+                        ))}
+                    </ScrollView>
+                ) : (
+                    <FlatList
+                        data={filteredAddons}
+                        renderItem={renderItem}
+                        keyExtractor={(item, index) => `${item.source}-${index}`}
+                        contentContainerStyle={styles.list}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                colors={[activeColors.primary]}
+                                tintColor={activeColors.primary}
+                            />
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.empty}>
+                                <MaterialIcons name="extension-off" size={64} color={activeColors.textSecondary + '40'} />
+                                <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No addons found</Text>
+                                <TouchableOpacity
+                                    style={[styles.emptyBtn, { borderColor: activeColors.primary }]}
+                                    onPress={() => setModalVisible(true)}
+                                >
+                                    <Text style={{ color: activeColors.primary, fontWeight: '600' }}>Install Addon</Text>
+                                </TouchableOpacity>
+                            </View>
+                        }
+                    />
+                )}
+
+                <Modal visible={modalVisible} transparent animationType="fade">
+                    <BlurView intensity={30} tint={theme.includes('light') ? 'light' : 'dark'} style={styles.modalOverlay}>
+                        <View style={[styles.modalContent, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
+                            <View style={styles.modalHeader}>
+                                <Text style={[styles.modalTitle, { color: activeColors.text }]}>Add Addon</Text>
+                                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                                    <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <TextInput
+                                style={[styles.input, { backgroundColor: activeColors.background, color: activeColors.text, borderColor: activeColors.border }]}
+                                placeholder="Enter Addon URL (JSON)"
+                                placeholderTextColor={activeColors.textSecondary}
+                                value={newUrl}
+                                onChangeText={setNewUrl}
+                                autoFocus
+                                autoCapitalize="none"
+                            />
+                            <Text style={[styles.hint, { color: activeColors.textSecondary }]}>Supported: JSON links, rogplay:// links</Text>
+
+                            <View style={styles.modalActions}>
+                                <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
+                                    {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </BlurView>
                 </Modal>
-            )}
-        </SafeAreaView>
+
+                {isFtueVisible && (
+                    <Modal
+                        visible
+                        transparent
+                        animationType="none"
+                        onRequestClose={() => setHasSeenAddonFTUE(true)}
+                    >
+                        <AddonsFTUE onDismiss={() => setHasSeenAddonFTUE(true)} />
+                    </Modal>
+                )}
+            </SafeAreaView>
+        </View>
     );
 }
 

@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,10 +7,9 @@ import {
     StyleSheet,
     Dimensions,
     Platform,
-    Animated,
+    FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
@@ -27,13 +25,90 @@ interface SubtitleModalProps {
     visible: boolean;
     textTracks: Track[];
     selectedTextTrack: number;
-    subtitleDelay: number; // In milliseconds
+    subtitleDelay: number;
     onSelectText: (index: number) => void;
     onImportSubtitle?: () => void;
     onAdjustDelay: (delay: number) => void;
     onApply: () => void;
     onCancel: () => void;
+    isFetchingSubtitles?: boolean;
 }
+
+interface TrackItemProps {
+    track: Track;
+    index: number;
+    isSelected: boolean;
+    onSelect: (index: number) => void;
+    isTV: boolean;
+    width: number;
+    getResponsiveSize: (mobile: number, tablet: number, tv: number) => number;
+    activeColors: any;
+}
+
+const TrackItem = React.memo(function TrackItem({
+    track, index, isSelected, onSelect, isTV, width, getResponsiveSize, activeColors
+}: TrackItemProps) {
+    let displayText = '';
+    let subText = '';
+
+    if (index === -1) {
+        displayText = 'OFF';
+    } else {
+        displayText = track.title || `Subtitle ${index + 1}`;
+        subText = track.language || 'Unknown';
+        if (track.uri) {
+            subText = 'External File';
+        }
+    }
+
+    return (
+        <TVFocusable
+            autoFlex={false}
+            style={[
+                styles.trackItem,
+                isSelected && { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '60' },
+                { minHeight: getResponsiveSize(44, 48, 52) }
+            ]}
+            onPress={() => onSelect(index)}
+            focusedBackgroundColor={activeColors.surface + '40'}
+            focusedBorderColor={activeColors.primary}
+        >
+            {({ focused }) => (
+                <View style={styles.trackContentRow}>
+                    <View style={styles.trackContent}>
+                        <Text style={[
+                            styles.trackText,
+                            { color: activeColors.text },
+                            isSelected && { color: activeColors.primary, fontWeight: 'bold' },
+                            focused && { color: activeColors.text, fontWeight: 'bold' },
+                            { fontSize: getResponsiveSize(13, 15, 17) }
+                        ]}>
+                            {displayText}
+                        </Text>
+                        {subText ? (
+                            <Text style={[
+                                styles.trackSubText,
+                                { color: activeColors.textSecondary },
+                                isSelected && { color: activeColors.primary + 'CC' },
+                                focused && { color: activeColors.textSecondary },
+                                { fontSize: getResponsiveSize(11, 13, 15) }
+                            ]}>
+                                {subText}
+                            </Text>
+                        ) : null}
+                    </View>
+                    {isSelected && (
+                        <MaterialIcons
+                            name="check-circle"
+                            size={getResponsiveSize(18, 20, 22)}
+                            color={activeColors.primary}
+                        />
+                    )}
+                </View>
+            )}
+        </TVFocusable>
+    );
+});
 
 const SubtitleModal: React.FC<SubtitleModalProps> = ({
     visible,
@@ -44,7 +119,8 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
     onImportSubtitle,
     onAdjustDelay,
     onApply,
-    onCancel
+    onCancel,
+    isFetchingSubtitles
 }) => {
     const { theme } = useSettingsStore();
     const activeColors = Colors[theme] || Colors.dark;
@@ -67,88 +143,44 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
     const { width, height } = screenData;
     const isTV = Platform.isTV;
 
-    const getResponsiveSize = (mobile: number, tablet: number, tv: number) => {
+    const getResponsiveSize = useCallback((mobile: number, tablet: number, tv: number) => {
         if (isTV) return tv;
         if (width >= 768) return tablet;
         return mobile;
-    };
+    }, [isTV, width]);
 
     const shouldUseHorizontalLayout = () => {
         return isTV || isLandscape;
     };
 
-    const getMaxTrackListHeight = () => {
-        const availableHeight = height * (shouldUseHorizontalLayout() ? 0.7 : 0.4);
-        return Math.max(availableHeight, 200);
-    };
-
     const formatDelay = (ms: number) => {
         const seconds = (ms / 1000).toFixed(1);
-        return `${seconds > "0" ? '+' : ''}${seconds}s`;
+        return `${+seconds > 0 ? '+' : ''}${seconds}s`;
     };
 
-    const TrackItem = ({ track, index, isSelected, onSelect }: { track: Track, index: number, isSelected: boolean, onSelect: (index: number) => void }) => {
-        let displayText = '';
-        let subText = '';
+    const allTracks = React.useMemo(() => {
+        return [{ title: 'OFF', language: 'OFF' }, ...textTracks];
+    }, [textTracks]);
 
-        if (index === -1) {
-            displayText = 'OFF';
-        } else {
-            displayText = track.title || `Subtitle ${index + 1}`;
-            subText = track.language || 'Unknown';
-            if (track.uri) {
-                subText = 'External File';
-            }
-        }
+    const keyExtractor = useCallback((item: any, index: number) => {
+        return `sub-${index}`;
+    }, []);
 
+    const renderItem = useCallback(({ item, index }: { item: Track; index: number }) => {
+        const trackIndex = index - 1;
         return (
-            <TVFocusable
-                autoFlex={false}
-                style={[
-                    styles.trackItem,
-                    isSelected && { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '60' },
-                    { minHeight: getResponsiveSize(44, 48, 52) }
-                ]}
-                onPress={() => onSelect(index)}
-                focusedBackgroundColor={activeColors.surface + '40'}
-                focusedBorderColor={activeColors.primary}
-            >
-                {({ focused }) => (
-                    <View style={styles.trackContentRow}>
-                        <View style={styles.trackContent}>
-                            <Text style={[
-                                styles.trackText,
-                                { color: activeColors.text },
-                                isSelected && { color: activeColors.primary, fontWeight: 'bold' },
-                                focused && { color: activeColors.text, fontWeight: 'bold' },
-                                { fontSize: getResponsiveSize(13, 15, 17) }
-                            ]}>
-                                {displayText}
-                            </Text>
-                            {subText ? (
-                                <Text style={[
-                                    styles.trackSubText,
-                                    { color: activeColors.textSecondary },
-                                    isSelected && { color: activeColors.primary + 'CC' },
-                                    focused && { color: activeColors.textSecondary },
-                                    { fontSize: getResponsiveSize(11, 13, 15) }
-                                ]}>
-                                    {subText}
-                                </Text>
-                            ) : null}
-                        </View>
-                        {isSelected && (
-                            <MaterialIcons
-                                name="check-circle"
-                                size={getResponsiveSize(18, 20, 22)}
-                                color={activeColors.primary}
-                            />
-                        )}
-                    </View>
-                )}
-            </TVFocusable>
+            <TrackItem
+                track={item}
+                index={trackIndex}
+                isSelected={selectedTextTrack === trackIndex}
+                onSelect={onSelectText}
+                isTV={isTV}
+                width={width}
+                getResponsiveSize={getResponsiveSize}
+                activeColors={activeColors}
+            />
         );
-    };
+    }, [selectedTextTrack, onSelectText, isTV, width, getResponsiveSize, activeColors]);
 
     return (
         <Modal
@@ -210,7 +242,6 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
 
                         <View style={styles.contentContainer}>
                             <View style={[styles.mainLayout, shouldUseHorizontalLayout() && styles.horizontalLayout]}>
-                                {/* Left/Top Section: Track List */}
                                 <View style={[styles.tracksSection, shouldUseHorizontalLayout() && { flex: 1.2 }]}>
                                     <View style={styles.sectionHeader}>
                                         <Text style={[styles.sectionTitle, { color: activeColors.textSecondary }]}>Select Track</Text>
@@ -231,30 +262,27 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
                                         )}
                                     </View>
 
-                                    <ScrollView
+                                    {isFetchingSubtitles && (
+                                        <View style={styles.fetchingContainer}>
+                                            <MaterialIcons name="sync" size={16} color={activeColors.primary} />
+                                            <Text style={[styles.fetchingText, { color: activeColors.textSecondary }]}>
+                                                Fetching OpenSubtitles...
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    <FlatList
                                         style={styles.tracksList}
-                                        showsVerticalScrollIndicator={true}
                                         contentContainerStyle={styles.tracksContent}
-                                    >
-                                        <TrackItem
-                                            track={{ language: 'OFF' }}
-                                            index={-1}
-                                            isSelected={selectedTextTrack === -1}
-                                            onSelect={onSelectText}
-                                        />
-                                        {textTracks.map((track, index) => (
-                                            <TrackItem
-                                                key={`sub-${index}`}
-                                                track={track}
-                                                index={index}
-                                                isSelected={selectedTextTrack === index}
-                                                onSelect={onSelectText}
-                                            />
-                                        ))}
-                                    </ScrollView>
+                                        data={allTracks}
+                                        keyExtractor={keyExtractor}
+                                        renderItem={renderItem}
+                                        showsVerticalScrollIndicator={true}
+                                        removeClippedSubviews={false}
+                                        extraData={selectedTextTrack}
+                                    />
                                 </View>
 
-                                {/* Right/Bottom Section: Delay Adjustment */}
                                 <View style={[
                                     styles.delaySection,
                                     { backgroundColor: activeColors.surface, borderColor: activeColors.border },
@@ -431,6 +459,17 @@ const styles = StyleSheet.create({
     },
     tracksContent: {
         paddingBottom: 16,
+    },
+    fetchingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+    },
+    fetchingText: {
+        fontSize: 12,
+        fontStyle: 'italic',
     },
     trackItem: {
         borderRadius: 12,

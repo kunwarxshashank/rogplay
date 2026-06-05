@@ -2,6 +2,8 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import TrendingSlider from '@/components/cinema/TrendingSlider';
 import OTTSection from '@/components/cinema/OTTSection';
 import MovieList from '@/components/cinema/MovieList';
@@ -160,138 +162,145 @@ export function Cinema() {
         );
     }
 
-    // If No active Addons
+    // Fallback: no addons at all (should not happen since TMDB is built-in)
     if (addons.length === 0) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background }]} edges={['top']}>
-                <View style={styles.headerTitleRow}>
-                    <Text style={[styles.categoryTitle, { color: currentColors.text }]}>Cinema</Text>
-                </View>
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <Ionicons name="film-outline" size={60} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
-                    <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center', marginBottom: 8 }}>No Addons Added</Text>
-                    <Text style={{ color: currentColors.textSecondary, fontSize: 14, fontFamily: 'Outfit_400Regular', textAlign: 'center', marginBottom: 24 }}>
-                        Please add an addon to view the cinema catalog.
-                    </Text>
-                    <TouchableOpacity
-                        style={{ backgroundColor: currentColors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
-                        onPress={() => router.push('/(mobile)/addon-browser')}
-                    >
-                        <Text style={{ color: currentColors.background, fontFamily: 'Outfit_600SemiBold' }}>Add Extensions</Text>
-                    </TouchableOpacity>
-                </View>
+            <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={currentColors.primary} />
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background }]} edges={['top']}>
-            {/* Header + Addon Picker Header */}
-            <View style={[styles.headerTitleRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                    <Text style={[styles.categoryTitle, { color: currentColors.text }]}>
-                        {activeFilter === 'All' ? 'Cinema' : activeFilter}
-                    </Text>
-                    <View style={[styles.titleDot, { backgroundColor: currentColors.primary }]} />
-                </View>
-                <TouchableOpacity onPress={() => setShowAddonPicker(!showAddonPicker)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={{ color: currentColors.primary, fontFamily: 'Outfit_500Medium', marginRight: 4 }}>
-                        {addonConfig?.addon?.title || 'Providers'}
-                    </Text>
-                    <Ionicons name={showAddonPicker ? "chevron-up" : "chevron-down"} size={16} color={currentColors.primary} />
-                </TouchableOpacity>
-            </View>
-
-            {showAddonPicker && (
-                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-                        {addons.map((a, i) => {
-                            const addSource = a.source || a.url;
-                            const isSelected = activeCinemaAddon === addSource;
-                            return (
-                                <TouchableOpacity
-                                    key={i}
-                                    style={{
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 6,
-                                        borderRadius: 20,
-                                        borderWidth: 1,
-                                        borderColor: isSelected ? currentColors.primary : currentColors.border,
-                                        backgroundColor: isSelected ? currentColors.primary + '20' : 'transparent',
-                                        flexDirection: 'row',
-                                        alignItems: 'center'
-                                    }}
-                                    onPress={() => {
-                                        setActiveCinemaAddon(addSource);
-                                        setShowAddonPicker(false);
-                                    }}
-                                >
-                                    <Text style={{ color: isSelected ? currentColors.primary : currentColors.text, fontFamily: 'Outfit_500Medium', fontSize: 13 }}>
-                                        {a.title || 'Addon'}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-            )}
-
-            <View style={styles.header}>
-                <View style={[styles.searchBar, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}>
-                    <Ionicons name="search-outline" size={20} color={currentColors.textSecondary} />
-                    <TextInput
-                        style={[styles.searchInput, { color: currentColors.text }]}
-                        placeholder="Search movies, tv shows..."
-                        placeholderTextColor={currentColors.textSecondary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearch}
-                        returnKeyType="search"
-                    />
-                </View>
-                {addonConfig?.settings?.showfilter && cinemaFilters && (
-                    <TouchableOpacity
-                        style={[styles.filterBtn, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}
-                        onPress={() => setIsFilterVisible(!isFilterVisible)}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="options-outline" size={20} color={currentColors.text} />
+        <View style={[styles.container, { backgroundColor: currentColors.background }]}>
+            {/* Dark Luxury Gradient */}
+            <LinearGradient
+                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                locations={[0, 0.25, 1]}
+                style={StyleSheet.absoluteFill}
+            />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                {/* Header + Addon Picker Header */}
+                <View style={[styles.headerTitleRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <Text style={[styles.categoryTitle, { color: currentColors.text }]}>
+                            {activeFilter === 'All' ? 'Cinema' : activeFilter}
+                        </Text>
+                        <View style={[styles.titleDot, { backgroundColor: currentColors.primary }]} />
+                    </View>
+                    <TouchableOpacity onPress={() => setShowAddonPicker(!showAddonPicker)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: currentColors.primary, fontFamily: 'Outfit_500Medium', marginRight: 4 }}>
+                            {addonConfig?.addon?.title || 'Providers'}
+                        </Text>
+                        <Ionicons name={showAddonPicker ? "chevron-up" : "chevron-down"} size={16} color={currentColors.primary} />
                     </TouchableOpacity>
-                )}
-            </View>
-
-            {/* Filter */}
-            {addonConfig?.settings?.showfilter && cinemaFilters && (
-                <CinemaFilter
-                    visible={isFilterVisible}
-                    onClose={() => setIsFilterVisible(false)}
-                    onApply={handleApplyFilters}
-                    onReset={handleResetFilters}
-                    selectedFilters={selectedFilters}
-                    setSelectedFilters={setSelectedFilters}
-                    type={contentType === 'all' ? 'movie' : contentType}
-                />
-            )}
-
-            {appliedFilters ? (
-                <View style={{ flex: 1, paddingHorizontal: 20 }}>
-                    <Text style={{ color: currentColors.text, paddingVertical: 10 }}>Filter functionality requires global search API support which may not be mapped for custom addons.</Text>
                 </View>
-            ) : (
-                <FlatList
-                    data={sections}
-                    renderItem={renderSection}
-                    keyExtractor={item => item.id}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.content}
-                    initialNumToRender={3}
-                    windowSize={5}
-                    maxToRenderPerBatch={2}
-                    removeClippedSubviews={Platform.OS === 'android'}
-                    ListHeaderComponent={<View style={{ height: 10 }} />}
-                />
-            )}
-        </SafeAreaView>
+
+                {showAddonPicker && (
+                    <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                            {addons.map((a, i) => {
+                                const addSource = a.source || a.url;
+                                const isSelected = activeCinemaAddon === addSource;
+                                return (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={{
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 6,
+                                            borderRadius: 20,
+                                            borderWidth: 1,
+                                            borderColor: isSelected ? currentColors.primary : 'rgba(255,255,255,0.1)',
+                                            backgroundColor: 'transparent',
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            overflow: 'hidden'
+                                        }}
+                                        onPress={() => {
+                                            setActiveCinemaAddon(addSource);
+                                            setShowAddonPicker(false);
+                                        }}
+                                    >
+                                        <BlurView intensity={isSelected ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />
+                                        {isSelected && <View style={[StyleSheet.absoluteFill, { backgroundColor: currentColors.primary + '20' }]} />}
+                                        <Text style={{ color: isSelected ? currentColors.primary : currentColors.text, fontFamily: 'Outfit_500Medium', fontSize: 13, zIndex: 1 }}>
+                                            {a.title || 'Addon'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
+
+                <View style={styles.header}>
+                    <View style={[styles.searchBar, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <Ionicons name="search-outline" size={20} color={currentColors.textSecondary} style={{ zIndex: 1 }} />
+                        <TextInput
+                            style={[styles.searchInput, { color: currentColors.text, zIndex: 1 }]}
+                            placeholder="Search movies, tv shows..."
+                            placeholderTextColor={currentColors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                            returnKeyType="search"
+                        />
+                    </View>
+                    {addonConfig?.settings?.showfilter && cinemaFilters && (
+                        <TouchableOpacity
+                            style={[styles.filterBtn, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}
+                            onPress={() => setIsFilterVisible(!isFilterVisible)}
+                            activeOpacity={0.7}
+                        >
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <Ionicons name="options-outline" size={20} color={currentColors.text} style={{ zIndex: 1 }} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Filter */}
+                {addonConfig?.settings?.showfilter && cinemaFilters && (
+                    <CinemaFilter
+                        visible={isFilterVisible}
+                        onClose={() => setIsFilterVisible(false)}
+                        onApply={handleApplyFilters}
+                        onReset={handleResetFilters}
+                        selectedFilters={selectedFilters}
+                        setSelectedFilters={setSelectedFilters}
+                        type={contentType === 'all' ? 'movie' : contentType}
+                    />
+                )}
+
+                {appliedFilters ? (
+                    <View style={{ flex: 1, paddingHorizontal: 20 }}>
+                        <Text style={{ color: currentColors.text, paddingVertical: 10 }}>Filter functionality requires global search API support which may not be mapped for custom addons.</Text>
+                    </View>
+                ) : !activeCinemaAddon || !addonConfig || !addonConfig.catalogs || addonConfig.catalogs.length === 0 ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 }}>
+                        <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
+                        <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
+                            Please choose Any Provider to Explore
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={sections}
+                        renderItem={renderSection}
+                        keyExtractor={item => item.id}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.content}
+                        initialNumToRender={3}
+                        windowSize={5}
+                        maxToRenderPerBatch={2}
+                        removeClippedSubviews={Platform.OS === 'android'}
+                        ListHeaderComponent={<View style={{ height: 10 }} />}
+                    />
+                )}
+            </SafeAreaView>
+        </View>
     );
 }
 
@@ -305,9 +314,9 @@ const styles = StyleSheet.create({
     headerTitleRow: { flexDirection: 'row', alignItems: 'baseline', paddingHorizontal: 20, marginTop: 10 },
     titleDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 4 },
     header: { paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
-    searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, height: 52, borderWidth: 1 },
+    searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, height: 52, borderWidth: 1, backgroundColor: 'rgba(255, 255, 255, 0.03)' },
     searchInput: { flex: 1, marginLeft: 10, fontSize: 15, fontFamily: 'Outfit_500Medium' },
-    filterBtn: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
+    filterBtn: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255, 255, 255, 0.03)' },
     content: { paddingBottom: 120 },
     categoryTitle: { fontSize: 32, fontFamily: 'Outfit_700Bold' },
     categoriesContainer: { marginBottom: 10 },

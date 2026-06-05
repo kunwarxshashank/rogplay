@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
 import { getExternalIds } from '@/services/tmdb';
 
@@ -13,14 +13,24 @@ export interface StreamResult {
 }
 
 export function useStreamSources() {
-    const { addons } = useAddonsStore();
+    const addons = useAddonsStore(s => s.addons);
     const [results, setResults] = useState<StreamResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const abortRef = useRef<AbortController | null>(null);
+
+    // Cleanup AbortController on unmount
+    useEffect(() => {
+        return () => {
+            if (abortRef.current) {
+                abortRef.current.abort();
+                abortRef.current = null;
+            }
+        };
+    }, []);
 
     const addResults = (newItems: StreamResult[], cinemaSources: Set<string> = new Set()) => {
         setResults(prev => {
             const combined = [...prev, ...newItems];
-            // Deduplicate by URL
             const unique = combined.filter((v, i, a) => a.findIndex(t => (t.url === v.url)) === i);
             return unique.sort((a, b) => {
                 const aIsCinema = cinemaSources.has(a.source);
@@ -39,8 +49,16 @@ export function useStreamSources() {
         type: 'movie' | 'tv' | 'rogmovie' = 'movie',
         directUrl?: string,
         movieData?: string,
-        serverAddonUrl?: string    // For serveraddon items: direct URL that returns [{title, url, headers}]
+        serverAddonUrl?: string
     ) => {
+        // Cancel previous request
+        if (abortRef.current) {
+            abortRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const signal = controller.signal;
+
         setLoading(true);
         setResults([]);
 
@@ -65,6 +83,7 @@ export function useStreamSources() {
                 } else if (directUrl && directUrl !== 'undefined') {
                     const cleanUrl = directUrl.trim();
                     const response = await fetch(cleanUrl, {
+                        signal,
                         headers: {
                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36',
                             'Accept': 'application/json'
@@ -101,6 +120,7 @@ export function useStreamSources() {
             try {
                 const cleanUrl = serverAddonUrl.trim();
                 const res = await fetch(cleanUrl, {
+                    signal,
                     headers: { 'Accept': 'application/json' }
                 });
                 if (res.ok) {
@@ -184,7 +204,8 @@ export function useStreamSources() {
                 }
 
                 console.log(`STREMIO FETCHING: ${streamUrl}`);
-                const res = await fetch(streamUrl);
+                if (signal.aborted) return;
+                const res = await fetch(streamUrl, { signal });
                 if (!res.ok) return;
 
                 const data = await res.json();
@@ -217,8 +238,9 @@ export function useStreamSources() {
         // ─── Fetch from cinema/mapping addons ───────────────────
         const cinemaPromises = cinemaAddons.map(async (addon) => {
             try {
+                if (signal.aborted) return;
                 console.log(`Checking addon: ${addon.title} (${addon.url})`);
-                const response = await fetch(addon.url);
+                const response = await fetch(addon.url, { signal });
                 const json = await response.json();
 
                 if (!Array.isArray(json)) return;
@@ -240,7 +262,7 @@ export function useStreamSources() {
                                 if (!fetchUrl) return;
 
                                 console.log(`CINEMA FETCHING: ${fetchUrl}`);
-                                const res = await fetch(fetchUrl);
+                                const res = await fetch(fetchUrl, { signal });
                                 if (!res.ok) return;
 
                                 const sourceData = await res.json();

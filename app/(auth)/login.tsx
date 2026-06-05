@@ -87,9 +87,12 @@ export default function LoginScreen() {
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background }]}>
             <LinearGradient
-                colors={currentColors.gradients.surface}
+                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                locations={[0, 0.25, 1]}
                 style={StyleSheet.absoluteFill}
             />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -122,7 +125,8 @@ export default function LoginScreen() {
 
                         <View style={styles.inputWrapper}>
                             <Text style={[styles.inputLabel, { color: currentColors.textSecondary }]}>Email</Text>
-                            <View style={[styles.inputContainer, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}>
+                            <View style={[styles.inputContainer, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <MaterialCommunityIcons name="email-outline" size={20} color={currentColors.textSecondary} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { color: currentColors.text }]}
@@ -138,7 +142,8 @@ export default function LoginScreen() {
 
                         <View style={styles.inputWrapper}>
                             <Text style={[styles.inputLabel, { color: currentColors.textSecondary }]}>Password</Text>
-                            <View style={[styles.inputContainer, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}>
+                            <View style={[styles.inputContainer, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <MaterialCommunityIcons name="lock-outline" size={20} color={currentColors.textSecondary} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { color: currentColors.text }]}

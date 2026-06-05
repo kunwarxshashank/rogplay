@@ -273,6 +273,7 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
         drmData, headersData, newDrmType,
         streamUrl, isReady, setIsReady,
         importedSubtitles, setImportedSubtitles,
+        isFetchingSubtitles,
         playbackError, setPlaybackError,
         watchPartyModalVisible, setWatchPartyModalVisible,
         handleChannelSelect,
@@ -482,6 +483,7 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
                 textTracks={[...allTextTracks, ...importedSubtitles]}
                 selectedTextTrack={selectedTextTrack}
                 subtitleDelay={subtitleDelay}
+                isFetchingSubtitles={isFetchingSubtitles}
                 onSelectText={(index) => setSelectedTextTrack(index)}
                 onImportSubtitle={handleImportSubtitle}
                 onAdjustDelay={(delay) => setSubtitleDelay(delay)}

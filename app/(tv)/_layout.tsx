@@ -111,6 +111,7 @@ export default function TVLayout() {
                 <Tabs.Screen name="details/index" options={{ href: null }} />
                 <Tabs.Screen name="details/[type]/[id]" options={{ href: null }} />
                 <Tabs.Screen name="season/[tvId]/[seasonNumber]" options={{ href: null }} />
+                <Tabs.Screen name="music-player" options={{ href: null }} />
                 <Tabs.Screen name="account" options={{ title: 'Profile' }} />
             </Tabs>
         </View>

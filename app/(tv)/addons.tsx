@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAddonsStore } from '@/store/addonsStore';
+import { useAddonsStore, TMDB_BUILTIN_SOURCE } from '@/store/addonsStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { TVFocusable } from '@/components/TVFocusable';
@@ -124,6 +124,7 @@ export default function TVAddonsScreen() {
     };
 
     const handleOpenAddon = (item: any) => {
+        if (item.type === 'subtitles') return;
         setActiveCinemaAddon(item.url || item.source);
         router.push('/cinema');
     };
@@ -152,19 +153,25 @@ export default function TVAddonsScreen() {
         });
     }, [addons, searchQuery, selectedFilter]);
 
-    /* ── Addon Card ─────────────────────── */
     const renderItem = ({ item, index }: { item: any; index: number }) => {
         const typeConfig = getTypeConfig(item.type);
+        const isBuiltin = item.source === TMDB_BUILTIN_SOURCE || item.isBuiltin;
         return (
             <View style={[styles.cardOuter, { width: CARD_W }]}>
                 {/* Main card area — focusable */}
                 <TVFocusable
                     style={styles.cardFocusWrap}
                     onPress={() => handleOpenAddon(item)}
-                    onLongPress={() => Alert.alert('Remove Addon?', `Remove ${item.title}?`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Remove', onPress: () => removeAddon(item.source) }
-                    ])}
+                    onLongPress={() => {
+                        if (isBuiltin) {
+                            Alert.alert('Built-in Addon', 'The TMDB Addon is pre-installed and cannot be removed.');
+                            return;
+                        }
+                        Alert.alert('Remove Addon?', `Remove ${item.title}?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', onPress: () => removeAddon(item.source) }
+                        ]);
+                    }}
                     nativeID={`tv-addon-${index}`}
                     focusedBorderColor={typeConfig.color}
                     focusedScale={1.04}
@@ -222,9 +229,16 @@ export default function TVAddonsScreen() {
                                                 {item.type?.toUpperCase() || 'OTHER'}
                                             </Text>
                                         </View>
-                                        <View style={styles.openIndicator}>
-                                            <MaterialIcons name="open-in-new" size={13} color={c.textSecondary} />
-                                        </View>
+                                        {isBuiltin ? (
+                                            <View style={[styles.typeBadge, { backgroundColor: 'rgba(16,185,129,0.12)' }]}>
+                                                <MaterialIcons name="verified" size={11} color="#10b981" />
+                                                <Text style={[styles.typeBadgeText, { color: '#10b981' }]}>BUILT-IN</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.openIndicator}>
+                                                <MaterialIcons name="open-in-new" size={13} color={c.textSecondary} />
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                             </View>
@@ -232,27 +246,29 @@ export default function TVAddonsScreen() {
                     )}
                 </TVFocusable>
 
-                {/* Delete button — independently focusable */}
-                <TVFocusable
-                    style={styles.deleteBtn}
-                    onPress={() => Alert.alert('Remove Addon?', `Remove ${item.title}?`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Remove', onPress: () => removeAddon(item.source) }
-                    ])}
-                    nativeID={`tv-addon-del-${index}`}
-                    focusedBackgroundColor={hexAlpha(c.error || '#f43f5e', 0.15)}
-                    focusedScale={1.08}
-                    autoFlex={false}
-                >
-                    {({ focused: delFocused }) => (
-                        <View style={[styles.deleteBtnInner, {
-                            backgroundColor: delFocused ? hexAlpha(c.error || '#f43f5e', 0.12) : 'rgba(255,255,255,0.04)',
-                            borderColor: delFocused ? (c.error || '#f43f5e') : 'rgba(255,255,255,0.06)',
-                        }]}>
-                            <MaterialIcons name="delete-outline" size={16} color={delFocused ? c.error : c.textSecondary} />
-                        </View>
-                    )}
-                </TVFocusable>
+                {/* Delete button — hide for built-in addons */}
+                {!isBuiltin && (
+                    <TVFocusable
+                        style={styles.deleteBtn}
+                        onPress={() => Alert.alert('Remove Addon?', `Remove ${item.title}?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', onPress: () => removeAddon(item.source) }
+                        ])}
+                        nativeID={`tv-addon-del-${index}`}
+                        focusedBackgroundColor={hexAlpha(c.error || '#f43f5e', 0.15)}
+                        focusedScale={1.08}
+                        autoFlex={false}
+                    >
+                        {({ focused: delFocused }) => (
+                            <View style={[styles.deleteBtnInner, {
+                                backgroundColor: delFocused ? hexAlpha(c.error || '#f43f5e', 0.12) : 'rgba(255,255,255,0.04)',
+                                borderColor: delFocused ? (c.error || '#f43f5e') : 'rgba(255,255,255,0.06)',
+                            }]}>
+                                <MaterialIcons name="delete-outline" size={16} color={delFocused ? c.error : c.textSecondary} />
+                            </View>
+                        )}
+                    </TVFocusable>
+                )}
             </View>
         );
     };

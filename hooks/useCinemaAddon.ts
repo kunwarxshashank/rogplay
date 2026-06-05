@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
 
 export function useCinemaAddon() {
-    const { addons, activeCinemaAddon } = useAddonsStore();
+    const addons = useAddonsStore(s => s.addons);
+    const activeCinemaAddon = useAddonsStore(s => s.activeCinemaAddon);
 
     return useMemo(() => {
         if (!activeCinemaAddon) return null;
@@ -40,7 +41,8 @@ export function useCinemaAddon() {
         const isStremio = (addon.manifest && addon.manifest.id && addon.manifest.resources) ||
             (addon.type === 'stremio' || activeCinemaAddon.endsWith('manifest.json'));
 
-        const addonType = addon.addontype || (addon.manifest?.addontype) || (isStremio ? 'stremio' : 'serveraddon');
+        const addonType = addon.addontype || (addon.manifest?.addontype) || (addon.type === 'music' ? 'music' : null) || (isStremio ? 'stremio' : 'serveraddon');
+        const isStremioLike = addonType === 'stremio' || addonType === 'music';
         const rawCatalogs = addon.catalogs || (addon.manifest?.catalogs) || [];
         const searchcatalog = addon.searchcatalog || (addon.manifest?.searchcatalog) || [];
         const slidercatalog = addon.slidercatalog || (addon.manifest?.slidercatalog) || null;
@@ -51,7 +53,7 @@ export function useCinemaAddon() {
         const idPrefixes = addon.manifest?.idPrefixes || addon.idPrefixes || [];
 
         let finalSearchCatalog = [...searchcatalog];
-        if (addonType === 'stremio' && addon.manifest?.catalogs) {
+        if (isStremioLike && addon.manifest?.catalogs) {
             const stremioSearchCatalogs = addon.manifest.catalogs
                 .filter((c: any) => (c.type === 'movie' || c.type === 'series') && c.extra?.some((e: any) => e.name === 'search'))
                 .map((c: any) => ({
@@ -71,13 +73,12 @@ export function useCinemaAddon() {
         }
 
         const mappedCatalogs = rawCatalogs.map((c: any) => {
-            if (addonType === 'stremio' && !c.url) {
+            if (isStremioLike && !c.url) {
                 return {
                     ...c,
                     url: `${baseUrl}/catalog/${c.type}/${c.id}.json`,
                     paginationurl: `${baseUrl}/catalog/${c.type}/${c.id}/skip=\${stremioSkip}.json`,
                     ispagination: true,
-                    // Attach addon info for custom ID routing
                     _addonUrl: stremioManifestUrl,
                     _addonManifestStr: addonManifestStr,
                 };
@@ -148,7 +149,7 @@ export async function fetchAddonCatalog(catalogUrl: string, page: number = 1, ad
         }
 
         let results: any[] = [];
-        if (addonType === 'stremio') {
+        if (addonType === 'stremio' || addonType === 'music') {
             results = data?.metas || data?.results || data?.items || [];
         } else if (addonType === 'tmdbaddon') {
             results = data?.results || (Array.isArray(data) ? data : []);

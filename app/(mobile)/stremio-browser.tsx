@@ -465,6 +465,8 @@ export default function StremioBrowserScreen() {
         );
     };
 
+    const isSeriesDetail = detailMeta?.type === 'series' || manifest?.types?.includes('series');
+
     const detailView = showDetail && detailMeta ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.background, zIndex: 100 }]}>
             {/* Background Image */}
@@ -516,12 +518,14 @@ export default function StremioBrowserScreen() {
                                 </Text>
                             </View>
                         )}
-                        <View style={styles.detailMetaRow}>
-                            <MaterialIcons name="video-library" size={14} color={activeColors.textSecondary} />
-                            <Text style={[styles.detailMetaText, { color: activeColors.textSecondary }]}>
-                                {detailMeta.videos?.length || 0} Episodes · {seasons.length} Season{seasons.length !== 1 ? 's' : ''}
-                            </Text>
-                        </View>
+                        {isSeriesDetail && (
+                            <View style={styles.detailMetaRow}>
+                                <MaterialIcons name="video-library" size={14} color={activeColors.textSecondary} />
+                                <Text style={[styles.detailMetaText, { color: activeColors.textSecondary }]}>
+                                    {detailMeta.videos?.length || 0} Episodes · {seasons.length} Season{seasons.length !== 1 ? 's' : ''}
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
@@ -532,8 +536,8 @@ export default function StremioBrowserScreen() {
                     </Text>
                 )}
 
-                {/* Play Movie Button (If no videos/episodes) */}
-                {(!detailMeta.videos || detailMeta.videos.length === 0) && (
+                {/* Play Movie Button — always for movies; for series only if no videos */}
+                {(!isSeriesDetail || !detailMeta.videos || detailMeta.videos.length === 0) && (
                     <TouchableOpacity
                         style={[styles.playMovieBtn, { backgroundColor: activeColors.primary }]}
                         onPress={() => fetchAndPlayStreams(detailMeta)}
@@ -543,8 +547,8 @@ export default function StremioBrowserScreen() {
                     </TouchableOpacity>
                 )}
 
-                {/* Season Selector */}
-                {seasons.length > 1 && (
+                {/* Season Selector — series only */}
+                {isSeriesDetail && seasons.length > 1 && (
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -576,20 +580,24 @@ export default function StremioBrowserScreen() {
                     </ScrollView>
                 )}
 
-                {/* Episode List */}
-                <View style={styles.episodeListHeader}>
-                    <Text style={[styles.episodeListTitle, { color: activeColors.text }]}>
-                        {seasons.length <= 1 ? 'Episodes' : `Season ${selectedSeason}`}
-                    </Text>
-                    <Text style={[styles.episodeCount, { color: activeColors.textSecondary }]}>
-                        {episodesForSeason.length} episodes
-                    </Text>
-                </View>
-                {episodesForSeason.map(video => (
-                    <View key={video.id}>
-                        {renderEpisode({ item: video })}
-                    </View>
-                ))}
+                {/* Episode List — series only */}
+                {isSeriesDetail && (
+                    <>
+                        <View style={styles.episodeListHeader}>
+                            <Text style={[styles.episodeListTitle, { color: activeColors.text }]}>
+                                {seasons.length <= 1 ? 'Episodes' : `Season ${selectedSeason}`}
+                            </Text>
+                            <Text style={[styles.episodeCount, { color: activeColors.textSecondary }]}>
+                                {episodesForSeason.length} episodes
+                            </Text>
+                        </View>
+                        {episodesForSeason.map(video => (
+                            <View key={video.id}>
+                                {renderEpisode({ item: video })}
+                            </View>
+                        ))}
+                    </>
+                )}
                 <View style={{ height: 100 }} />
             </ScrollView>
         </View>

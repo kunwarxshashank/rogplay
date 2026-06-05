@@ -492,6 +492,8 @@ export default function StremioBrowserScreen() {
         );
     };
 
+    const isSeriesDetail = detailMeta?.type === 'series' || manifest?.types?.includes('series');
+
     const detailView = showDetail && detailMeta ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.background, zIndex: 100 }]}>
             {/* Background Image Immersive */}
@@ -523,7 +525,7 @@ export default function StremioBrowserScreen() {
                     </TVFocusable>
                     <View style={styles.tvHeaderSeparator} />
                     <Text style={[styles.tvHeaderInfoText, { color: activeColors.textSecondary }]}>
-                        {detailMeta.type?.toUpperCase()} • {seasons.length} SEASONS
+                        {detailMeta.type?.toUpperCase()}{isSeriesDetail ? ` • ${seasons.length} SEASONS` : ''}
                     </Text>
                 </View>
 
@@ -536,7 +538,7 @@ export default function StremioBrowserScreen() {
                         />
                         <TVFocusable
                             onPress={() => {
-                                if (episodesForSeason && episodesForSeason.length > 0) {
+                                if (isSeriesDetail && episodesForSeason && episodesForSeason.length > 0) {
                                     handleEpisodePress(episodesForSeason[0]);
                                 } else {
                                     fetchAndPlayStreams(detailMeta);
@@ -548,7 +550,9 @@ export default function StremioBrowserScreen() {
                             <View style={styles.tvMainPlayContent}>
                                 <MaterialIcons name="play-arrow" size={32} color="#fff" />
                                 <Text style={styles.tvMainPlayText}>
-                                    {episodesForSeason && episodesForSeason.length > 0 ? `WATCH S${selectedSeason} E1` : 'WATCH NOW'}
+                                    {isSeriesDetail && episodesForSeason && episodesForSeason.length > 0
+                                        ? `WATCH S${selectedSeason} E1`
+                                        : 'WATCH NOW'}
                                 </Text>
                             </View>
                         </TVFocusable>
@@ -570,19 +574,21 @@ export default function StremioBrowserScreen() {
                                     {detailMeta.country}
                                 </Text>
                             )}
-                            <Text style={[styles.tvMetaSimple, { color: activeColors.textSecondary }]}>
-                                {detailMeta.videos?.length} Episodes
-                            </Text>
+                            {isSeriesDetail && (
+                                <Text style={[styles.tvMetaSimple, { color: activeColors.textSecondary }]}>
+                                    {detailMeta.videos?.length} Episodes
+                                </Text>
+                            )}
                         </View>
 
                         <Text style={[styles.tvDetailDesc, { color: activeColors.textSecondary }]} numberOfLines={6}>
-                            {detailMeta.description || 'No description available for this series.'}
+                            {detailMeta.description || (isSeriesDetail ? 'No description available for this series.' : '')}
                         </Text>
                     </View>
                 </View>
 
-                {/* Season Selection - Grid or horizontal scroll */}
-                {seasons.length > 1 && (
+                {/* Season Selection — series only */}
+                {isSeriesDetail && seasons.length > 1 && (
                     <View style={styles.tvSeasonSection}>
                         <Text style={[styles.tvSectionTitle, { color: activeColors.text }]}>Seasons</Text>
                         <ScrollView
@@ -616,25 +622,27 @@ export default function StremioBrowserScreen() {
                     </View>
                 )}
 
-                {/* Episodes Grid-like list */}
-                <View style={styles.tvEpisodeSection}>
-                    <View style={styles.tvEpisodeHeader}>
-                        <Text style={[styles.tvSectionTitle, { color: activeColors.text }]}>
-                            Episodes — Season {selectedSeason}
-                        </Text>
-                        <Text style={[styles.tvEpisodeCount, { color: activeColors.textSecondary }]}>
-                            {episodesForSeason.length} Total
-                        </Text>
-                    </View>
+                {/* Episodes Grid-like list — series only */}
+                {isSeriesDetail && (
+                    <View style={styles.tvEpisodeSection}>
+                        <View style={styles.tvEpisodeHeader}>
+                            <Text style={[styles.tvSectionTitle, { color: activeColors.text }]}>
+                                Episodes — Season {selectedSeason}
+                            </Text>
+                            <Text style={[styles.tvEpisodeCount, { color: activeColors.textSecondary }]}>
+                                {episodesForSeason.length} Total
+                            </Text>
+                        </View>
 
-                    <View style={styles.tvEpisodeList}>
-                        {episodesForSeason.map(video => (
-                            <View key={video.id}>
-                                {renderEpisode({ item: video })}
-                            </View>
-                        ))}
+                        <View style={styles.tvEpisodeList}>
+                            {episodesForSeason.map(video => (
+                                <View key={video.id}>
+                                    {renderEpisode({ item: video })}
+                                </View>
+                            ))}
+                        </View>
                     </View>
-                </View>
+                )}
             </ScrollView>
         </View>
     ) : null;

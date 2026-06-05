@@ -110,6 +110,31 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         };
     }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
 
+    // Compute VLC-safe subtitle URI — never pass undefined, always a string
+    const vlcSubtitleUri = React.useMemo(() => {
+        if (selectedTextTrack < 0) return '';
+        const importedOffset = allTextTracks.length;
+        if (selectedTextTrack >= importedOffset) {
+            const importedIndex = selectedTextTrack - importedOffset;
+            const track = importedSubtitles[importedIndex];
+            return track?.uri || '';
+        }
+        return '';
+    }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
+
+    // Compute VLC text track ID for embedded tracks
+    const vlcTextTrackId = React.useMemo(() => {
+        if (selectedTextTrack < 0) return -1;
+        const importedOffset = allTextTracks.length;
+        if (selectedTextTrack < importedOffset) {
+            // Use the VLC SPU track id from allTextTracks
+            const track = allTextTracks[selectedTextTrack];
+            return track?.id ?? selectedTextTrack;
+        }
+        // External subtitle is loaded via subtitleUri, no embedded track to select
+        return -1;
+    }, [selectedTextTrack, allTextTracks]);
+
     useImperativeHandle(ref, () => ({
         seek: (seconds: number) => {
             if (isVlcRequired) {
@@ -128,6 +153,16 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
             }
         }
     }));
+
+    const videoSource = React.useMemo(() => ({
+        uri: streamUrl,
+        headers: headersData,
+        textTracks: importedSubtitles,
+        drm: drmData ? {
+            type: newDrmType,
+            licenseServer: drmData,
+        } : undefined
+    }), [streamUrl, headersData, importedSubtitles, drmData, newDrmType]);
 
     if (isDetecting || !streamUrl) {
         return (
@@ -175,20 +210,17 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                 playInBackground={bgPlay}
                 onProgress={(data: any) => {
                     onProgress(data, true);
-                    // Force hide buffer indicator if we have positive current time
                     if (data?.currentTime > 0) {
                         onBuffer({ isBuffering: false });
                     }
                 }}
                 onBuffering={(e: any) => {
-                    // Only update if it's actually buffering, often VLC sends false hits
                     if (e?.isBuffering) {
                         onBuffer({ isBuffering: true });
                     }
                 }}
                 onLoad={(data: any) => {
                     onLoad(data, true);
-                    // We only set buffering true if we haven't started playing yet
                     onBuffer({ isBuffering: true });
                 }}
                 onPlaying={() => onBuffer({ isBuffering: false })}
@@ -202,29 +234,17 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                     onError && onError(`Playback error: ${errStr || 'Unknown error'}`);
                 }}
                 audioTrack={selectedAudioTrack}
-                textTrack={selectedTextTrack}
-                subtitleUri={selectedTextTrack >= 0 && selectedTextTrack < importedSubtitles.length
-                    ? importedSubtitles[selectedTextTrack].uri
-                    : undefined
-                }
+                textTrack={vlcTextTrackId}
+                subtitleUri={vlcSubtitleUri}
             />
         );
     }
 
     return (
         <Video
-            key={streamUrl}
             focusable={false}
             ref={internalRef}
-            source={{
-                uri: streamUrl,
-                headers: headersData,
-                textTracks: importedSubtitles,
-                drm: drmData ? {
-                    type: newDrmType,
-                    licenseServer: drmData,
-                } : undefined
-            }}
+            source={videoSource}
             style={[styles.video, style]}
             paused={!isPlaying}
             rate={playbackSpeed}

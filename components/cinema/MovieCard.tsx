@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -56,7 +57,7 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
         return /^[a-zA-Z][a-zA-Z0-9]+/.test(id) && isNaN(Number(id));
     };
 
-    const handlePress = () => {
+    const handlePress = async () => {
         if (onPress) {
             onPress();
             return;
@@ -66,6 +67,51 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
         const finalAddonType = addonType || item.addonType;
         const streamUrl = item.url || item.movieUrl || item.link || item.source || '';
 
+        // ── music: route to music-player ──
+        if (finalAddonType === 'music') {
+            const baseUrl = item._addonUrl || '';
+            const manifestStr = item._addonManifestStr || '';
+
+            let trackUrl = streamUrl;
+            let trackHeaders = item.headers || {};
+
+            if (!trackUrl && baseUrl) {
+                try {
+                    const cleanBase = baseUrl.replace(/\/manifest\.json$/, '');
+                    const res = await fetch(`${cleanBase}/stream/movie/${itemId}.json`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const streams = data.streams || [];
+                        if (streams.length > 0) {
+                            trackUrl = streams[0].url || trackUrl;
+                            trackHeaders = streams[0].headers || trackHeaders;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch music stream:', e);
+                }
+            }
+
+            const params: any = {
+                tracks: JSON.stringify([{
+                    id: itemId,
+                    title: item.title || item.name || 'Unknown Track',
+                    artist: item.artist || item.subtitle || '',
+                    poster: posterUrl,
+                    url: trackUrl,
+                    headers: trackHeaders,
+                }]),
+                index: '0',
+                addonUrl: baseUrl,
+                addonManifest: manifestStr,
+            };
+            if (Platform.isTV) {
+                router.push({ pathname: '/(tv)/music-player', params });
+            } else {
+                router.push({ pathname: '/music-player', params });
+            }
+            return;
+        }
 
         // ── serveraddon: items have a direct stream URL, skip details entirely ──
         if (finalAddonType === 'serveraddon') {
@@ -123,7 +169,7 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
                         style={[
                             styles.posterContainer,
                             {
-                                backgroundColor: '#0E0D17',
+                                backgroundColor: 'transparent',
                                 borderColor: focused ? currentColors.glow : 'rgba(255,255,255,0.2)',
                                 borderWidth: 1,
                             },
@@ -136,6 +182,7 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
                             },
                         ]}
                     >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         {posterUrl ? (
                             <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} />
                         ) : (
@@ -173,7 +220,8 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width = 120, showTyp
 
     return (
         <TouchableOpacity style={[styles.container, { width }, style]} onPress={handlePress} activeOpacity={0.8}>
-            <View style={[styles.posterContainer, { backgroundColor: currentColors.card }]}>
+            <View style={[styles.posterContainer, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]}>
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 {posterUrl ? <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} /> : (
                     <View style={styles.placeholder}>
                         <MaterialIcons name="movie" size={width * 0.3} color={currentColors.textSecondary} />

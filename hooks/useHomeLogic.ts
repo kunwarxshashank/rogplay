@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     Alert,
     Platform,
@@ -34,16 +34,26 @@ export function useHomeLogic() {
     const [newFilename, setNewFilename] = useState('');
     const [showInfoModal, setShowInfoModal] = useState(false);
     const [selectedVideoSize, setSelectedVideoSize] = useState<string>('Unknown');
-    const [viewMode, setViewMode] = useState<'video' | 'folder'>('video');
+    const [viewMode, setViewMode] = useState<'video' | 'folder'>('folder');
     const [folders, setFolders] = useState<{ name: string, count: number, uri: string }[]>([]);
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<'filename' | 'modificationTime' | 'duration' | 'size'>('modificationTime');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [showSortModal, setShowSortModal] = useState(false);
     const router = useRouter();
+    const mountedRef = useRef(true);
+    const thumbTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        mountedRef.current = true;
         loadData();
+        return () => {
+            mountedRef.current = false;
+            if (thumbTimeoutRef.current) {
+                clearTimeout(thumbTimeoutRef.current);
+                thumbTimeoutRef.current = null;
+            }
+        };
     }, [permissionResponse]);
 
     useEffect(() => {
@@ -174,8 +184,9 @@ export function useHomeLogic() {
             setFilteredVideos(instantVideos);
             setLoading(false);
 
-            // Load thumbnails asynchronously
-            setTimeout(async () => {
+            // Load thumbnails asynchronously (deferred to avoid blocking UI)
+            thumbTimeoutRef.current = setTimeout(async () => {
+                if (!mountedRef.current) return;
                 try {
                     await ensureCacheDir();
 
@@ -184,6 +195,8 @@ export function useHomeLogic() {
                         const cached = await getCachedThumbnail(video.id);
                         return cached ? { ...video, thumbnailUri: cached } : video;
                     }));
+
+                    if (!mountedRef.current) return;
 
                     setVideos(prev => {
                         return prev.map(v => {
@@ -195,6 +208,7 @@ export function useHomeLogic() {
                     // Phase 2: Generate missing thumbnails in small batches
                     const batchSize = 4;
                     for (let i = 0; i < withCache.length; i += batchSize) {
+                        if (!mountedRef.current) return;
                         const batch = withCache.slice(i, i + batchSize);
                         const missingInBatch = batch.filter(v => !v.thumbnailUri);
 

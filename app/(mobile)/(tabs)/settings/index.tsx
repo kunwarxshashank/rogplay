@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Share, Linking, Platform } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -152,17 +153,35 @@ export default function SettingsScreen() {
     if (Platform.isTV) {
         return (
             <TVLayout>
-                <View style={{ flex: 1, padding: 20 }}>
-                    {renderContent()}
+                <View style={{ flex: 1, backgroundColor: currentColors.background }}>
+                    <LinearGradient
+                        colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                        locations={[0, 0.25, 1]}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <View style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+                    <View style={{ flex: 1, padding: 20 }}>
+                        {renderContent()}
+                    </View>
                 </View>
             </TVLayout>
         );
     }
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: currentColors.background }]}>
-            {renderContent()}
-        </SafeAreaView>
+        <View style={[styles.container, { backgroundColor: currentColors.background }]}>
+            {/* Dark Luxury Gradient */}
+            <LinearGradient
+                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                locations={[0, 0.25, 1]}
+                style={StyleSheet.absoluteFill}
+            />
+            {/* Subtle light flares for premium aesthetic */}
+            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            <SafeAreaView style={{ flex: 1 }}>
+                {renderContent()}
+            </SafeAreaView>
+        </View>
     );
 }
 

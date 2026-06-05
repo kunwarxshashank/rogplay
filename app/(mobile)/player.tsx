@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MobilePlayer from '@/components/player/MobilePlayer';
@@ -49,10 +49,11 @@ export default function MobilePlayerScreen() {
         return currentChannels;
     }, [channelsParam, currentChannels]);
 
+    useEffect(() => {
+        if (!url) router.back();
+    }, [url, router]);
+
     if (!url) {
-        React.useEffect(() => {
-            if (!url) router.back();
-        }, [url]);
         return <View style={styles.container} />;
     }
 

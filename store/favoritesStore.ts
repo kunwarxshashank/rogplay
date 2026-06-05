@@ -6,7 +6,7 @@ import { useAuthStore } from './authStore';
 
 const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 
-export type FavoriteKind = 'movie' | 'tv' | 'addon' | 'stremio' | 'iptv';
+export type FavoriteKind = 'movie' | 'tv' | 'addon' | 'stremio' | 'iptv' | 'music';
 
 export interface FavoriteItem {
     id: string;
