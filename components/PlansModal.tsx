@@ -10,7 +10,6 @@ import { useAuthStore } from '@/store/authStore';
 
 const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 const rzp_key = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
-const rzp_secret = process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET;
 
 interface PlansModalProps {
     visible: boolean;
