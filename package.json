@@ -27,6 +27,7 @@
     "expo": "~54.0.33",
     "expo-blur": "~15.0.8",
     "expo-brightness": "~14.0.8",
+    "expo-build-properties": "^56.0.17",
     "expo-camera": "~17.0.10",
     "expo-dev-client": "~6.0.20",
     "expo-document-picker": "~14.0.8",

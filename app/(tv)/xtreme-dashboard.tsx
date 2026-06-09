@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { BackHandler } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { XtremeApiClient, XtremeCategory, XtremeSeries } from '@/services/xtremeApi';
 import CatalogBrowser, { BrowserItem } from '@/components/CatalogBrowser';
@@ -68,6 +68,10 @@ export default function XtremeDashboardScreen() {
             setSearchQuery('');
         } catch (e) {
             console.error(e);
+            Alert.alert(
+                'Connection Error',
+                `Failed to load categories. Check that the server URL is correct and the server is reachable.\n\n${e instanceof Error ? e.message : 'Network request failed'}`
+            );
         } finally {
             setLoading(false);
         }
@@ -90,6 +94,10 @@ export default function XtremeDashboardScreen() {
             setSearchQuery('');
         } catch (e) {
             console.error(e);
+            Alert.alert(
+                'Connection Error',
+                `Failed to load streams. Check your connection and try again.\n\n${e instanceof Error ? e.message : 'Network request failed'}`
+            );
         } finally {
             setLoading(false);
         }
@@ -113,6 +121,10 @@ export default function XtremeDashboardScreen() {
             setSearchQuery('');
         } catch (e) {
             console.error(e);
+            Alert.alert(
+                'Connection Error',
+                `Failed to load series info.\n\n${e instanceof Error ? e.message : 'Network request failed'}`
+            );
         } finally {
             setLoading(false);
         }
