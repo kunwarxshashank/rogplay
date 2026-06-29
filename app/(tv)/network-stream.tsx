@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useIptvStore } from '@/store/iptvStore'; // Reusing store or create new logic?
+import { useTheme } from '@/hooks/useTheme';
 // Assuming simpler logic for just playing a URL
 
 export default function TVNetworkStreamScreen() {
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
+    const { colors: activeColors } = useTheme();
     const router = useRouter();
     const [url, setUrl] = useState('');
     const [isFocused, setIsFocused] = useState(false);

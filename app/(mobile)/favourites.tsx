@@ -12,14 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { FavoriteItem, useFavoritesStore } from '@/store/favoritesStore';
 import { useToastStore } from '@/store/toastStore';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function MobileFavouritesScreen() {
+    const { colors: activeColors } = useTheme();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     const items = useFavoritesStore((state) => state.items);
     const removeFavorite = useFavoritesStore((state) => state.removeFavorite);

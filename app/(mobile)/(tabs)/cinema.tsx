@@ -14,6 +14,9 @@ import CinemaFilter, { FilterState } from '@/components/cinema/CinemaFilter';
 import ContinueWatchingSection from '@/components/cinema/ContinueWatchingSection';
 import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
 import { useAddonsStore } from '@/store/addonsStore';
+import { useTheme } from '@/hooks/useTheme';
+import { discoverContent, discoverAllContent } from '@/services/tmdb';
+import { useThemeStore } from '@/store/themeStore';
 
 export function Cinema() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -33,12 +36,12 @@ export function Cinema() {
     const [showAddonPicker, setShowAddonPicker] = useState(false);
 
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
 
     const { addons, activeCinemaAddon, setActiveCinemaAddon, isLoading, isHydrated } = useAddonsStore();
     const addonConfig = useCinemaAddon();
     const { cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider, cinemaFilters } = useSettingsStore();
+    const { colors: currentColors } = useTheme();
+    const themeStore = useThemeStore();
 
     // Set default addon to tmdbaddon if not set and available
     useEffect(() => {
@@ -93,7 +96,6 @@ export function Cinema() {
             (activeFilter === 'Movies' || activeFilter === 'Bollywood' ? 'movie' : 'all'),
         [activeFilter]);
 
-
     const sections = useMemo(() => {
         if (!addonConfig || appliedFilters) return [];
 
@@ -138,7 +140,7 @@ export function Cinema() {
 
     const renderSection = useCallback(({ item }: { item: any }) => {
         switch (item.type) {
-            case 'slider': return <TrendingSlider />;
+            case 'slider': return <TrendingSlider variant={themeStore.homeBuilder.heroBannerStyle} />;
             case 'ott': return <OTTSection onSelect={handleOTTSelect} />;
             case 'continue': return <ContinueWatchingSection />;
             default: return (
@@ -174,13 +176,18 @@ export function Cinema() {
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background }]}>
             {/* Dark Luxury Gradient */}
-            <LinearGradient
-                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {currentColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!currentColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 {/* Header + Addon Picker Header */}
                 <View style={[styles.headerTitleRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
@@ -223,7 +230,7 @@ export function Cinema() {
                                             setShowAddonPicker(false);
                                         }}
                                     >
-                                        <BlurView intensity={isSelected ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />
+                                        {currentColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={isSelected ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />}
                                         {isSelected && <View style={[StyleSheet.absoluteFill, { backgroundColor: currentColors.primary + '20' }]} />}
                                         <Text style={{ color: isSelected ? currentColors.primary : currentColors.text, fontFamily: 'Outfit_500Medium', fontSize: 13, zIndex: 1 }}>
                                             {a.title || 'Addon'}
@@ -237,7 +244,7 @@ export function Cinema() {
 
                 <View style={styles.header}>
                     <View style={[styles.searchBar, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
-                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        {currentColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                         <Ionicons name="search-outline" size={20} color={currentColors.textSecondary} style={{ zIndex: 1 }} />
                         <TextInput
                             style={[styles.searchInput, { color: currentColors.text, zIndex: 1 }]}
@@ -255,7 +262,7 @@ export function Cinema() {
                             onPress={() => setIsFilterVisible(!isFilterVisible)}
                             activeOpacity={0.7}
                         >
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            {currentColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                             <Ionicons name="options-outline" size={20} color={currentColors.text} style={{ zIndex: 1 }} />
                         </TouchableOpacity>
                     )}
@@ -275,9 +282,26 @@ export function Cinema() {
                 )}
 
                 {appliedFilters ? (
-                    <View style={{ flex: 1, paddingHorizontal: 20 }}>
-                        <Text style={{ color: currentColors.text, paddingVertical: 10 }}>Filter functionality requires global search API support which may not be mapped for custom addons.</Text>
-                    </View>
+                    addonConfig?.addontype === 'tmdbaddon' ? (
+                        <MovieList
+                            key={`filtered-${contentType}`}
+                            title="Filtered Results"
+                            type={contentType === 'all' ? 'all' : contentType === 'tv' ? 'tv' : 'movie'}
+                            fetchFunction={(page = 1) => {
+                                if (contentType === 'all') {
+                                    return discoverAllContent({ ...appliedFilters, page });
+                                }
+                                return discoverContent(contentType as 'movie' | 'tv', { ...appliedFilters, page });
+                            }}
+                            mode="grid"
+                            paginated={true}
+                            addonType="tmdbaddon"
+                        />
+                    ) : (
+                        <View style={{ flex: 1, paddingHorizontal: 20 }}>
+                            <Text style={{ color: currentColors.text, paddingVertical: 10 }}>Filter functionality requires global search API support which may not be mapped for custom addons.</Text>
+                        </View>
+                    )
                 ) : !activeCinemaAddon || !addonConfig || !addonConfig.catalogs || addonConfig.catalogs.length === 0 ? (
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 }}>
                         <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />

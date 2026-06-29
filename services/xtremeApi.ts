@@ -71,11 +71,24 @@ export class XtremeApiClient {
             url.searchParams.append(key, value);
         }
 
-        const response = await fetch(url.toString());
-        if (!response.ok) {
-            throw new Error(`Xtreme API error: ${response.status} ${response.statusText}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        try {
+            const response = await fetch(url.toString(), {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'RogPlay/6.5.0',
+                    'Accept': 'application/json, text/plain, */*',
+                },
+            });
+            if (!response.ok) {
+                throw new Error(`Xtreme API error: ${response.status} ${response.statusText}`);
+            }
+            return await response.json();
+        } finally {
+            clearTimeout(timeout);
         }
-        return await response.json();
     }
 
     async authenticate() {

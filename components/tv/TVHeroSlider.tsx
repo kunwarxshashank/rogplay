@@ -10,24 +10,23 @@ import {
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getTrending } from '@/services/tmdb';
-import { Colors } from '@/constants/Colors';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { TVFocusable } from '@/components/TVFocusable';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useThemeStore, computeThemeColors } from '@/store/themeStore';
 
 const SIDEBAR_WIDTH = 86;
 const AUTO_SCROLL_INTERVAL = 8000;
 
-export default function TVHeroSlider() {
+export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 'traditional' | 'fullscreen' }) {
     const [trending, setTrending] = useState<any[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
     const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
     const router = useRouter();
-    const theme = useSettingsStore((state) => state.theme);
-    const c = React.useMemo(() => Colors[theme] || Colors.dark, [theme]);
+    const ts = useThemeStore();
+    const c = React.useMemo(() => computeThemeColors(ts.themePalette, ts.accentColorId, ts.customHexAccent, ts.borderRadius, ts.cardElevation, ts.animationIntensity), [ts.themePalette, ts.accentColorId, ts.customHexAccent, ts.borderRadius, ts.cardElevation, ts.animationIntensity]);
 
     const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
     const SLIDE_W = SCREEN_W - SIDEBAR_WIDTH;
@@ -101,148 +100,178 @@ export default function TVHeroSlider() {
             const rating = item.vote_average || 0;
             const mediaType = item.media_type === 'tv' ? 'Series' : 'Movie';
             const overview = item.overview || '';
+            const isFullscreen = variant === 'fullscreen';
 
             return (
                 <View style={[styles.slide, { width: SLIDE_W, height: HERO_H }]}>
-                    {/* Background image */}
                     <OptimizedImage
                         source={{ uri: backdropUrl }}
                         style={styles.backdrop}
                         resizeMode="cover"
                     />
 
-                    {/* Gradient overlays for cinematic depth */}
-                    {/* Left edge fade — deep for text readability */}
-                    <LinearGradient
-                        colors={['rgba(14,13,23,0.95)', 'rgba(14,13,23,0.75)', 'rgba(14,13,23,0.3)', 'transparent']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0.7, y: 0 }}
-                        style={styles.gradientOverlay}
-                    />
-
-                    {/* Bottom fade — anchors content */}
-                    <LinearGradient
-                        colors={['transparent', 'rgba(14,13,23,0.4)', 'rgba(14,13,23,0.95)', '#0E0D17']}
-                        start={{ x: 0, y: 0.3 }}
-                        end={{ x: 0, y: 1 }}
-                        style={styles.gradientOverlay}
-                    />
-
-                    {/* Top subtle vignette */}
-                    <LinearGradient
-                        colors={['rgba(14,13,23,0.4)', 'transparent']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 0.15 }}
-                        style={styles.gradientOverlay}
-                    />
-
-                    {/* Content overlay */}
-                    <View style={[styles.contentWrap, { maxWidth: SLIDE_W * 0.55 }]}>
-                        {/* Rank indicator */}
-                        <View style={styles.rankRow}>
-                            <View style={[styles.rankBadge, { backgroundColor: c.primary }]}>
-                                <Text style={styles.rankNumber}>#{index + 1}</Text>
-                            </View>
-                            <Text style={styles.trendingLabel}>TRENDING THIS WEEK</Text>
-                        </View>
-
-                        {/* Title */}
-                        <Text style={styles.title} numberOfLines={2}>
-                            {item.title || item.name}
-                        </Text>
-
-                        {/* Meta info row */}
-                        <View style={styles.metaRow}>
-                            {/* Rating */}
-                            <View style={styles.metaChip}>
-                                <MaterialIcons name="star" size={15} color="#fbbf24" />
-                                <Text style={styles.metaChipText}>{getRatingStars(rating)}</Text>
-                            </View>
-
-                            {/* Year */}
-                            {year ? (
-                                <View style={styles.metaChip}>
-                                    <MaterialIcons name="calendar-today" size={13} color="rgba(255,255,255,0.7)" />
-                                    <Text style={styles.metaChipText}>{year}</Text>
-                                </View>
-                            ) : null}
-
-                            {/* Media type */}
-                            <View style={[styles.metaChip, { backgroundColor: 'rgba(99,102,241,0.2)' }]}>
-                                <MaterialIcons
-                                    name={item.media_type === 'tv' ? 'live-tv' : 'movie'}
-                                    size={13}
-                                    color="rgba(165,180,252,0.9)"
+                    {isFullscreen ? (
+                        <>
+                            {c.isAmoled ? (
+                                <View style={StyleSheet.absoluteFill} />
+                            ) : (
+                                <LinearGradient
+                                    colors={['transparent', c.background]}
+                                    start={{ x: 0, y: 0.3 }}
+                                    end={{ x: 0, y: 1 }}
+                                    style={StyleSheet.absoluteFill}
                                 />
-                                <Text style={[styles.metaChipText, { color: 'rgba(165,180,252,0.9)' }]}>{mediaType}</Text>
+                            )}
+                            <LinearGradient
+                                colors={[c.primary + '30', 'transparent']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={[StyleSheet.absoluteFill, { height: HERO_H * 0.6 }]}
+                            />
+                            <View style={[styles.contentWrap, { maxWidth: SLIDE_W * 0.6, justifyContent: 'flex-end', paddingBottom: 60 }]}>
+                                <Text style={styles.rankNumber}>#{index + 1}</Text>
+                                <Text style={[styles.title, { fontSize: 56 }]} numberOfLines={2}>
+                                    {item.title || item.name}
+                                </Text>
+                                <View style={styles.metaRow}>
+                                    <View style={styles.metaChip}>
+                                        <MaterialIcons name="star" size={15} color="#fbbf24" />
+                                        <Text style={styles.metaChipText}>{getRatingStars(rating)}</Text>
+                                    </View>
+                                    {year ? (
+                                        <View style={styles.metaChip}>
+                                            <MaterialIcons name="calendar-today" size={13} color="rgba(255,255,255,0.7)" />
+                                            <Text style={styles.metaChipText}>{year}</Text>
+                                        </View>
+                                    ) : null}
+                                    <View style={[styles.metaChip, { backgroundColor: 'rgba(99,102,241,0.2)' }]}>
+                                        <MaterialIcons name={item.media_type === 'tv' ? 'live-tv' : 'movie'} size={13} color="rgba(165,180,252,0.9)" />
+                                        <Text style={[styles.metaChipText, { color: 'rgba(165,180,252,0.9)' }]}>{mediaType}</Text>
+                                    </View>
+                                </View>
+                                {overview ? (
+                                    <Text style={styles.overview} numberOfLines={2}>{overview}</Text>
+                                ) : null}
+                                <View style={styles.actionRow}>
+                                    <TVFocusable
+                                        onPress={() => handlePress(item)}
+                                        onFocus={() => stopAutoScroll()}
+                                        onBlur={() => startAutoScroll()}
+                                        style={styles.watchBtnWrap}
+                                        nativeID={`tv-hero-play-${index}`}
+                                        focusedScale={1.06}
+                                        autoFlex={false}
+                                    >
+                                        {({ focused }) => (
+                                            <View style={[styles.watchBtn, { backgroundColor: focused ? '#fff' : c.primary }]}>
+                                                <Ionicons name="play" size={22} color={focused ? '#000' : '#fff'} />
+                                                <Text style={[styles.watchBtnText, { color: focused ? '#000' : '#fff' }]}>Watch Now</Text>
+                                            </View>
+                                        )}
+                                    </TVFocusable>
+                                </View>
                             </View>
-                        </View>
-
-                        {/* Overview */}
-                        {overview ? (
-                            <Text style={styles.overview} numberOfLines={3}>
-                                {overview}
-                            </Text>
-                        ) : null}
-
-                        {/* Action buttons */}
-                        <View style={styles.actionRow}>
-                            <TVFocusable
-                                onPress={() => handlePress(item)}
-                                onFocus={() => stopAutoScroll()}
-                                onBlur={() => startAutoScroll()}
-                                style={styles.watchBtnWrap}
-                                nativeID={`tv-hero-play-${index}`}
-                                focusedScale={1.06}
-                                autoFlex={false}
-                            >
-                                {({ focused }) => (
-                                    <View style={[styles.watchBtn, {
-                                        backgroundColor: focused ? '#fff' : c.primary,
-                                    }]}>
-                                        <Ionicons
-                                            name="play"
-                                            size={22}
-                                            color={focused ? '#000' : '#fff'}
-                                        />
-                                        <Text style={[styles.watchBtnText, {
-                                            color: focused ? '#000' : '#fff',
-                                        }]}>Watch Now</Text>
+                        </>
+                    ) : (
+                        <>
+                            {c.isAmoled ? (
+                                <View style={styles.gradientOverlay} />
+                            ) : (
+                                <LinearGradient
+                                    colors={[c.background + 'F2', c.background + 'BF', c.background + '4D', 'transparent']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 0.7, y: 0 }}
+                                    style={styles.gradientOverlay}
+                                />
+                            )}
+                            <LinearGradient
+                                colors={['transparent', c.background + '66', c.background + 'F2', c.background]}
+                                start={{ x: 0, y: 0.3 }}
+                                end={{ x: 0, y: 1 }}
+                                style={styles.gradientOverlay}
+                            />
+                            <LinearGradient
+                                colors={[c.background + '66', 'transparent']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 0.15 }}
+                                style={styles.gradientOverlay}
+                            />
+                            <View style={[styles.contentWrap, { maxWidth: SLIDE_W * 0.55 }]}>
+                                <View style={styles.rankRow}>
+                                    <View style={[styles.rankBadge, { backgroundColor: c.primary }]}>
+                                        <Text style={styles.rankNumber}>#{index + 1}</Text>
                                     </View>
-                                )}
-                            </TVFocusable>
-
-                            <TVFocusable
-                                onPress={() => handlePress(item)}
-                                onFocus={() => stopAutoScroll()}
-                                onBlur={() => startAutoScroll()}
-                                style={styles.infoBtnWrap}
-                                nativeID={`tv-hero-info-${index}`}
-                                focusedScale={1.06}
-                                autoFlex={false}
-                            >
-                                {({ focused }) => (
-                                    <View style={[styles.infoBtn, {
-                                        backgroundColor: focused ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
-                                        borderColor: focused ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
-                                    }]}>
-                                        <MaterialIcons name="info-outline" size={20} color="#fff" />
-                                        <Text style={styles.infoBtnText}>More Info</Text>
+                                    <Text style={styles.trendingLabel}>TRENDING THIS WEEK</Text>
+                                </View>
+                                <Text style={styles.title} numberOfLines={2}>
+                                    {item.title || item.name}
+                                </Text>
+                                <View style={styles.metaRow}>
+                                    <View style={styles.metaChip}>
+                                        <MaterialIcons name="star" size={15} color="#fbbf24" />
+                                        <Text style={styles.metaChipText}>{getRatingStars(rating)}</Text>
                                     </View>
-                                )}
-                            </TVFocusable>
-                        </View>
-                    </View>
+                                    {year ? (
+                                        <View style={styles.metaChip}>
+                                            <MaterialIcons name="calendar-today" size={13} color="rgba(255,255,255,0.7)" />
+                                            <Text style={styles.metaChipText}>{year}</Text>
+                                        </View>
+                                    ) : null}
+                                    <View style={[styles.metaChip, { backgroundColor: 'rgba(99,102,241,0.2)' }]}>
+                                        <MaterialIcons name={item.media_type === 'tv' ? 'live-tv' : 'movie'} size={13} color="rgba(165,180,252,0.9)" />
+                                        <Text style={[styles.metaChipText, { color: 'rgba(165,180,252,0.9)' }]}>{mediaType}</Text>
+                                    </View>
+                                </View>
+                                {overview ? (
+                                    <Text style={styles.overview} numberOfLines={3}>{overview}</Text>
+                                ) : null}
+                                <View style={styles.actionRow}>
+                                    <TVFocusable
+                                        onPress={() => handlePress(item)}
+                                        onFocus={() => stopAutoScroll()}
+                                        onBlur={() => startAutoScroll()}
+                                        style={styles.watchBtnWrap}
+                                        nativeID={`tv-hero-play-${index}`}
+                                        focusedScale={1.06}
+                                        autoFlex={false}
+                                    >
+                                        {({ focused }) => (
+                                            <View style={[styles.watchBtn, { backgroundColor: focused ? '#fff' : c.primary }]}>
+                                                <Ionicons name="play" size={22} color={focused ? '#000' : '#fff'} />
+                                                <Text style={[styles.watchBtnText, { color: focused ? '#000' : '#fff' }]}>Watch Now</Text>
+                                            </View>
+                                        )}
+                                    </TVFocusable>
+                                    <TVFocusable
+                                        onPress={() => handlePress(item)}
+                                        onFocus={() => stopAutoScroll()}
+                                        onBlur={() => startAutoScroll()}
+                                        style={styles.infoBtnWrap}
+                                        nativeID={`tv-hero-info-${index}`}
+                                        focusedScale={1.06}
+                                        autoFlex={false}
+                                    >
+                                        {({ focused }) => (
+                                            <View style={[styles.infoBtn, { backgroundColor: focused ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)', borderColor: focused ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }]}>
+                                                <MaterialIcons name="info-outline" size={20} color="#fff" />
+                                                <Text style={styles.infoBtnText}>More Info</Text>
+                                            </View>
+                                        )}
+                                    </TVFocusable>
+                                </View>
+                            </View>
+                        </>
+                    )}
                 </View>
             );
         },
-        [SLIDE_W, HERO_H, c, handlePress, stopAutoScroll, startAutoScroll]
+        [SLIDE_W, HERO_H, c, handlePress, stopAutoScroll, startAutoScroll, variant]
     );
 
     if (trending.length === 0) return null;
 
     return (
-        <View style={[styles.container, { width: SLIDE_W, height: HERO_H }]}>
+        <View style={[styles.container, { backgroundColor: c.background, width: SLIDE_W, height: HERO_H }]}>
             <FlatList
                 ref={flatListRef}
                 data={trending}
@@ -296,7 +325,6 @@ export default function TVHeroSlider() {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#0E0D17',
         overflow: 'hidden',
     },
     slide: {

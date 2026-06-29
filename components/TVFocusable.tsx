@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Pressable, Animated, StyleSheet, Platform, ViewStyle, StyleProp } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 
 interface TVFocusableProps {
     children: React.ReactNode | ((props: { focused: boolean }) => React.ReactNode);
@@ -65,11 +65,10 @@ export function TVFocusable({
     disabled = false,
     autoFlex = true,
 }: TVFocusableProps) {
+    const { colors: currentColors } = useTheme();
     const [focused, setFocused] = useState(false);
     const scaleRef = useRef<Animated.Value | null>(Platform.isTV && !disableFocusEffect ? new Animated.Value(1) : null);
     const scale = scaleRef.current ?? 1;
-    const theme = useSettingsStore((state) => state.theme);
-    const currentColors = useMemo(() => Colors[theme] || Colors.dark, [theme]);
     const borderColor = focusedBorderColor || currentColors.primary;
 
     const handleFocus = useCallback(() => {
@@ -127,7 +126,6 @@ export function TVFocusable({
                 !autoFlex && { flex: 0 },
                 !disableFocusEffect && focused && [
                     styles.focusedContainer,
-                    // { borderColor },
                     focusedBackgroundColor ? { backgroundColor: focusedBackgroundColor } : null
                 ]
             ]}>
@@ -147,8 +145,8 @@ const styles = StyleSheet.create({
     },
     focusedContainer: {
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 10,
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+        elevation: 8,
     }
 });

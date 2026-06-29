@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '@/hooks/useTheme';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
     EpgData,
@@ -74,6 +75,7 @@ const EpgSidebar = React.memo(function EpgSidebar({
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
     const [isRendered, setIsRendered] = useState(false);
+    const { colors: epgColors } = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
     const gridScrollRef = useRef<ScrollView>(null);
     const channelScrollRef = useRef<FlatList>(null);
@@ -500,7 +502,7 @@ const EpgSidebar = React.memo(function EpgSidebar({
             ]}
             pointerEvents={visible ? 'auto' : 'none'}
         >
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+            {epgColors.isAmoled ? <View style={StyleSheet.absoluteFill} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
             <View style={styles.background} />
 
             {/* Header */}

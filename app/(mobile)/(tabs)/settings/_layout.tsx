@@ -1,10 +1,9 @@
 import { Stack } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function SettingsLayout() {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors } = useTheme();
 
     return (
         <Stack
@@ -20,6 +19,8 @@ export default function SettingsLayout() {
             <Stack.Screen name="maintenance" options={{ headerShown: false }} />
             <Stack.Screen name="account" options={{ headerShown: false }} />
             <Stack.Screen name="cinema" options={{ headerShown: false }} />
+            <Stack.Screen name="theme" options={{ headerShown: false }} />
+            <Stack.Screen name="insights" options={{ headerShown: false }} />
         </Stack>
     );
 }

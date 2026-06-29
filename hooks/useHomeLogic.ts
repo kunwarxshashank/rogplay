@@ -10,6 +10,7 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Colors } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useThemeStore, computeThemeColors } from '@/store/themeStore';
 
 export interface VideoWithThumbnail extends MediaLibrary.Asset {
     thumbnailUri?: string;
@@ -19,7 +20,8 @@ const THUMB_CACHE_DIR = `${FileSystem.cacheDirectory}rogplay_thumbnails/`;
 
 export function useHomeLogic() {
     const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const ts = useThemeStore();
+    const currentColors = computeThemeColors(ts.themePalette, ts.accentColorId, ts.customHexAccent, ts.borderRadius, ts.cardElevation, ts.animationIntensity);
     const [videos, setVideos] = useState<VideoWithThumbnail[]>([]);
     const [filteredVideos, setFilteredVideos] = useState<VideoWithThumbnail[]>([]);
     const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();

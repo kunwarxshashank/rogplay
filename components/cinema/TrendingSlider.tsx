@@ -7,17 +7,19 @@ import { Colors } from '@/constants/Colors';
 import { Ionicons, } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { TVFocusable } from '@/components/TVFocusable';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TrendingSliderSkeleton } from '@/components/Skeleton';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 const isTV = Platform.isTV;
 
 interface TrendingSliderProps {
     fullScreen?: boolean;
+    variant?: 'traditional' | 'fullscreen';
 }
 
-const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur, currentColors }: any) => {
+const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur }: any) => {
+    const { colors: currentColors } = useTheme();
     // We animate the width based on focus
     const animWidth = useRef(new Animated.Value(isFocused ? width * 0.5 : width * 0.22)).current;
 
@@ -72,11 +74,14 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur, currentColo
                     source={{ uri: imageUrl }}
                     style={styles.poster}
                 />
-                <LinearGradient
-                    colors={['transparent', 'rgba(6, 9, 18, 0.6)', 'rgba(6, 9, 18, 0.95)']}
-                    locations={[0.2, 0.7, 1]}
-                    style={styles.gradientImageLook}
-                >
+                <View style={[styles.gradientImageLook, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+                    {!currentColors.isAmoled && (
+                        <LinearGradient
+                            colors={['transparent', 'rgba(6, 9, 18, 0.6)', 'rgba(6, 9, 18, 0.95)']}
+                            locations={[0.2, 0.7, 1]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
                     <View style={styles.imageContentWrap}>
                         <Text style={[styles.title, { fontSize: isFocused ? 28 : 20 }]} numberOfLines={isFocused ? 2 : 1}>
                             {item.title || item.name}
@@ -90,19 +95,18 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur, currentColo
                             </Text>
                         </View>
                     </View>
-                </LinearGradient>
+                </View>
             </Animated.View>
         </TVFocusable>
     );
 };
 
-function TrendingSlider({ fullScreen = false }: TrendingSliderProps) {
+function TrendingSlider({ fullScreen = false, variant = 'traditional' }: TrendingSliderProps) {
+    const { colors: currentColors } = useTheme();
     const [data, setData] = useState<any[]>([]);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
     const ITEM_WIDTH = useMemo(() => {
@@ -168,7 +172,6 @@ function TrendingSlider({ fullScreen = false }: TrendingSliderProps) {
                     onPress={onPress}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    currentColors={currentColors}
                 />
             );
         }
@@ -215,14 +218,19 @@ function TrendingSlider({ fullScreen = false }: TrendingSliderProps) {
                         style={styles.poster}
                     />
 
-                    <LinearGradient
-                        colors={['transparent', 'rgba(6, 9, 18, 0.4)', 'rgba(6, 9, 18, 0.9)', '#060912']}
-                        locations={[0, 0.5, 0.8, 1]}
-                        style={styles.gradient}
-                    >
+                    <View style={[styles.gradient, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+                        {!currentColors.isAmoled && (
+                            <LinearGradient
+                                colors={variant === 'fullscreen'
+                                    ? ['transparent', currentColors.background + '99', currentColors.background]
+                                    : ['transparent', 'rgba(6, 9, 18, 0.4)', 'rgba(6, 9, 18, 0.9)', '#060912']}
+                                locations={variant === 'fullscreen' ? [0, 0.7, 1] : [0, 0.5, 0.8, 1]}
+                                style={StyleSheet.absoluteFill}
+                            />
+                        )}
                         <View style={styles.contentWrap}>
-                            <View style={styles.badge}>
-                                <Text style={styles.badgeText}>TRENDING</Text>
+                            <View style={[styles.badge, variant === 'fullscreen' && { backgroundColor: currentColors.primary + '30' }]}>
+                                <Text style={[styles.badgeText, variant === 'fullscreen' && { color: currentColors.primary }]}>TRENDING</Text>
                             </View>
                             <Text style={styles.title} numberOfLines={1}>
                                 {item.title || item.name}
@@ -249,7 +257,7 @@ function TrendingSlider({ fullScreen = false }: TrendingSliderProps) {
                                 </View>
                             </View>
                         </View>
-                    </LinearGradient>
+                    </View>
                 </Animated.View>
             </Container>
         );

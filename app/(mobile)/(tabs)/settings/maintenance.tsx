@@ -11,12 +11,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import appConfigJson from '@/app.json';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function MaintenanceSettings() {
     const router = useRouter();
     const settings = useSettingsStore();
+    const { colors: currentColors } = useTheme();
     const { theme } = settings;
-    const currentColors = Colors[theme] || Colors.dark;
     const { addons, addonUrls, loadAddons, addAddon } = useAddonsStore();
 
     const handleBackup = async () => {

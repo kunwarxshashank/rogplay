@@ -3,21 +3,20 @@ import {
     View,
     Text,
     StyleSheet,
-    FlatList,
     TouchableOpacity,
     TextInput,
     Platform,
     ActivityIndicator,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVSearchBar } from './tv/TVSearchBar';
 import { TVFocusable } from './TVFocusable';
 import { GridSkeleton, MovieCardSkeleton } from './Skeleton';
 import OptimizedImage from '@/components/ui/OptimizedImage';
+import { useTheme } from '@/hooks/useTheme';
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -103,8 +102,7 @@ export default function CatalogBrowser({
     isLiveMode = false,
     children,
 }: CatalogBrowserProps) {
-    const theme = useSettingsStore(state => state.theme);
-    const activeColors = Colors[theme] || Colors.dark;
+    const { colors: activeColors } = useTheme();
 
     // ─── Category Tab ──────────────────────────────────
     const renderCategoryTab = useCallback(({ item }: { item: BrowserCategory }) => {
@@ -158,10 +156,14 @@ export default function CatalogBrowser({
                         />
                     </View>
                 )}
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.95)']}
-                    style={styles.gradient}
-                />
+                {activeColors.isAmoled ? (
+                    <View style={styles.gradient} />
+                ) : (
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.95)']}
+                        style={styles.gradient}
+                    />
+                )}
                 <View style={styles.infoOverlay}>
                     <Text style={styles.cardTitle} numberOfLines={1}>
                         {item.title}
@@ -236,17 +238,14 @@ export default function CatalogBrowser({
             {/* Category Tabs */}
             {categories.length > 0 && (
                 <View style={styles.categorySelector}>
-                    <FlatList
+                    <FlashList
                         horizontal
                         data={categories}
                         renderItem={renderCategoryTab}
                         keyExtractor={(item) => item.id}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.categoryList}
-                        removeClippedSubviews={true}
-                        initialNumToRender={8}
-                        maxToRenderPerBatch={8}
-                        windowSize={5}
+                        estimatedItemSize={120}
                     />
                 </View>
             )}
@@ -285,38 +284,36 @@ export default function CatalogBrowser({
                     }
                 />
             ) : (
-                <FlatList
-                    data={items}
-                    keyExtractor={(item, index) => item.id || index.toString()}
-                    renderItem={renderItem}
-                    numColumns={3}
-                    key="grid-3"
-                    contentContainerStyle={styles.list}
-                    onEndReached={onEndReached}
-                    initialNumToRender={9}
-                    maxToRenderPerBatch={9}
-                    windowSize={5}
-                    removeClippedSubviews={true}
-                    onEndReachedThreshold={0.5}
-                    ListFooterComponent={
-                        loadingMore ? (
-                            <View style={{ paddingVertical: 20 }}>
-                                <ActivityIndicator color={activeColors.primary} size="large" />
-                            </View>
-                        ) : null
-                    }
-                    ListEmptyComponent={
-                        !loading ? (
-                            <View style={styles.emptyContainer}>
-                                <MaterialIcons name="search-off" size={64} color={activeColors.border} />
-                                <Text style={[styles.emptyText, { color: activeColors.text }]}>No content found</Text>
-                                <Text style={[styles.emptySubtitle, { color: activeColors.textSecondary }]}>
-                                    Try a different category or search query
-                                </Text>
-                            </View>
-                        ) : null
-                    }
-                />
+                <View style={{ flex: 1, width: '100%' }}>
+                    <FlashList
+                        data={items}
+                        keyExtractor={(item, index) => item.id || index.toString()}
+                        renderItem={renderItem}
+                        numColumns={3}
+                        contentContainerStyle={styles.list}
+                        onEndReached={onEndReached}
+                        estimatedItemSize={250}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={
+                            loadingMore ? (
+                                <View style={{ paddingVertical: 20 }}>
+                                    <ActivityIndicator color={activeColors.primary} size="large" />
+                                </View>
+                            ) : null
+                        }
+                        ListEmptyComponent={
+                            !loading ? (
+                                <View style={styles.emptyContainer}>
+                                    <MaterialIcons name="search-off" size={64} color={activeColors.border} />
+                                    <Text style={[styles.emptyText, { color: activeColors.text }]}>No content found</Text>
+                                    <Text style={[styles.emptySubtitle, { color: activeColors.textSecondary }]}>
+                                        Try a different category or search query
+                                    </Text>
+                                </View>
+                            ) : null
+                        }
+                    />
+                </View>
             )}
 
             {/* Extra content (modals, overlays, etc.) */}

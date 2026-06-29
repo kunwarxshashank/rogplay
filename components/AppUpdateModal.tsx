@@ -16,10 +16,10 @@ import * as Updates from 'expo-updates';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import appConfigJson from '../app.json';
 import { downloadApkAndOpenInstaller, openInstallUnknownAppsSettings } from '@/services/androidApkUpdate';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +53,7 @@ function shouldOfferNativeUpdate(data: UpdateConfig): boolean {
 }
 
 export function AppUpdateModal() {
+    const { colors: currentColors } = useTheme();
     const [visible, setVisible] = useState(false);
     const [config, setConfig] = useState<UpdateConfig | null>(null);
     const [isOtaAvailable, setIsOtaAvailable] = useState(false);
@@ -61,8 +62,6 @@ export function AppUpdateModal() {
     const [apkDownloadProgress, setApkDownloadProgress] = useState(0);
     const [apkDownloadedBytes, setApkDownloadedBytes] = useState(0);
     const [apkDownloadTotalBytes, setApkDownloadTotalBytes] = useState<number | null>(null);
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
 
     useEffect(() => {
         const checkForUpdate = async () => {
@@ -168,7 +167,7 @@ export function AppUpdateModal() {
                         onPress: () => {
                             Alert.alert(
                                 'Manual Installation (Android 7.0+)',
-                                'Due to Android security restrictions, automatic installation may not work. To install manually:\n\n1. Open your file manager app\n2. Navigate to Android/data/com.rogplay.org/files\n3. Find the RogPlay APK file\n4. Tap to install\n\nMake sure "Install unknown apps" is enabled for your file manager in Settings > Apps > [File Manager] > Install unknown apps.',
+                                'Due to Android security restrictions, automatic installation may not work. To install manually:\n\n1. Open your file manager app\n2. Navigate to Android/data/com.rogplay.app/files\n3. Find the RogPlay APK file\n4. Tap to install\n\nMake sure "Install unknown apps" is enabled for your file manager in Settings > Apps > [File Manager] > Install unknown apps.',
                                 [{ text: 'OK' }]
                             );
                         },
@@ -208,14 +207,16 @@ export function AppUpdateModal() {
     return (
         <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
             <View style={styles.overlay}>
-                {Platform.OS !== 'web' && (
+                <View style={[styles.container, Platform.isTV && styles.tvContainer, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+                {Platform.OS !== 'web' && !currentColors.isAmoled && (
                     <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
                 )}
-
-                <LinearGradient
-                    colors={currentColors.gradients.surface || ['#1e293b', '#0f172a']}
-                    style={[styles.container, Platform.isTV && styles.tvContainer]}
-                >
+                {!currentColors.isAmoled && (
+                    <LinearGradient
+                        colors={currentColors.gradients.surface || ['#1e293b', '#0f172a']}
+                        style={StyleSheet.absoluteFill}
+                    />
+                )}
                     <Image
                         source={require('../assets/images/appupdate.png')}
                         style={styles.illustration}
@@ -336,7 +337,7 @@ export function AppUpdateModal() {
                             )}
                         </View>
                     </View>
-                </LinearGradient>
+                </View>
             </View>
         </Modal>
     );

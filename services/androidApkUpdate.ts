@@ -14,7 +14,7 @@ function getAndroidPackage(): string {
         Constants.expoConfig?.android?.package ??
         (Constants as unknown as { manifest?: { android?: { package?: string } } }).manifest?.android
             ?.package ??
-        'com.rogplay.org'
+        'com.rogplay.app'
     );
 }
 

@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity,
+    View, Text, StyleSheet, TouchableOpacity,
     TextInput, ActivityIndicator, Alert, Dimensions, Platform, ScrollView
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FlashList } from '@shopify/flash-list';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useIptvStore, IptvPlaylist } from '@/store/iptvStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { GridSkeleton, MovieCardSkeleton } from '@/components/Skeleton';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ function buildXtremeM3uUrl(server: string, username: string, password: string): 
 type AddTab = 'm3u' | 'xtreme';
 
 function useIptvLogic() {
+    const { colors: activeColors } = useTheme();
     const [addTab, setAddTab] = useState<AddTab>('m3u');
     const [title, setTitle] = useState('');
     const [m3uUrl, setM3uUrl] = useState('');
@@ -39,8 +42,6 @@ function useIptvLogic() {
     const [initialLoading, setInitialLoading] = useState(true);
     const router = useRouter();
     const { playlists, addPlaylist, removePlaylist } = useIptvStore();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     React.useEffect(() => {
         const timer = setTimeout(() => setInitialLoading(false), 800);
@@ -390,13 +391,16 @@ export function IptvMobile() {
                         renderItem={() => <MovieCardSkeleton width="100%" />}
                     />
                 ) : playlists.length > 0 ? (
-                    <FlatList
-                        data={playlists}
-                        renderItem={renderAddon}
-                        keyExtractor={(item) => item.id}
-                        contentContainerStyle={styles.list}
-                        showsVerticalScrollIndicator={false}
-                    />
+                    <View style={{ flex: 1, width: '100%' }}>
+                        <FlashList
+                            data={playlists}
+                            renderItem={renderAddon}
+                            keyExtractor={(item) => item.id}
+                            contentContainerStyle={styles.list}
+                            showsVerticalScrollIndicator={false}
+                            estimatedItemSize={100}
+                        />
+                    </View>
                 ) : (
                     <View style={styles.emptyState}>
                         <MaterialIcons name="playlist-add" size={64} color={activeColors.border} />

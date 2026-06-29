@@ -3,13 +3,12 @@ import { View, Pressable, StyleSheet, Platform, Text, Animated } from 'react-nat
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 import { BlurView } from 'expo-blur';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/hooks/useTheme';
 
 export function TVTopBar({ state, descriptors, navigation }: any) {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
     const router = useRouter();
+    const { colors: currentColors } = useTheme();
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
     const [searchFocused, setSearchFocused] = useState(false);
     const [profileFocused, setProfileFocused] = useState(false);
@@ -21,7 +20,10 @@ export function TVTopBar({ state, descriptors, navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            {currentColors.isAmoled
+                ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
+                : <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            }
 
             <View style={styles.contentContainer}>
                 {/* Brand / Logo */}

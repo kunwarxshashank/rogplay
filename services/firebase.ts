@@ -1,43 +1,69 @@
 import { Platform } from 'react-native'
-import analytics from '@react-native-firebase/analytics'
-import crashlytics from '@react-native-firebase/crashlytics'
+import {
+  getAnalytics,
+  setAnalyticsCollectionEnabled,
+  logEvent as analyticsLogEvent,
+  setUserId as setAnalyticsUserId,
+  setUserProperty as setAnalyticsUserProperty,
+} from '@react-native-firebase/analytics'
+import {
+  getCrashlytics,
+  setCrashlyticsCollectionEnabled,
+  setUserId as setCrashlyticsUserId,
+  recordError as recordCrashlyticsError,
+  setAttribute,
+} from '@react-native-firebase/crashlytics'
 import messaging, {
   type FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging'
 
 let initialized = false
 
+let _analytics: ReturnType<typeof getAnalytics> | null = null
+let _crashlytics: ReturnType<typeof getCrashlytics> | null = null
+
+function getAnalyticsInstance() {
+  if (!_analytics) _analytics = getAnalytics()
+  return _analytics
+}
+
+function getCrashlyticsInstance() {
+  if (!_crashlytics) _crashlytics = getCrashlytics()
+  return _crashlytics
+}
+
 export function initializeFirebase() {
   if (initialized) return
   initialized = true
   if (Platform.OS === 'web') return
 
-  analytics().setAnalyticsCollectionEnabled(true)
-  crashlytics().setCrashlyticsCollectionEnabled(true)
+  setAnalyticsCollectionEnabled(getAnalyticsInstance(), true)
+  setCrashlyticsCollectionEnabled(getCrashlyticsInstance(), true)
 }
 
 export function logEvent(name: string, params?: Record<string, any>) {
   if (Platform.OS === 'web') return
-  analytics().logEvent(name, params)
+  analyticsLogEvent(getAnalyticsInstance(), name, params)
 }
 
 export function setUserId(userId: string | null) {
   if (Platform.OS === 'web') return
-  analytics().setUserId(userId)
-  crashlytics().setUserId(userId || '')
+  setAnalyticsUserId(getAnalyticsInstance(), userId)
+  setCrashlyticsUserId(getCrashlyticsInstance(), userId || '')
 }
 
 export function setUserProperty(name: string, value: string) {
   if (Platform.OS === 'web') return
-  analytics().setUserProperty(name, value)
+  setAnalyticsUserProperty(getAnalyticsInstance(), name, value)
 }
 
 export function recordError(error: Error, context?: Record<string, any>) {
   if (Platform.OS === 'web') return
-  crashlytics().recordError(error)
+  const c = getCrashlyticsInstance()
+  recordCrashlyticsError(c, error)
   if (context) {
     Object.entries(context).forEach(([key, value]) => {
-      crashlytics().setAttribute(key, String(value))
+      setAttribute(c, key, String(value))
     })
   }
 }

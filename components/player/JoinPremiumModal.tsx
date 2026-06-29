@@ -10,9 +10,8 @@ import {
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Colors } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/hooks/useTheme';
 
 const isTV = Platform.isTV;
 
@@ -24,6 +23,7 @@ interface JoinPremiumModalProps {
 
 /** TV-friendly Pressable with focus styling */
 function FocusablePressable({ style, focusedStyle, children, ...props }: any) {
+    const { colors: c } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     if (!isTV) {
         return (
@@ -58,14 +58,13 @@ function hexAlpha(hex: string, alpha: number): string {
 const FEATURES = [
     { icon: 'groups', label: 'Watch Party — watch with friends in real-time' },
     { icon: 'hd', label: 'Premium quality streaming' },
-    { icon: 'speed', label: 'Priority server access' },
-    { icon: 'support-agent', label: 'Priority support' },
+    { icon: 'flash-on', label: 'Priority server access' },
+    { icon: 'support', label: 'Priority support' },
 ];
 
 export default function JoinPremiumModal({ visible, onClose, onUpgrade }: JoinPremiumModalProps) {
-    const { theme } = useSettingsStore();
+    const { colors: c } = useTheme();
     const router = useRouter();
-    const c = Colors[theme] || Colors.dark;
     const gradients = c.gradients?.primary || [c.primary, c.accent || c.primary];
     const premiumGradients = c.gradients?.premium || ['#f59e0b', '#fbbf24', '#f59e0b'];
 

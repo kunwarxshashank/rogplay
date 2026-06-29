@@ -6,13 +6,13 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import CatalogBrowser, { BrowserCategory, BrowserItem } from '@/components/CatalogBrowser';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useToastStore } from '@/store/toastStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -57,6 +57,7 @@ interface StremioStream {
 }
 
 export default function StremioBrowserScreen() {
+    const { colors: activeColors } = useTheme();
     const { url, title, manifest: manifestStr, selectedItemId, selectedItemType } = useLocalSearchParams();
     const manifest = useMemo(() => {
         try {
@@ -66,8 +67,6 @@ export default function StremioBrowserScreen() {
         }
     }, [manifestStr]);
     const router = useRouter();
-    const theme = useSettingsStore(state => state.theme);
-    const activeColors = Colors[theme] || Colors.dark;
 
     const [selectedCatalog, setSelectedCatalog] = useState<StremioCatalog | null>(null);
     const [items, setItems] = useState<StremioMeta[]>([]);
@@ -475,11 +474,15 @@ export default function StremioBrowserScreen() {
                 style={styles.detailBg}
                 blurRadius={20}
             />
-            <LinearGradient
-                colors={['rgba(0,0,0,0.3)', activeColors.background, activeColors.background]}
-                locations={[0, 0.35, 1]}
-                style={StyleSheet.absoluteFill}
-            />
+            {activeColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.3)', activeColors.background, activeColors.background]}
+                    locations={[0, 0.35, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
 
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
                 {/* Header */}
@@ -602,7 +605,6 @@ export default function StremioBrowserScreen() {
             </ScrollView>
         </View>
     ) : null;
-
 
     // ─── Streams Modal ──────────────────────────────────
     const streamsModal = showStreams ? (

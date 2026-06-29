@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Platform, Dimensions, FlatList } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getGenres, getLanguages, getCountries } from '@/services/tmdb';
 import { TVFocusable } from '@/components/TVFocusable';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/hooks/useTheme';
 
 export interface FilterState {
     genre: string;
@@ -49,8 +49,7 @@ interface FilterProps {
 }
 
 function CinemaFilter({ visible, onClose, onApply, onReset, selectedFilters, setSelectedFilters, type }: FilterProps) {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors, theme } = useTheme();
 
     const [genres, setGenres] = useState<{ label: string, value: string }[]>([]);
     const [languages, setLanguages] = useState<{ label: string, value: string }[]>([]);
@@ -213,7 +212,7 @@ function CinemaFilter({ visible, onClose, onApply, onReset, selectedFilters, set
                     activeOpacity={1}
                     onPress={() => setPickerVisible(false)}
                 >
-                    <BlurView intensity={theme === 'light' ? 10 : 30} tint={theme === 'light' ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />
+                    {currentColors.isAmoled ? <View style={StyleSheet.absoluteFill} /> : <BlurView intensity={theme === 'light' ? 10 : 30} tint={theme === 'light' ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />}
                     <View style={[styles.pickerContainer, { backgroundColor: currentColors.card, borderColor: currentColors.border }]}>
                         <Text style={[styles.pickerTitle, { color: currentColors.text }]}>{activePicker?.title}</Text>
                         <FlatList
@@ -332,6 +331,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+        backgroundColor: 'rgba(0,0,0,0.9)',
     },
     pickerContainer: {
         width: '100%',

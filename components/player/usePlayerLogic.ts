@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { BackHandler, Dimensions, Platform } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -12,6 +12,7 @@ import { TextTrackType, DRMType } from 'react-native-video';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { useAuthStore } from '@/store/authStore';
+import { useAnalyticsStore } from '@/store/analyticsStore';
 import { fetchOpenSubtitles } from '@/services/subtitles';
 
 export interface UsePlayerLogicProps {
@@ -41,13 +42,17 @@ export interface UsePlayerLogicProps {
     season?: string;
     episode?: string;
     resumeMs?: string;
+    sourceList?: string;
+    initialSourceIndex?: string;
+    genre?: string;
 }
 
 export function usePlayerLogic(props: UsePlayerLogicProps) {
     const {
         url, title, referer, origin, cookie, userAgent, drmkeys, drmtype, headers,
         onBack, channelLogo, channelGroup, epgUrl, channelId, watchPartyCode, watchPartyUsername,
-        channels = [], playlistUrl, sourceType, poster, backdrop, contentType, tmdbId, season, episode, resumeMs
+        channels = [], playlistUrl, sourceType, poster, backdrop, contentType, tmdbId, season, episode, resumeMs,
+        sourceList, initialSourceIndex, genre
     } = props;
 
     const videoRef = useRef<any>(null);
@@ -122,9 +127,15 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
     const { upsertItem, removeItem } = useContinueWatchingStore();
     const hasAppliedResumeRef = useRef(false);
     const lastProgressSaveSecondRef = useRef(0);
+    const sessionLoggedRef = useRef(false);
 
     const parsedResumeMs = Number(resumeMs || 0);
     const safeResumeMs = Number.isFinite(parsedResumeMs) ? Math.max(0, parsedResumeMs) : 0;
+
+    const [currentSourceIndex, setCurrentSourceIndex] = useState(Number(initialSourceIndex) || 0);
+    const parsedSourceList = useMemo(() => {
+        try { return JSON.parse(sourceList || '[]'); } catch { return []; }
+    }, [sourceList]);
 
     const parseHeadersObject = useCallback((rawHeaders: any) => {
         if (!rawHeaders) return {};
@@ -141,6 +152,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
 
     useEffect(() => {
         setActiveUrl(url);
+        console.log("url", url);
         setActiveTitle(title);
         setActiveChannelId(channelId || '');
         setActiveChannelLogo(channelLogo || '');
@@ -317,7 +329,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
 
     const lastStateUpdateRef = useRef(0);
     // Use refs for callbacks so VideoWrapper (React.memo) gets stable references
-    const onProgressRef = useRef<(data: any, isVlc?: boolean) => void>(() => {});
+    const onProgressRef = useRef<(data: any, isVlc?: boolean) => void>(() => { });
 
     onProgressRef.current = (data: any, isVlc: boolean = false) => {
         let currentMs = 0;
@@ -364,6 +376,21 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         const itemId = buildContinueWatchingId(activeUrl, contentType, tmdbId, season, episode);
         if (ratio >= 0.96) {
             removeItem(itemId);
+            if (!sessionLoggedRef.current) {
+                sessionLoggedRef.current = true;
+                useAnalyticsStore.getState().logSession({
+                    title: activeTitle || title || 'Untitled',
+                    type: contentType === 'tv' ? 'series' : 'movie',
+                    genre: genre || '',
+                    startTime: Date.now() - currentMs,
+                    duration: currentMs / 60000,
+                    device: Platform.isTV ? 'Android TV' : Platform.OS === 'android' || Platform.OS === 'ios' ? 'Mobile' : Platform.OS === 'windows' ? 'Windows' : 'Web',
+                    posterUrl: poster || undefined,
+                    progress: ratio,
+                    tmdbId,
+                    contentType,
+                });
+            }
             return;
         }
 
@@ -394,11 +421,65 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         onProgressRef.current(data, isVlc);
     }, []);
 
-    const onBufferRef = useRef<(arg: { isBuffering: boolean }) => void>(() => {});
+    const { autoSelectHealthiestSource } = useSettingsStore();
+
+    // Custom Error Handler for auto failover
+    const handlePlaybackErrorInternal = useCallback((msg: string) => {
+        if (autoSelectHealthiestSource && parsedSourceList.length > currentSourceIndex + 1) {
+            console.log("Auto-failover triggered from error:", msg);
+            const nextIdx = currentSourceIndex + 1;
+            const nextSource = parsedSourceList[nextIdx];
+            setCurrentSourceIndex(nextIdx);
+            setPlaybackError(null);
+
+            // Re-initialize active states to the new source
+            setActiveUrl(nextSource.url);
+            setActiveTitle(nextSource.title || title);
+            setActiveDrmKeys(nextSource.drmkeys || '');
+            setActiveDrmType(nextSource.drmtype || '');
+            setActiveReferer(nextSource.referer || '');
+            setActiveOrigin(nextSource.origin || '');
+            setActiveCookie(nextSource.cookie || '');
+            setActiveUserAgent(nextSource.userAgent || '');
+            setActiveHeaders(nextSource.headers || null);
+            setIsReady(false);
+            setControlsVisibleSync(true); // force controls open briefly to show failover
+        } else {
+            console.log("No more sources for failover or autoSelect disabled.");
+            setPlaybackError(msg);
+        }
+    }, [autoSelectHealthiestSource, parsedSourceList, currentSourceIndex, title]);
+
+    // Keep handlePlaybackError up-to-date in ref for callbacks
+    const handlePlaybackErrorRef = useRef(handlePlaybackErrorInternal);
+    useEffect(() => {
+        handlePlaybackErrorRef.current = handlePlaybackErrorInternal;
+    }, [handlePlaybackErrorInternal]);
+
+    const autoSelectHealthiestSourceRef = useRef(autoSelectHealthiestSource);
+    useEffect(() => {
+        autoSelectHealthiestSourceRef.current = autoSelectHealthiestSource;
+    }, [autoSelectHealthiestSource]);
+
+    const bufferDelayTimeout = useRef<any>(null);
+
+    const onBufferRef = useRef<(arg: { isBuffering: boolean }) => void>(() => { });
     onBufferRef.current = ({ isBuffering: buffering }: { isBuffering: boolean }) => {
         setIsBuffering(buffering);
-        if (!buffering) {
+        if (buffering) {
+            if (!bufferDelayTimeout.current && autoSelectHealthiestSourceRef.current) {
+                bufferDelayTimeout.current = setTimeout(() => {
+                    console.log("Buffer stall detected, triggering failover...");
+                    setIsBuffering(false);
+                    handlePlaybackErrorRef.current("Stream stalled too long (15s). Failing over...");
+                }, 15000);
+            }
+        } else {
             setBufferProgress(0);
+            if (bufferDelayTimeout.current) {
+                clearTimeout(bufferDelayTimeout.current);
+                bufferDelayTimeout.current = null;
+            }
         }
     };
 
@@ -406,7 +487,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         onBufferRef.current(data);
     }, []);
 
-    const onLoadRef = useRef<(videoInfo: any, isVlc?: boolean) => void>(() => {});
+    const onLoadRef = useRef<(videoInfo: any, isVlc?: boolean) => void>(() => { });
     onLoadRef.current = (videoInfo: any, isVlc: boolean = false) => {
         const audioTracks = videoInfo.audioTracks || [];
         const videoTracks = videoInfo.videoTracks || [];
@@ -539,6 +620,32 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
 
     const [brightness, setBrightness] = useState(0.5);
 
+    useEffect(() => {
+        return () => {
+            if (sessionLoggedRef.current) return;
+            const pos = positionRef.current;
+            const dur = durationRef.current;
+            if (sourceType !== 'cinema') return;
+            if (!dur || pos < 30000) return;
+
+            sessionLoggedRef.current = true;
+            try {
+                useAnalyticsStore.getState().logSession({
+                    title: activeTitle || title || 'Untitled',
+                    type: contentType === 'tv' ? 'series' : 'movie',
+                    genre: genre || '',
+                    startTime: Date.now() - pos,
+                    duration: pos / 60000,
+                    device: Platform.isTV ? 'Android TV' : Platform.OS === 'android' || Platform.OS === 'ios' ? 'Mobile' : Platform.OS === 'windows' ? 'Windows' : 'Web',
+                    posterUrl: poster || undefined,
+                    progress: pos / dur,
+                    tmdbId,
+                    contentType,
+                });
+            } catch {}
+        };
+    }, []);
+
     return {
         videoRef,
         isPremium,
@@ -550,8 +657,8 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         isBuffering, setIsBuffering,
         bufferProgress,
         controlsVisible, setControlsVisible: setControlsVisibleSync,
-        duration, setDuration,
-        position, setPosition,
+        duration, setDuration, durationRef,
+        position, setPosition, positionRef,
         selectedAudioTrack, setSelectedAudioTrack,
         selectedVideoTrack, setSelectedVideoTrack,
         selectedTextTrack, setSelectedTextTrack,
@@ -575,7 +682,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         streamUrl, isReady, setIsReady,
         importedSubtitles, setImportedSubtitles,
         isFetchingSubtitles,
-        playbackError, setPlaybackError,
+        playbackError, setPlaybackError: handlePlaybackErrorInternal,
         watchPartyModalVisible, setWatchPartyModalVisible,
         handleChannelSelect,
         handlePlayPause,

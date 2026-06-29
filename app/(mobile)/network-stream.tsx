@@ -5,10 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 function useNetworkStreamLogic() {
+    const { colors: activeColors } = useTheme();
     const [url, setUrl] = useState('');
 
     // DRM States
@@ -24,8 +25,6 @@ function useNetworkStreamLogic() {
     const [jsonHeaders, setJsonHeaders] = useState('');
 
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     const addHeader = () => {
         if (!headerKey.trim() || !headerValue.trim()) return;

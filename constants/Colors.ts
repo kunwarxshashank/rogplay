@@ -1,9 +1,11 @@
+import { THEME_PALETTES, ACCENT_COLORS, computeThemeColors } from '@/store/themeStore';
+
 const baseDark = {
-    background: '#04070d', // Modern deep black-blue
-    surface: '#0d111b', // Card background
-    card: '#121723', // Slightly lighter card
+    background: '#04070d',
+    surface: '#0d111b',
+    card: '#121723',
     cardOverlay: 'rgba(18, 23, 35, 0.7)',
-    text: '#ffffff', // Pure white for better contrast
+    text: '#ffffff',
     textSecondary: '#94a3b8',
     textMuted: '#64748b',
     border: 'rgba(255, 255, 255, 0.08)',
@@ -17,19 +19,27 @@ const baseDark = {
     tvBackground: '#020408',
 };
 
-export const Colors: any = {
+const gradients = {
+    primary: ['#6366f1', '#4338ca'],
+    surface: ['rgba(26, 24, 41, 0.8)', 'rgba(14, 13, 23, 0.95)'],
+    fade: ['transparent', '#0E0D17'],
+    premium: ['#818cf8', '#6366f1', '#4338ca'],
+};
+
+export const Colors: Record<string, any> = {
+    // ─── Legacy themes (backward compat) ─────────────────
     dark: {
         ...baseDark,
-        background: '#0E0D17', // Deep obsidian base
-        surface: '#151322', // Card background slightly lighter obsidian
-        card: '#1A1829', // Card color
+        background: '#0E0D17',
+        surface: '#151322',
+        card: '#1A1829',
         cardOverlay: 'rgba(26, 24, 41, 0.7)',
         blurBackground: 'rgba(14, 13, 23, 0.5)',
         tvBackground: '#0E0D17',
-        border: 'rgba(255, 255, 255, 0.2)', // 20% opacity for micro-borders
-        primary: '#6366f1', // Stellar-indigo
-        accent: '#818cf8', // Lighter indigo
-        glow: 'rgba(99, 102, 241, 0.4)', // Slightly stronger glow
+        border: 'rgba(255, 255, 255, 0.2)',
+        primary: '#6366f1',
+        accent: '#818cf8',
+        glow: 'rgba(99, 102, 241, 0.4)',
         tint: '#6366f1',
         tabIconSelected: '#6366f1',
         gradients: {
@@ -41,8 +51,8 @@ export const Colors: any = {
     },
     dark_red: {
         ...baseDark,
-        primary: '#f43f5e', // Rose 500
-        accent: '#ef4444', // Red 500
+        primary: '#f43f5e',
+        accent: '#ef4444',
         glow: 'rgba(244, 63, 94, 0.3)',
         tint: '#f43f5e',
         tabIconSelected: '#f43f5e',
@@ -55,8 +65,8 @@ export const Colors: any = {
     },
     dark_yellow: {
         ...baseDark,
-        primary: '#eab308', // Yellow 500
-        accent: '#f59e0b', // Amber 500
+        primary: '#eab308',
+        accent: '#f59e0b',
         glow: 'rgba(234, 179, 8, 0.3)',
         tint: '#eab308',
         tabIconSelected: '#eab308',
@@ -69,8 +79,8 @@ export const Colors: any = {
     },
     dark_blue: {
         ...baseDark,
-        primary: '#3b82f6', // Blue 500
-        accent: '#06b6d4', // Cyan 500
+        primary: '#3b82f6',
+        accent: '#06b6d4',
         glow: 'rgba(59, 130, 246, 0.3)',
         tint: '#3b82f6',
         tabIconSelected: '#3b82f6',
@@ -83,8 +93,8 @@ export const Colors: any = {
     },
     dark_pink: {
         ...baseDark,
-        primary: '#ec4899', // Pink 500
-        accent: '#d946ef', // Fuchsia 500
+        primary: '#ec4899',
+        accent: '#d946ef',
         glow: 'rgba(236, 72, 153, 0.3)',
         tint: '#ec4899',
         tabIconSelected: '#ec4899',
@@ -110,7 +120,14 @@ export const Colors: any = {
         error: '#ef4444',
         warning: '#f59e0b',
         info: '#3b82f6',
-    }
+    },
+
+    // ─── NEW: Dynamic theme system aliases ──────────────
+    amoled: computeThemeColors('amoled', 'blue', '#6366f1', 12, 5, 'normal'),
+    glassmorphism: computeThemeColors('glassmorphism', 'blue', '#6366f1', 16, 8, 'normal'),
+    material3: computeThemeColors('material3', 'blue', '#6366f1', 20, 6, 'normal'),
+    minimal: computeThemeColors('minimal', 'blue', '#6366f1', 4, 2, 'normal'),
+    cinema: computeThemeColors('cinema', 'blue', '#6366f1', 8, 10, 'enhanced'),
 };
 
 export const Layout = {
@@ -162,4 +179,3 @@ export const Layout = {
         }
     }
 };
-

@@ -6,15 +6,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMusicPlayerStore } from '@/store/musicPlayerStore';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const MINI_HEIGHT = 64;
 const BOTTOM_OFFSET = 85;
 
 export default function MiniPlayer() {
+    const { colors: activeColors } = useTheme();
     const router = useRouter();
-    const theme = useSettingsStore(s => s.theme);
-    const activeColors = Colors[theme] || Colors.dark;
 
     const tracks = useMusicPlayerStore(s => s.tracks);
     const currentIndex = useMusicPlayerStore(s => s.currentIndex);

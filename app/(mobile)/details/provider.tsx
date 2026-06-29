@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/hooks/useTheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getMoviesByProvider, getTVByProvider } from '@/services/tmdb';
@@ -10,6 +10,7 @@ import { MovieCardSkeleton, GridSkeleton } from '@/components/Skeleton';
 export default function ProviderScreen() {
     const { providerId, name } = useLocalSearchParams();
     const router = useRouter();
+    const { colors } = useTheme();
     const [movies, setMovies] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -65,26 +66,26 @@ export default function ProviderScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()}>
-                    <MaterialIcons name="arrow-back" size={24} color="#fff" />
+                    <MaterialIcons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{name} - {activeTab === 'movie' ? 'Movies' : 'TV Shows'}</Text>
             </View>
 
             <View style={styles.tabs}>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'movie' && styles.activeTab]}
+                    style={[styles.tab, { backgroundColor: colors.card }, activeTab === 'movie' && { backgroundColor: colors.primary }]}
                     onPress={() => { setActiveTab('movie'); setPage(1); }}
                 >
-                    <Text style={[styles.tabText, activeTab === 'movie' && styles.activeTabText]}>Movies</Text>
+                    <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'movie' && styles.activeTabText]}>Movies</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'tv' && styles.activeTab]}
+                    style={[styles.tab, { backgroundColor: colors.card }, activeTab === 'tv' && { backgroundColor: colors.primary }]}
                     onPress={() => { setActiveTab('tv'); setPage(1); }}
                 >
-                    <Text style={[styles.tabText, activeTab === 'tv' && styles.activeTabText]}>TV Shows</Text>
+                    <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'tv' && styles.activeTabText]}>TV Shows</Text>
                 </TouchableOpacity>
             </View>
 
@@ -112,7 +113,6 @@ export default function ProviderScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.dark.background,
     },
     header: {
         flexDirection: 'row',
@@ -120,7 +120,6 @@ const styles = StyleSheet.create({
         padding: 16,
         gap: 16,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.dark.border,
     },
     headerTitle: {
         fontSize: 18,
@@ -136,13 +135,8 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,
-        backgroundColor: Colors.dark.card,
-    },
-    activeTab: {
-        backgroundColor: Colors.dark.primary,
     },
     tabText: {
-        color: Colors.dark.textSecondary,
         fontWeight: '600',
     },
     activeTabText: {

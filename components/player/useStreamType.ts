@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 
+
+// By default VLC is our video player, so we set isVlcRequired to true
+// But if the stream type is hls or mp4, we set isVlcRequired to false
 export function useStreamType(url: string, headers: any = {}) {
     const [streamType, setStreamType] = useState<'hls' | 'mp4' | 'mkv' | 'unknown' | null>(null);
-    const [isVlcRequired, setIsVlcRequired] = useState(false);
+    const [isVlcRequired, setIsVlcRequired] = useState(true);
     const [isDetecting, setIsDetecting] = useState(true);
     const headersKeyRef = useRef('');
 

@@ -1,31 +1,30 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Platform, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { ContinueWatchingItem, useContinueWatchingStore } from '@/store/continueWatchingStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import MovieCard from './MovieCard';
-
-const decodeSafe = (value?: string) => {
-    if (!value) return '';
-    try {
-        return decodeURIComponent(value);
-    } catch {
-        return value;
-    }
-};
+import { useTheme } from '@/hooks/useTheme';
 
 function ContinueWatchingSection() {
+    const { colors: currentColors } = useTheme();
     const router = useRouter();
-    const theme = useSettingsStore((state) => state.theme);
-    const currentColors = React.useMemo(() => Colors[theme] || Colors.dark, [theme]);
     const items = useContinueWatchingStore(state => state.items);
     const clearAll = useContinueWatchingStore(state => state.clearAll);
     const cardWidth = Platform.isTV ? 240 : 130;
     const cardGap = Platform.isTV ? 20 : 16;
 
-    const openItem = React.useCallback((item: ContinueWatchingItem) => {
+    const decodeSafe = useCallback((value?: string) => {
+        if (!value) return '';
+        try {
+            return decodeURIComponent(value);
+        } catch {
+            return value;
+        }
+    }, []);
+
+    const openItem = useCallback((item: ContinueWatchingItem) => {
         const pathname = Platform.isTV ? '/(tv)/player' : '/player';
         router.push({
             pathname,
@@ -51,7 +50,7 @@ function ContinueWatchingSection() {
         });
     }, [router]);
 
-    const renderCard = React.useCallback(
+    const renderCard = useCallback(
         ({ item, index }: { item: ContinueWatchingItem; index: number }) => {
             const ratio = item.durationMs > 0 ? Math.min(1, item.positionMs / item.durationMs) : 0;
             const cardItem = {
@@ -80,7 +79,7 @@ function ContinueWatchingSection() {
                 </View>
             );
         },
-        [cardWidth, cardGap, currentColors.border, currentColors.primary, openItem]
+        [cardWidth, cardGap, currentColors.border, currentColors.primary, openItem, decodeSafe]
     );
 
     if (!items.length) return null;

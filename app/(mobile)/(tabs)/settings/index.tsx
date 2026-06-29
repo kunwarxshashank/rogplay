@@ -5,18 +5,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useAddonsStore } from '@/store/addonsStore';
 import { useAuthStore } from '@/store/authStore';
 import appConfigJson from '@/app.json';
 
 import { TVFocusable } from '@/components/TVFocusable';
 import { TVLayout } from '@/components/TVLayout';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function SettingsScreen() {
+    const { colors: currentColors } = useTheme();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
     const { user, logout } = useAuthStore();
     const isGuest = !user || user.id === 'guest';
 
@@ -44,15 +43,21 @@ export default function SettingsScreen() {
             action: () => router.push('/settings/account')
         },
         {
+            title: "Theme",
+            icon: 'palette',
+            description: 'Themes, accent color, poster style',
+            action: () => router.push('/settings/theme')
+        },
+        {
             title: "General",
             icon: 'settings',
-            description: 'Theme, region and UI preferences',
+            description: 'Region and UI preferences',
             action: () => router.push('/settings/general')
         },
         {
             title: "Playback",
             icon: 'play-circle-outline',
-            description: 'Video player and streaming options',
+            description: 'Video player options',
             action: () => router.push('/settings/playback')
         },
         {
@@ -60,6 +65,18 @@ export default function SettingsScreen() {
             icon: 'movie',
             description: 'Cinema Page Settings',
             action: () => router.push('/settings/cinema')
+        },
+        {
+            title: "Insights",
+            icon: 'auto-graph',
+            description: 'Viewing stats, achievements',
+            action: () => router.push('/settings/insights')
+        },
+        {
+            title: "Debrid Integrations",
+            icon: 'cloud-sync',
+            description: 'Real-Debrid, Premiumize',
+            action: () => router.push('/settings/debrid')
         },
         {
             title: "Maintenance",
@@ -154,12 +171,18 @@ export default function SettingsScreen() {
         return (
             <TVLayout>
                 <View style={{ flex: 1, backgroundColor: currentColors.background }}>
-                    <LinearGradient
-                        colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                        locations={[0, 0.25, 1]}
-                        style={StyleSheet.absoluteFill}
-                    />
-                    <View style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+                    {currentColors.isAmoled ? (
+                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                    ) : (
+                        <LinearGradient
+                            colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                            locations={[0, 0.25, 1]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
+                    {!currentColors.isAmoled && (
+                      <View style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+                    )}
                     <View style={{ flex: 1, padding: 20 }}>
                         {renderContent()}
                     </View>
@@ -171,13 +194,18 @@ export default function SettingsScreen() {
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background }]}>
             {/* Dark Luxury Gradient */}
-            <LinearGradient
-                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {currentColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!currentColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
             <SafeAreaView style={{ flex: 1 }}>
                 {renderContent()}
             </SafeAreaView>

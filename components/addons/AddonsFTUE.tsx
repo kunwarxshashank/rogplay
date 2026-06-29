@@ -13,15 +13,14 @@ import Animated, {
     SharedValue
 } from 'react-native-reanimated';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 
 interface AddonsFTUEProps {
     onDismiss: () => void;
 }
 
 export function AddonsFTUE({ onDismiss }: AddonsFTUEProps) {
-    const theme = useSettingsStore(state => state.theme);
-    const activeColors = Colors[theme] || Colors.dark;
+    const { colors: activeColors } = useTheme();
     const { width, height } = useWindowDimensions();
 
     const compactScreen = height < 760 || width < 380;
@@ -71,99 +70,100 @@ export function AddonsFTUE({ onDismiss }: AddonsFTUEProps) {
     };
 
     return (
-        <View style={[StyleSheet.absoluteFill, styles.overlay]}>
-            <BlurView
-                intensity={70}
-                tint="dark"
-                style={[StyleSheet.absoluteFill, styles.overlay]}
-                experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+        <View style={[StyleSheet.absoluteFill, styles.overlay, activeColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+            {!activeColors.isAmoled && (
+                <BlurView
+                    intensity={70}
+                    tint="dark"
+                    style={StyleSheet.absoluteFill}
+                    experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+                />
+            )}
+            <Animated.View
+                style={[
+                    styles.container,
+                    containerStyle,
+                    {
+                        width: Math.min(width * 0.92, 760),
+                        maxHeight: Math.min(height * 0.9, 820),
+                    }
+                ]}
             >
-                <Animated.View
-                    style={[
-                        styles.container,
-                        containerStyle,
-                        {
-                            width: Math.min(width * 0.92, 760),
-                            maxHeight: Math.min(height * 0.9, 820),
-                        }
-                    ]}
+                <ScrollView
+                    bounces={false}
+                    alwaysBounceVertical={false}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
                 >
-                    <ScrollView
-                        bounces={false}
-                        alwaysBounceVertical={false}
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        <View style={[styles.content, { padding: compactScreen ? 20 : 28 }]}> 
-                            <View style={[styles.header, { marginBottom: compactScreen ? 20 : 28 }]}>
-                                <View
-                                    style={[
-                                        styles.iconContainer,
-                                        {
-                                            backgroundColor: activeColors.primary + '20',
-                                            width: compactScreen ? 64 : 80,
-                                            height: compactScreen ? 64 : 80,
-                                            borderRadius: compactScreen ? 32 : 40,
-                                            marginBottom: compactScreen ? 14 : 20,
-                                        }
-                                    ]}
-                                >
-                                    <MaterialIcons name="extension" size={compactScreen ? 28 : 32} color={activeColors.primary} />
+                    <View style={[styles.content, { padding: compactScreen ? 20 : 28 }]}> 
+                        <View style={[styles.header, { marginBottom: compactScreen ? 20 : 28 }]}>
+                            <View
+                                style={[
+                                    styles.iconContainer,
+                                    {
+                                        backgroundColor: activeColors.primary + '20',
+                                        width: compactScreen ? 64 : 80,
+                                        height: compactScreen ? 64 : 80,
+                                        borderRadius: compactScreen ? 32 : 40,
+                                        marginBottom: compactScreen ? 14 : 20,
+                                    }
+                                ]}
+                            >
+                                <MaterialIcons name="extension" size={compactScreen ? 28 : 32} color={activeColors.primary} />
+                            </View>
+                            <Text style={[styles.title, { color: activeColors.text, fontSize: compactScreen ? 24 : 28 }]}>Add Extensions</Text>
+                            <Text style={[styles.subtitle, { color: activeColors.textSecondary, fontSize: compactScreen ? 14 : 16, lineHeight: compactScreen ? 21 : 24 }]}>
+                                Enhance your experience by installing community addons. Here's how:
+                            </Text>
+                        </View>
+
+                        <View style={[styles.stepsContainer, { marginBottom: compactScreen ? 20 : 28 }]}> 
+                            <Animated.View style={[styles.stepItem, getStepStyle(step1Opacity), compactScreen && styles.stepItemCompact]}>
+                                <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
+                                    <Text style={styles.stepNumberText}>1</Text>
                                 </View>
-                                <Text style={[styles.title, { color: activeColors.text, fontSize: compactScreen ? 24 : 28 }]}>Add Extensions</Text>
-                                <Text style={[styles.subtitle, { color: activeColors.textSecondary, fontSize: compactScreen ? 14 : 16, lineHeight: compactScreen ? 21 : 24 }]}>
-                                    Enhance your experience by installing community addons. Here's how:
-                                </Text>
-                            </View>
+                                <View style={styles.stepContent}>
+                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Tap the Add Button</Text>
+                                    <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Look for the + button at the top right of the screen.</Text>
+                                </View>
+                                <MaterialIcons name="add-circle" size={compactScreen ? 22 : 24} color={activeColors.primary} />
+                            </Animated.View>
 
-                            <View style={[styles.stepsContainer, { marginBottom: compactScreen ? 20 : 28 }]}> 
-                                <Animated.View style={[styles.stepItem, getStepStyle(step1Opacity), compactScreen && styles.stepItemCompact]}>
-                                    <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
-                                        <Text style={styles.stepNumberText}>1</Text>
-                                    </View>
-                                    <View style={styles.stepContent}>
-                                        <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Tap the Add Button</Text>
-                                        <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Look for the + button at the top right of the screen.</Text>
-                                    </View>
-                                    <MaterialIcons name="add-circle" size={compactScreen ? 22 : 24} color={activeColors.primary} />
-                                </Animated.View>
+                            <Animated.View style={[styles.stepItem, getStepStyle(step2Opacity), compactScreen && styles.stepItemCompact]}>
+                                <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
+                                    <Text style={styles.stepNumberText}>2</Text>
+                                </View>
+                                <View style={styles.stepContent}>
+                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Enter Addon URL</Text>
+                                    <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Paste the provided JSON link or rogplay:// link into the input field.</Text>
+                                </View>
+                                <MaterialIcons name="link" size={compactScreen ? 22 : 24} color={activeColors.primary} />
+                            </Animated.View>
 
-                                <Animated.View style={[styles.stepItem, getStepStyle(step2Opacity), compactScreen && styles.stepItemCompact]}>
-                                    <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
-                                        <Text style={styles.stepNumberText}>2</Text>
-                                    </View>
-                                    <View style={styles.stepContent}>
-                                        <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Enter Addon URL</Text>
-                                        <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Paste the provided JSON link or rogplay:// link into the input field.</Text>
-                                    </View>
-                                    <MaterialIcons name="link" size={compactScreen ? 22 : 24} color={activeColors.primary} />
-                                </Animated.View>
-
-                                <Animated.View style={[styles.stepItem, getStepStyle(step3Opacity), compactScreen && styles.stepItemCompact]}>
-                                    <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
-                                        <Text style={styles.stepNumberText}>3</Text>
-                                    </View>
-                                    <View style={styles.stepContent}>
-                                        <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Install</Text>
-                                        <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Tap Install and you're ready to explore new content!</Text>
-                                    </View>
-                                    <MaterialIcons name="download-done" size={compactScreen ? 22 : 24} color={activeColors.primary} />
-                                </Animated.View>
-                            </View>
-
-                            <Animated.View style={getStepStyle(step3Opacity)}>
-                                <TouchableOpacity
-                                    style={[styles.button, { backgroundColor: activeColors.primary, paddingVertical: compactScreen ? 14 : 16 }]}
-                                    onPress={onDismiss}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={[styles.buttonText, { fontSize: compactScreen ? 16 : 18 }]}>Got it, Let's Go!</Text>
-                                </TouchableOpacity>
+                            <Animated.View style={[styles.stepItem, getStepStyle(step3Opacity), compactScreen && styles.stepItemCompact]}>
+                                <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
+                                    <Text style={styles.stepNumberText}>3</Text>
+                                </View>
+                                <View style={styles.stepContent}>
+                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Install</Text>
+                                    <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Tap Install and you're ready to explore new content!</Text>
+                                </View>
+                                <MaterialIcons name="download-done" size={compactScreen ? 22 : 24} color={activeColors.primary} />
                             </Animated.View>
                         </View>
-                    </ScrollView>
-                </Animated.View>
-            </BlurView>
+
+                        <Animated.View style={getStepStyle(step3Opacity)}>
+                            <TouchableOpacity
+                                style={[styles.button, { backgroundColor: activeColors.primary, paddingVertical: compactScreen ? 14 : 16 }]}
+                                onPress={onDismiss}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[styles.buttonText, { fontSize: compactScreen ? 16 : 18 }]}>Got it, Let's Go!</Text>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </View>
+                </ScrollView>
+            </Animated.View>
         </View>
     );
 }

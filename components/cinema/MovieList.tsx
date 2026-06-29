@@ -4,9 +4,9 @@ import { Colors } from '@/constants/Colors';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TVFocusable } from '@/components/TVFocusable';
-import { useSettingsStore } from '@/store/settingsStore';
 import { MovieCardSkeleton } from '@/components/Skeleton';
 import MovieCard from './MovieCard';
+import { useTheme } from '@/hooks/useTheme';
 
 interface MovieListProps {
     title: string;
@@ -19,6 +19,7 @@ interface MovieListProps {
 }
 
 function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated = false, addonType, catalogRawType }: MovieListProps) {
+    const { colors: currentColors } = useTheme();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -26,8 +27,6 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const isMounted = React.useRef(true);
-    const theme = useSettingsStore((state) => state.theme);
-    const currentColors = useMemo(() => Colors[theme] || Colors.dark, [theme]);
 
     React.useEffect(() => {
         return () => {

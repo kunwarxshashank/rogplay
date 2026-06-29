@@ -34,6 +34,7 @@ export default function MobilePlayerScreen() {
         season,
         episode,
         resumeMs,
+        genre,
     } = params;
 
     const { currentChannels } = useIptvStore();
@@ -83,6 +84,7 @@ export default function MobilePlayerScreen() {
                 season={season as string}
                 episode={episode as string}
                 resumeMs={resumeMs as string}
+                genre={genre as string}
             />
         </View>
     );

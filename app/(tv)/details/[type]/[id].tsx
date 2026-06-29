@@ -4,8 +4,6 @@ import {
     FlatList, Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Colors } from '@/constants/Colors';
 import { getDetails } from '@/services/tmdb';
 import { TVFocusable } from '@/components/TVFocusable';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,6 +12,7 @@ import { useFavoritesStore } from '@/store/favoritesStore';
 import { useToastStore } from '@/store/toastStore';
 
 import { TVDetailsSkeleton } from '@/components/Skeleton';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -23,10 +22,9 @@ const hexAlpha = (hex: string, alpha: number) => {
 };
 
 export default function TVDetailsScreen() {
+    const { colors: c } = useTheme();
     const { type, id } = useLocalSearchParams();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const c = Colors[theme] || Colors.dark;
     const gradients = c.gradients || { primary: [c.primary, c.primary] };
     const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
     const isFavorite = useFavoritesStore((state) => state.isFavorite);
@@ -52,6 +50,7 @@ export default function TVDetailsScreen() {
     };
 
     const handlePlay = () => {
+        const primaryGenre = details.genres && details.genres.length > 0 ? details.genres[0].name : '';
         router.push({
             pathname: '/(tv)/server-selection',
             params: {
@@ -62,16 +61,19 @@ export default function TVDetailsScreen() {
                 title: details.title || details.name,
                 poster: details.poster_path,
                 backdrop: details.backdrop_path,
+                genre: primaryGenre,
             },
         });
     };
 
     const handleSeasonPress = (season: any) => {
+        const primaryGenre = details.genres && details.genres.length > 0 ? details.genres[0].name : '';
         router.push({
             pathname: `/(tv)/season/${id}/${season.season_number}`,
             params: {
                 showName: details.name,
                 backdrop: details.backdrop_path,
+                genre: primaryGenre,
             },
         });
     };
@@ -139,12 +141,16 @@ export default function TVDetailsScreen() {
                 )}
 
                 {/* Dark gradient overlay */}
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                />
+                {c.isAmoled ? (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                ) : (
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                    />
+                )}
 
                 {/* Top badges row */}
                 <View style={styles.seasonBadgesRow}>
@@ -183,18 +189,24 @@ export default function TVDetailsScreen() {
                 blurRadius={1}
             />
             {/* Gradient overlays */}
-            <LinearGradient
-                colors={['transparent', c.background]}
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0.2 }}
-                end={{ x: 0, y: 0.85 }}
-            />
-            <LinearGradient
-                colors={[`${c.background}DD`, 'transparent', `${c.background}AA`]}
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0.6, y: 0 }}
-            />
+            {c.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <>
+                    <LinearGradient
+                        colors={['transparent', c.background]}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0.2 }}
+                        end={{ x: 0, y: 0.85 }}
+                    />
+                    <LinearGradient
+                        colors={[`${c.background}DD`, 'transparent', `${c.background}AA`]}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0.6, y: 0 }}
+                    />
+                </>
+            )}
 
             {/* ── Main Content (no scroll) ─────────────── */}
             <View style={styles.mainContent}>
