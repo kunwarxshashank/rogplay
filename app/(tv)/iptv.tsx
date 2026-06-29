@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Alert, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Colors } from '@/constants/Colors';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useIptvStore, IptvPlaylist } from '@/store/iptvStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 /** Build the Xtreme Codes m3u_plus URL from credentials */
 function buildXtremeM3uUrl(server: string, username: string, password: string): string {
@@ -18,6 +19,7 @@ function buildXtremeM3uUrl(server: string, username: string, password: string): 
 type AddTab = 'm3u' | 'xtreme';
 
 function useIptvLogic() {
+    const { colors: activeColors } = useTheme();
     const [addTab, setAddTab] = useState<AddTab>('m3u');
     const [title, setTitle] = useState('');
     const [m3uUrl, setM3uUrl] = useState('');
@@ -29,8 +31,6 @@ function useIptvLogic() {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
     const { playlists, addPlaylist, removePlaylist } = useIptvStore();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     const handlePickFile = async () => {
         try {
@@ -396,14 +396,16 @@ export default function TVIptvScreen() {
                     )}
                 </View>
 
-                <FlatList
-                    data={playlists}
-                    renderItem={renderAddon}
-                    keyExtractor={(item) => item.id}
-                    numColumns={Platform.isTV ? 3 : 2}
-                    columnWrapperStyle={{ gap: 20 }}
-                    contentContainerStyle={styles.list}
-                />
+                <View style={{ flex: 1, width: '100%' }}>
+                    <FlashList
+                        data={playlists}
+                        renderItem={renderAddon}
+                        keyExtractor={(item) => item.id}
+                        numColumns={Platform.isTV ? 3 : 2}
+                        contentContainerStyle={styles.list}
+                        estimatedItemSize={250}
+                    />
+                </View>
             </View>
         </View>
     );

@@ -1,13 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Colors } from '@/constants/Colors';
+import { useThemeStore, computeThemeColors } from '@/store/themeStore';
 import { useToastStore } from '@/store/toastStore';
 
 export function AppToast() {
-    const { theme } = useSettingsStore();
-    const colors = Colors[theme] || Colors.dark;
+    const ts = useThemeStore();
+    const colors = computeThemeColors(ts.themePalette, ts.accentColorId, ts.customHexAccent, ts.borderRadius, ts.cardElevation, ts.animationIntensity);
     const { visible, message, tone, duration, hideToast } = useToastStore();
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(20)).current;

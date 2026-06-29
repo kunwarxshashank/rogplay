@@ -2,19 +2,17 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { FavoriteItem, useFavoritesStore } from '@/store/favoritesStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import { useToastStore } from '@/store/toastStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const CARD_W = 360;
 const CARD_H = 200;
 
 export default function TVFavouritesScreen() {
+    const { colors: c } = useTheme();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const c = Colors[theme] || Colors.dark;
 
     const items = useFavoritesStore((state) => state.items);
     const removeFavorite = useFavoritesStore((state) => state.removeFavorite);

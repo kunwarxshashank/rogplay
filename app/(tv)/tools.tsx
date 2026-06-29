@@ -1,10 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '@/hooks/useTheme';
 
 const hexAlpha = (hex: string, alpha: number) => {
     const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
@@ -59,8 +58,7 @@ const TOOLS = [
 const COLS = 2;
 
 export default function TVToolsScreen() {
-    const { theme } = useSettingsStore();
-    const c = Colors[theme] || Colors.dark;
+    const { colors: c } = useTheme();
     const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
     const router = useRouter();
 

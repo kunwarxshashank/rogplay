@@ -27,6 +27,7 @@ import JoinPremiumModal from './JoinPremiumModal';
 import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { useWatchParty } from '@/hooks/useWatchParty';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -68,10 +69,10 @@ const MobilePlayerTopBar = React.memo(function MobilePlayerTopBar({ onBack, acti
     );
 });
 
-const MobilePlayerCenterControls = React.memo(function MobilePlayerCenterControls({ skip, onLocalSeek, onLocalPause, onLocalPlay, handlePlayPause, isPlaying, position }: any) {
+const MobilePlayerCenterControls = React.memo(function MobilePlayerCenterControls({ handleSkipBackward, handleSkipForward, onLocalPause, onLocalPlay, handlePlayPause, isPlaying }: any) {
     return (
         <View style={styles.centerControls}>
-            <TouchableOpacity onPress={(() => { skip(false); onLocalSeek((position - 10000) / 1000); })} style={styles.skipButton}>
+            <TouchableOpacity onPress={handleSkipBackward} style={styles.skipButton}>
                 <MaterialIcons name="replay-10" size={50} color="white" />
             </TouchableOpacity>
 
@@ -90,7 +91,7 @@ const MobilePlayerCenterControls = React.memo(function MobilePlayerCenterControl
                 />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => { skip(true); onLocalSeek((position + 10000) / 1000); }} style={styles.skipButton}>
+            <TouchableOpacity onPress={handleSkipForward} style={styles.skipButton}>
                 <MaterialIcons name="forward-10" size={50} color="white" />
             </TouchableOpacity>
         </View>
@@ -268,8 +269,17 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
         resizeButtonEnabled,
         theme
     } = useSettingsStore();
+    const { colors: currentColors } = useTheme();
 
-    const currentColors = Colors[theme] || Colors.dark;
+    const handleSkipBackward = useCallback(() => {
+        skip(false);
+        watchParty.onLocalSeek(Math.max(0, playerLogic.positionRef.current - 10000) / 1000);
+    }, [skip, watchParty, playerLogic.positionRef]);
+
+    const handleSkipForward = useCallback(() => {
+        skip(true);
+        watchParty.onLocalSeek(Math.min(playerLogic.durationRef.current, playerLogic.positionRef.current + 10000) / 1000);
+    }, [skip, watchParty, playerLogic.positionRef, playerLogic.durationRef]);
 
     const [isSpeedingUp, setIsSpeedingUp] = useState(false);
     const speedBeforeBoost = useRef(1.0);
@@ -495,15 +505,16 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
                         handlePip={handlePip}
                     />
 
-                    <MobilePlayerCenterControls
-                        skip={skip}
-                        onLocalSeek={watchParty.onLocalSeek}
-                        onLocalPause={watchParty.onLocalPause}
-                        onLocalPlay={watchParty.onLocalPlay}
-                        handlePlayPause={handlePlayPause}
-                        isPlaying={isPlaying}
-                        position={position}
-                    />
+                    {controlsVisible && (
+                        <MobilePlayerCenterControls
+                            handleSkipBackward={handleSkipBackward}
+                            handleSkipForward={handleSkipForward}
+                            onLocalPause={watchParty.onLocalPause}
+                            onLocalPlay={watchParty.onLocalPlay}
+                            handlePlayPause={handlePlayPause}
+                            isPlaying={isPlaying}
+                        />
+                    )}
 
                     <MobilePlayerBottomBar
                         position={position}

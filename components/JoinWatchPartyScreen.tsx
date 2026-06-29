@@ -15,8 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import {
     getSocket,
@@ -24,12 +22,14 @@ import {
     disconnectSocket,
 } from '@/services/watchPartyService';
 import JoinPremiumModal from '@/components/player/JoinPremiumModal';
+import { useTheme } from '@/hooks/useTheme';
 
 const isTV = Platform.isTV;
 const { width: SCREEN_W } = Dimensions.get('window');
 
 /** Return rgba with custom alpha from a hex color */
 function hexAlpha(hex: string, alpha: number): string {
+    const { colors: c } = useTheme();
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
@@ -65,9 +65,8 @@ function FocusablePressable({ style, focusedStyle, children, disabled, ...props 
 export default function JoinWatchPartyScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const { theme } = useSettingsStore();
     const { user } = useAuthStore();
-    const c = Colors[theme] || Colors.dark;
+    const { colors: c } = useTheme();
     const gradients = c.gradients?.primary || [c.primary, c.accent || c.primary];
 
     const [roomCode, setRoomCode] = useState((params.code as string) || '');
@@ -76,7 +75,6 @@ export default function JoinWatchPartyScreen() {
     const [error, setError] = useState<string | null>(null);
     const [premiumModalVisible, setPremiumModalVisible] = useState(false);
     const isPremium = user?.isPremium || false;
-
 
     const focusedStyle = {
         borderColor: c.primary,

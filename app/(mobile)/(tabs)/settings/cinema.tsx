@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
-import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const CARD_SIZES = [
     { id: 'small', label: 'Small', icon: 'view-grid' },
@@ -15,8 +15,8 @@ const CARD_SIZES = [
 export default function CinemaSettings() {
     const router = useRouter();
     const settings = useSettingsStore();
+    const { colors: c } = useTheme();
     const { theme } = settings;
-    const c = Colors[theme] || Colors.dark;
 
     const toggleItems = [
         {

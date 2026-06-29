@@ -28,14 +28,14 @@ const PLANS = [
         title: 'Premium',
         price: '2$',
         amount: 2,
-        days: 90,
-        popular: true
+        days: 90
     },
     {
         title: 'Ultimate',
         price: '5$',
         amount: 5,
-        days: 360
+        days: 360,
+        popular: true
     },
 ];
 
@@ -50,14 +50,14 @@ const RUPEEPLANS = [
         title: 'Premium',
         price: '₹199',
         amount: 199,
-        days: 90,
-        popular: true
+        days: 90
     },
     {
         title: 'Ultimate',
         price: '₹499',
         amount: 499,
-        days: 360
+        days: 360,
+        popular: true
     },
 ];
 
@@ -149,19 +149,23 @@ export const PlansModal: React.FC<PlansModalProps> = ({ visible, onClose, curren
                 onPress={() => handlePayment(plan.amount, plan.days)}
             >
                 {({ focused }) => (
-                    <LinearGradient
-                        colors={focused
-                            ? [currentColors.primary + '33', currentColors.primary + '11']
-                            : [currentColors.card + '88', currentColors.card + '44']
-                        }
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={[
-                            styles.planCard,
-                            { borderColor: focused ? currentColors.primary : currentColors.border + '44' },
-                            plan.popular && !focused && { borderColor: currentColors.primary + '66' }
-                        ]}
-                    >
+                    <View style={[
+                        styles.planCard,
+                        currentColors.isAmoled ? { backgroundColor: '#000000' } : {},
+                        { borderColor: focused ? currentColors.primary : currentColors.border + '44' },
+                        plan.popular && !focused && { borderColor: currentColors.primary + '66' }
+                    ]}>
+                        {!currentColors.isAmoled && (
+                            <LinearGradient
+                                colors={focused
+                                    ? [currentColors.primary + '33', currentColors.primary + '11']
+                                    : [currentColors.card + '88', currentColors.card + '44']
+                                }
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={StyleSheet.absoluteFill}
+                            />
+                        )}
                         {plan.popular && (
                             <View style={[styles.popularTag, { backgroundColor: currentColors.primary }]}>
                                 <Text style={styles.popularTagText}>MOST POPULAR</Text>
@@ -193,7 +197,7 @@ export const PlansModal: React.FC<PlansModalProps> = ({ visible, onClose, curren
                                 />
                             </View>
                         </View>
-                    </LinearGradient>
+                    </View>
                 )}
             </TVFocusable>
         );
@@ -216,12 +220,18 @@ export const PlansModal: React.FC<PlansModalProps> = ({ visible, onClose, curren
                         <View style={styles.headerGlow} />
                         <View style={styles.headerContent}>
                             <View style={styles.crownContainer}>
-                                <LinearGradient
-                                    colors={['#FFD700', '#FFA500']}
-                                    style={styles.crownCircle}
-                                >
-                                    <MaterialCommunityIcons name="crown" size={32} color="#fff" />
-                                </LinearGradient>
+                                {currentColors.isAmoled ? (
+                                    <View style={[styles.crownCircle, { backgroundColor: '#000000' }]}>
+                                        <MaterialCommunityIcons name="crown" size={32} color="#fff" />
+                                    </View>
+                                ) : (
+                                    <LinearGradient
+                                        colors={['#FFD700', '#FFA500']}
+                                        style={styles.crownCircle}
+                                    >
+                                        <MaterialCommunityIcons name="crown" size={32} color="#fff" />
+                                    </LinearGradient>
+                                )}
                                 <View style={[styles.crownPulse, { backgroundColor: '#FFD70044' }]} />
                             </View>
 

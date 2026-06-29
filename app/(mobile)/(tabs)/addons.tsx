@@ -12,14 +12,12 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrowserAddonSkeleton } from '@/components/Skeleton';
 import { AddonsFTUE } from '@/components/addons/AddonsFTUE';
-
+import { useTheme } from '@/hooks/useTheme';
 
 const FILTERS = ['All', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
 
 function useAddonsLogic() {
     const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
-    const theme = useSettingsStore(state => state.theme);
-    const activeColors = Colors[theme] || Colors.dark;
     const { user } = useAuthStore();
     const isPremium = user?.isPremium || false;
 
@@ -71,7 +69,6 @@ function useAddonsLogic() {
         }
     };
 
-
     const filteredAddons = useMemo(() => {
         return addons.filter(item => {
             const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -103,21 +100,22 @@ function useAddonsLogic() {
     };
 
     const hasSeenAddonFTUE = useSettingsStore(state => state.hasSeenAddonFTUE);
+    const { colors: activeColors, theme } = useTheme();
     const setHasSeenAddonFTUE = useSettingsStore(state => state.setHasSeenAddonFTUE);
 
     return {
-        addons, activeColors, modalVisible, setModalVisible, newUrl, setNewUrl, adding, setAdding,
+        addons, activeColors, theme, modalVisible, setModalVisible, newUrl, setNewUrl, adding, setAdding,
         searchQuery, setSearchQuery, selectedFilter, setSelectedFilter, router, isLoading, filteredAddons,
-        handleAdd, handleOpenAddon, removeAddon, theme, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
+        handleAdd, handleOpenAddon, removeAddon, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
         refreshing, onRefresh
     };
 }
 
 export function AddonsMobile() {
     const {
-        addons, activeColors, modalVisible, setModalVisible, newUrl, setNewUrl, adding,
+        addons, activeColors, theme, modalVisible, setModalVisible, newUrl, setNewUrl, adding,
         searchQuery, setSearchQuery, selectedFilter, setSelectedFilter, isLoading, filteredAddons,
-        handleAdd, handleOpenAddon, removeAddon, theme, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
+        handleAdd, handleOpenAddon, removeAddon, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
         refreshing, onRefresh
     } = useAddonsLogic();
 
@@ -142,7 +140,7 @@ export function AddonsMobile() {
                 onPress={() => handleOpenAddon(item)}
                 activeOpacity={0.8}
             >
-                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                 <View style={styles.logoContainer}>
                     <Image
                         source={{ uri: item.logo || 'https://via.placeholder.com/60' }}
@@ -193,13 +191,18 @@ export function AddonsMobile() {
     return (
         <View style={[styles.container, { backgroundColor: activeColors.background }]}>
             {/* Dark Luxury Gradient */}
-            <LinearGradient
-                colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {activeColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!activeColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <View style={styles.header}>
                     <View>
@@ -225,7 +228,7 @@ export function AddonsMobile() {
 
                 <View style={styles.toolbar}>
                     <View style={[styles.searchBar, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
-                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                         <MaterialIcons name="search" size={20} color={activeColors.textSecondary} style={{ zIndex: 1 }} />
                         <TextInput
                             style={[styles.searchInput, { color: activeColors.text, zIndex: 1 }]}
@@ -249,7 +252,7 @@ export function AddonsMobile() {
                                 ]}
                                 onPress={() => setSelectedFilter(filter)}
                             >
-                                <BlurView intensity={selectedFilter === filter ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />
+                                {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={selectedFilter === filter ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />}
                                 {selectedFilter === filter && <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.primary + '20' }]} />}
                                 <Text style={[
                                     styles.filterText,
@@ -297,33 +300,63 @@ export function AddonsMobile() {
                 )}
 
                 <Modal visible={modalVisible} transparent animationType="fade">
-                    <BlurView intensity={30} tint={theme.includes('light') ? 'light' : 'dark'} style={styles.modalOverlay}>
-                        <View style={[styles.modalContent, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
-                            <View style={styles.modalHeader}>
-                                <Text style={[styles.modalTitle, { color: activeColors.text }]}>Add Addon</Text>
-                                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
-                                    <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
-                                </TouchableOpacity>
-                            </View>
+                    {activeColors.isAmoled ? (
+                        <View style={[styles.modalOverlay, { backgroundColor: '#000' }]}>
+                            <View style={[styles.modalContent, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={[styles.modalTitle, { color: activeColors.text }]}>Add Addon</Text>
+                                    <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                                        <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                </View>
 
-                            <TextInput
-                                style={[styles.input, { backgroundColor: activeColors.background, color: activeColors.text, borderColor: activeColors.border }]}
-                                placeholder="Enter Addon URL (JSON)"
-                                placeholderTextColor={activeColors.textSecondary}
-                                value={newUrl}
-                                onChangeText={setNewUrl}
-                                autoFocus
-                                autoCapitalize="none"
-                            />
-                            <Text style={[styles.hint, { color: activeColors.textSecondary }]}>Supported: JSON links, rogplay:// links</Text>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: activeColors.background, color: activeColors.text, borderColor: activeColors.border }]}
+                                    placeholder="Enter Addon URL (JSON)"
+                                    placeholderTextColor={activeColors.textSecondary}
+                                    value={newUrl}
+                                    onChangeText={setNewUrl}
+                                    autoFocus
+                                    autoCapitalize="none"
+                                />
+                                <Text style={[styles.hint, { color: activeColors.textSecondary }]}>Supported: JSON links, rogplay:// links</Text>
 
-                            <View style={styles.modalActions}>
-                                <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
-                                    {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
-                                </TouchableOpacity>
+                                <View style={styles.modalActions}>
+                                    <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
+                                        {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
-                    </BlurView>
+                    ) : (
+                        <BlurView intensity={30} tint={theme.includes('light') ? 'light' : 'dark'} style={styles.modalOverlay}>
+                            <View style={[styles.modalContent, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={[styles.modalTitle, { color: activeColors.text }]}>Add Addon</Text>
+                                    <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                                        <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: activeColors.background, color: activeColors.text, borderColor: activeColors.border }]}
+                                    placeholder="Enter Addon URL (JSON)"
+                                    placeholderTextColor={activeColors.textSecondary}
+                                    value={newUrl}
+                                    onChangeText={setNewUrl}
+                                    autoFocus
+                                    autoCapitalize="none"
+                                />
+                                <Text style={[styles.hint, { color: activeColors.textSecondary }]}>Supported: JSON links, rogplay:// links</Text>
+
+                                <View style={styles.modalActions}>
+                                    <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
+                                        {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </BlurView>
+                    )}
                 </Modal>
 
                 {isFtueVisible && (
@@ -340,8 +373,6 @@ export function AddonsMobile() {
         </View>
     );
 }
-
-
 
 export default function AddonsScreen() {
     return <AddonsMobile />;

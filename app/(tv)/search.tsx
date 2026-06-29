@@ -1,22 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
-import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
-import { searchMulti } from '@/services/tmdb';
+import { searchMulti, getTrending } from '@/services/tmdb';
 import MovieList from '@/components/cinema/MovieList';
 import { TVSearchBar } from '@/components/tv/TVSearchBar';
 import { GridSkeleton, MovieCardSkeleton } from '@/components/Skeleton';
 import { Platform } from 'react-native';
 import ContinueWatchingSection from '@/components/cinema/ContinueWatchingSection';
-import { getTrending } from '@/services/tmdb';
 
 import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function TVSearchScreen() {
+    const { colors: currentColors } = useTheme();
     const { query } = useLocalSearchParams();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
 
     const [searchQuery, setSearchQuery] = useState(query as string || '');
     const [results, setResults] = useState<any[]>([]);
@@ -24,11 +22,16 @@ export default function TVSearchScreen() {
 
     const addonConfig = useCinemaAddon();
 
+    const initialQueryDone = useRef(false);
+
     useEffect(() => {
-        if (searchQuery) {
-            handleSearch(searchQuery);
+        if (query && !initialQueryDone.current) {
+            initialQueryDone.current = true;
+            const q = query as string;
+            setSearchQuery(q);
+            handleSearch(q);
         }
-    }, [searchQuery]);
+    }, []);
 
     const handleSearch = async (text: string) => {
         setSearchQuery(text);
@@ -56,7 +59,7 @@ export default function TVSearchScreen() {
                     const tmdbData = await searchMulti(text);
                     const filteredTmdb = tmdbData.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv');
                     if (filteredTmdb.length > 0) {
-                        groupedData.push({ title: 'TMDB Search', data: filteredTmdb, isTmdb: true });
+                        groupedData.push({ title: 'Search Results', data: filteredTmdb, isTmdb: true });
                     }
                 }
                 setResults(groupedData);
@@ -70,21 +73,10 @@ export default function TVSearchScreen() {
         }
     };
 
-    // We reuse MovieList logic but pass data directly?
-    // MovieList expects a fetchFunction. 
-    // We can create a fetch function closure or modify MovieList to accept data.
-    // Or just implement a simple grid using specific components.
-    // For now, I'll use a fetch function wrapper if I can, but MovieList handles state internally.
-    // I can make a wrapper fetch function that returns 'results' state.
-
-    const fetchSearchResults = async () => {
-        return results;
-    };
-
-    const fetchCuratedForYou = async (page?: number) => {
+    const fetchCuratedForYou = useCallback(async (page?: number) => {
         const response = await getTrending('week');
         return response?.results || [];
-    };
+    }, []);
 
     const numColumns = Platform.isTV ? 5 : 3;
 
@@ -106,7 +98,7 @@ export default function TVSearchScreen() {
                     </View>
                 ) : results.length > 0 ? (
                     <View style={{ flex: 1 }}>
-                        <FlatList
+                        <FlashList
                             data={results}
                             keyExtractor={(item, index) => `${item.title}-${index}`}
                             renderItem={({ item }) => (
@@ -118,6 +110,7 @@ export default function TVSearchScreen() {
                                 />
                             )}
                             contentContainerStyle={{ paddingBottom: 50 }}
+                            estimatedItemSize={300}
                         />
                     </View>
                 ) : (
@@ -131,14 +124,12 @@ export default function TVSearchScreen() {
                         ) : (
                             <>
                                 <ContinueWatchingSection />
-                                <View style={styles.curatedWrapper}>
                                     <MovieList
                                         title="Curated For You"
                                         fetchFunction={fetchCuratedForYou}
                                         type="movie"
                                         addonType={addonConfig?.addontype}
                                     />
-                                </View>
                             </>
                         )}
                     </View>
@@ -176,6 +167,6 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     curatedWrapper: {
-        marginTop: 20,
+        marginTop: 40,
     }
 });

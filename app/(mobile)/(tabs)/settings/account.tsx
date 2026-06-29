@@ -4,7 +4,6 @@ import { Colors, Layout } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import { BlurView } from 'expo-blur';
@@ -12,15 +11,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios from 'axios';
 import { PlansModal } from '@/components/PlansModal';
+import { useTheme } from '@/hooks/useTheme';
 
 const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 
 const { width } = Dimensions.get('window');
 
 export default function AccountScreen() {
+    const { colors: currentColors } = useTheme();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
     const { user, logout } = useAuthStore();
     const [isModalVisible, setModalVisible] = useState(false);
     const isGuest = !user || user.id === 'guest';
@@ -82,7 +81,6 @@ export default function AccountScreen() {
         }
     };
 
-
     const PREMIUM_FEATURES = [
         { icon: 'devices', title: 'Multi-Device Login', desc: 'Use your account on unlimited devices' },
         { icon: 'sync', title: 'Cloud Addon & Favourite Sync', desc: 'Automatically sync addons and Favourites across all devices' },
@@ -137,7 +135,7 @@ export default function AccountScreen() {
                     <View style={styles.statusRow}>
                         <View style={styles.statusItem}>
                             <Text style={styles.statusLabel}>Status</Text>
-                            <Text style={styles.statusValue}>{isPremium ? 'GOD' : 'HUMAN'}</Text>
+                            <Text style={styles.statusValue}>{isPremium ? 'ROBINHOOD' : 'HUMAN'}</Text>
                         </View>
                         <View style={styles.statusDivider} />
                         <View style={styles.statusItem}>
@@ -193,7 +191,6 @@ export default function AccountScreen() {
                     </View>
                 )}
 
-
                 <View style={styles.authSection}>
 
                     {user && user.id !== 'guest' && !Platform.isTV && (
@@ -239,10 +236,9 @@ export default function AccountScreen() {
                         </TVFocusable>
                     )}
 
-
                 </View>
 
-                <Text style={styles.versionText}>ROGFOX v1.2.0 Beta</Text>
+                <Text style={styles.versionText}>ROGPLAY (Streaming 4 You)</Text>
             </ScrollView>
 
             {/* TV Login Scanner Modal */}
@@ -274,10 +270,17 @@ export default function AccountScreen() {
                     </View>
 
                     {scanning && (
-                        <BlurView intensity={80} tint="dark" style={styles.scanningOverlay}>
-                            <ActivityIndicator size="large" color={currentColors.primary} />
-                            <Text style={styles.scanningText}>Authorizing TV Session...</Text>
-                        </BlurView>
+                        currentColors.isAmoled ? (
+                            <View style={[styles.scanningOverlay, { backgroundColor: '#000' }]}>
+                                <ActivityIndicator size="large" color={currentColors.primary} />
+                                <Text style={styles.scanningText}>Authorizing TV Session...</Text>
+                            </View>
+                        ) : (
+                            <BlurView intensity={80} tint="dark" style={styles.scanningOverlay}>
+                                <ActivityIndicator size="large" color={currentColors.primary} />
+                                <Text style={styles.scanningText}>Authorizing TV Session...</Text>
+                            </BlurView>
+                        )
                     )}
                 </SafeAreaView>
             </Modal>

@@ -14,20 +14,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import QRCode from 'react-native-qrcode-svg';
 import { useAddonsStore } from '@/store/addonsStore';
 import { handleAuthSuccess, signInWithGoogle, signInAsGuest } from '@/services/authService';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 
 export default function TVLoginScreen() {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors } = useTheme();
     const router = useRouter();
     const { setAuth } = useAuthStore();
 
@@ -140,13 +139,18 @@ export default function TVLoginScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-            <LinearGradient
-                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {currentColors.isAmoled ? (
+                <View style={StyleSheet.absoluteFill} />
+            ) : (
+                <LinearGradient
+                    colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!currentColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
 
             <View style={styles.contentWrapper}>
                 {/* Header Section */}
@@ -186,18 +190,20 @@ export default function TVLoginScreen() {
                                             />
                                         </View>
                                         {status === 'scanned' && (
-                                            <BlurView intensity={80} tint="dark" style={styles.qrOverlay}>
+                                            <View style={[styles.qrOverlay, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+                                                {!currentColors.isAmoled && <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                                                 <ActivityIndicator size="large" color={currentColors.primary} />
                                                 <Text style={styles.qrOverlayText}>Code Scanned! Confirming...</Text>
-                                            </BlurView>
+                                            </View>
                                         )}
                                         {status === 'expired' && (
-                                            <BlurView intensity={80} tint="dark" style={styles.qrOverlay}>
+                                            <View style={[styles.qrOverlay, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+                                                {!currentColors.isAmoled && <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                                                 <MaterialIcons name="refresh" size={50} color="#fff" />
                                                 <TouchableOpacity onPress={generateQR}>
                                                     <Text style={styles.qrOverlayText}>Code Expired. Refresh?</Text>
                                                 </TouchableOpacity>
-                                            </BlurView>
+                                            </View>
                                         )}
                                     </>
                                 ) : (

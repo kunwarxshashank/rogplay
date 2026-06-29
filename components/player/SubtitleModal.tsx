@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 interface Track {
     title?: string;
@@ -122,8 +122,7 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
     onCancel,
     isFetchingSubtitles
 }) => {
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
+    const { colors: activeColors } = useTheme();
     const [screenData, setScreenData] = useState(Dimensions.get('window'));
     const [isLandscape, setIsLandscape] = useState(false);
 

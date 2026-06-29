@@ -6,12 +6,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function PlaybackSettings() {
     const router = useRouter();
     const settings = useSettingsStore();
+    const { colors: currentColors } = useTheme();
     const { theme } = settings;
-    const currentColors = Colors[theme] || Colors.dark;
 
     const sections = [
         {
@@ -23,6 +24,7 @@ export default function PlaybackSettings() {
                 { icon: 'fast-forward', label: 'Double Tap to Seek', type: 'toggle', value: !!settings.doubleTapSeekEnabled, action: () => settings.toggleSetting('doubleTapSeekEnabled') },
                 { icon: 'swipe', label: 'Swipe Gestures', type: 'toggle', value: !!settings.playbackGesturesEnabled, action: () => settings.toggleSetting('playbackGesturesEnabled') },
                 { icon: 'screen-rotation', label: 'Default Landscape', type: 'toggle', value: !!settings.forceLandscape, action: () => settings.toggleSetting('forceLandscape') },
+                { icon: 'auto-fix-high', label: 'Auto-Select Best Source', type: 'toggle', value: !!settings.autoSelectHealthiestSource, action: () => settings.toggleSetting('autoSelectHealthiestSource') },
             ]
         },
         {

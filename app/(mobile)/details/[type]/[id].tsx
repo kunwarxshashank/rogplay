@@ -7,20 +7,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAddonsStore } from '@/store/addonsStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { DetailsSkeleton } from '@/components/Skeleton';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useToastStore } from '@/store/toastStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
 export default function DetailsScreen() {
+    const { colors: currentColors } = useTheme();
     const { id, type } = useLocalSearchParams();
     const [details, setDetails] = useState<any>(null);
     const router = useRouter();
     const { addons } = useAddonsStore();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
     const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
     const isFavorite = useFavoritesStore((state) => state.isFavorite);
     const showToast = useToastStore((state) => state.showToast);
@@ -58,6 +57,7 @@ export default function DetailsScreen() {
         }
 
         const query = details.title || details.name;
+        const primaryGenre = details.genres && details.genres.length > 0 ? details.genres[0].name : '';
         // Navigate to content-list to search for streams for this title
         router.push({
             pathname: '/server-selection',
@@ -68,6 +68,7 @@ export default function DetailsScreen() {
                 title: details.title || details.name,
                 poster: details.poster_path,
                 backdrop: details.backdrop_path,
+                genre: primaryGenre,
                 ...(type === 'tv' && { season: 1, episode: 1 }),
             }
         });
@@ -94,10 +95,14 @@ export default function DetailsScreen() {
                     source={{ uri: `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${details.backdrop_path}` }}
                     style={styles.backdrop}
                 >
-                    <LinearGradient
-                        colors={['transparent', currentColors.background]}
-                        style={styles.gradient}
-                    />
+                    {currentColors.isAmoled ? (
+                        <View style={[styles.gradient, { backgroundColor: '#000' }]} />
+                    ) : (
+                        <LinearGradient
+                            colors={['transparent', currentColors.background]}
+                            style={styles.gradient}
+                        />
+                    )}
                     <SafeAreaView style={styles.headerSafeArea}>
                         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                             <MaterialIcons name="arrow-back" size={24} color="#fff" />
@@ -147,8 +152,6 @@ export default function DetailsScreen() {
                         </LinearGradient>
                     </TouchableOpacity>)}
 
-
-
                     <Text style={[styles.overview, { color: currentColors.textSecondary }]}>
                         {truncateDescription(details.overview, 50)}
                     </Text>
@@ -170,9 +173,10 @@ export default function DetailsScreen() {
                                         return;
                                     }
 
+                                    const primaryGenre = details.genres && details.genres.length > 0 ? details.genres[0].name : '';
                                     router.push({
                                         pathname: '/season/[tvId]/[seasonNumber]',
-                                        params: { tvId: id, seasonNumber: season.season_number }
+                                        params: { tvId: id, seasonNumber: season.season_number, genre: primaryGenre }
                                     });
                                 }}>
                                     <Image source={{ uri: `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${season.poster_path}` }} style={styles.seasonPoster} />

@@ -8,15 +8,25 @@ import { TVFocusable } from '@/components/TVFocusable';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useStreamSources, StreamResult } from '@/hooks/useStreamSources';
 import { TVServerSelectionSkeleton } from '@/components/Skeleton';
+import { analyzeAndSortStreams, StreamResultWithHealth } from '@/services/streamHealthEngine';
+import { useTheme } from '@/hooks/useTheme';
+import { resolveMagnet } from '@/services/debrid';
+import { Alert } from 'react-native';
 
 export default function TVServerSelectionScreen() {
-    const { id, type, title, season, episode, poster, backdrop, movieUrl, movieData } = useLocalSearchParams();
+    const { id, type, title, season, episode, poster, backdrop, movieUrl, movieData, genre, query } = useLocalSearchParams();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
+    const { autoSelectHealthiestSource, debridProvider, debridApiKey } = useSettingsStore();
+    const { colors: activeColors } = useTheme();
     const { addons, isHydrated } = useAddonsStore();
 
     const { results, loading, searchStreams } = useStreamSources();
+    const [analyzedResults, setAnalyzedResults] = React.useState<StreamResultWithHealth[]>([]);
+    const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+    const [resolvingMagnet, setResolvingMagnet] = React.useState(false);
+    const [filter, setFilter] = React.useState<'all' | 'direct' | 'debrid'>('all');
+    const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null);
+    const hasAutoPlayed = React.useRef(false);
 
     useEffect(() => {
         const resolvedType = (Array.isArray(type) ? type[0] : type || 'movie') as any;
@@ -33,11 +43,56 @@ export default function TVServerSelectionScreen() {
         );
     }, [id, type, title, season, episode, movieUrl, movieData]);
 
+    React.useEffect(() => {
+        if (!loading && results.length > 0) {
+            let active = true;
+            setIsAnalyzing(true);
+            analyzeAndSortStreams(results).then(analyzed => {
+                if (active) {
+                    setAnalyzedResults(analyzed);
+                    setIsAnalyzing(false);
+                    if (autoSelectHealthiestSource && !hasAutoPlayed.current && analyzed.length > 0) {
+                        hasAutoPlayed.current = true;
+                        handlePlay(analyzed[0], 0, analyzed);
+                    }
+                }
+            });
+            return () => { active = false; };
+        } else if (!loading) {
+            setAnalyzedResults([]);
+            setIsAnalyzing(false);
+        }
+    }, [results, loading, autoSelectHealthiestSource]);
 
-    const handlePlay = (item: StreamResult) => {
+    const handlePlay = async (item: StreamResultWithHealth, index: number, sourceList: StreamResultWithHealth[] = analyzedResults) => {
+        let finalUrl = item.url;
+
+        if (item.isTorrent) {
+            if (debridProvider === 'none' || !debridApiKey) {
+                Alert.alert('Debrid Required', 'Please configure Real-Debrid in TV Settings to play torrent sources.');
+                return;
+            }
+
+            setResolvingMagnet(true);
+            try {
+                const resolution = await resolveMagnet(item.magnetLink || item.url, debridProvider, debridApiKey);
+                if (resolution.error || !resolution.url) {
+                    Alert.alert('Debrid Error', resolution.error || 'Failed to unrestrict link.');
+                    setResolvingMagnet(false);
+                    return;
+                }
+                finalUrl = resolution.url;
+            } catch (err: any) {
+                Alert.alert('Error', err.message);
+                setResolvingMagnet(false);
+                return;
+            }
+            setResolvingMagnet(false);
+        }
+
         const videoParams: any = {
-            url: encodeURIComponent(item.url),
-            title: encodeURIComponent(item.title || String(title) || 'Video'),
+            url: encodeURIComponent(finalUrl),
+            title: encodeURIComponent((title ? String(title) : query ? String(query) : '') || item.title || 'Playing Video'),
             sourceType: 'cinema',
             contentType: Array.isArray(type) ? type[0] : type,
             tmdbId: Array.isArray(id) ? id[0] : id,
@@ -48,26 +103,72 @@ export default function TVServerSelectionScreen() {
         if (item.userAgent) videoParams.userAgent = item.userAgent;
         if (poster) videoParams.poster = Array.isArray(poster) ? poster[0] : poster;
         if (backdrop) videoParams.backdrop = Array.isArray(backdrop) ? backdrop[0] : backdrop;
+        if (genre) videoParams.genre = Array.isArray(genre) ? genre[0] : genre;
+
+        try {
+            videoParams.sourceList = JSON.stringify(sourceList.slice(0, 10));
+            videoParams.initialSourceIndex = index;
+        } catch (e) { }
 
         router.push({ pathname: '/(tv)/player', params: videoParams });
     };
 
-    const renderItem = ({ item, index }: { item: StreamResult; index: number }) => (
-        <TVFocusable
-            style={[styles.serverCard, { backgroundColor: activeColors.card, borderColor: activeColors.border }]}
-            onPress={() => handlePlay(item)}
-            hasTVPreferredFocus={index === 0}
-            nativeID={`tv-server-${index}`}
-        >
-            <View style={[styles.iconContainer, { backgroundColor: activeColors.primary + '20' }]}>
-                <MaterialIcons name="play-circle-outline" size={32} color={activeColors.primary} />
-            </View>
-            <View style={styles.serverInfo}>
-                <Text style={[styles.serverName, { color: activeColors.text }]}>{item.source}</Text>
-                <Text style={[styles.serverTitle, { color: activeColors.textSecondary }]} numberOfLines={1}>{item.title}</Text>
-            </View>
-        </TVFocusable>
-    );
+    const renderItem = ({ item, index }: { item: StreamResultWithHealth; index: number }) => {
+        const isFocused = focusedIndex === index;
+        return (
+            <TVFocusable
+                style={[styles.serverCard, { backgroundColor: activeColors.card, borderColor: activeColors.border }]}
+                onPress={() => handlePlay(item, index)}
+                onFocus={() => setFocusedIndex(index)}
+                onBlur={() => setFocusedIndex(prev => prev === index ? null : prev)}
+                hasTVPreferredFocus={index === 0}
+                nativeID={`tv-server-${index}`}
+            >
+                <View style={[styles.iconContainer, { backgroundColor: activeColors.primary + '20' }]}>
+                    <MaterialIcons name={item.isTorrent ? "cloud-download" : "play-circle-outline"} size={32} color={activeColors.primary} />
+                </View>
+                <View style={styles.serverInfo}>
+                    <Text style={[styles.serverName, { color: activeColors.text }]}>
+                        {item.isTorrent && debridProvider !== 'none' && <Text style={{ color: activeColors.primary, fontFamily: 'Outfit_600SemiBold' }}>[RD] </Text>}
+                        {item.source}
+                    </Text>
+                    <Text style={[styles.serverTitle, { color: activeColors.textSecondary }]} numberOfLines={isFocused ? 0 : 1}>{item.title}</Text>
+
+                    {item.healthInfo && !item.isTorrent && (
+                        <View style={styles.metricsRow}>
+                            <View style={[styles.badgeContainer, { backgroundColor: item.healthInfo.score >= 75 ? '#22c55e20' : item.healthInfo.score >= 50 ? '#eab30820' : '#ef444420' }]}>
+                                <Text style={[styles.badgeText, { color: item.healthInfo.score >= 75 ? '#22c55e' : item.healthInfo.score >= 50 ? '#eab308' : '#ef4444' }]}>
+                                    {item.healthInfo.statusBadge} {item.healthInfo.score}/100
+                                </Text>
+                            </View>
+                            {item.healthInfo.resolution && (
+                                <View style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
+                                    <Text style={[styles.metaText, { color: activeColors.primary }]}>{item.healthInfo.resolution}</Text>
+                                </View>
+                            )}
+                            <Text style={[styles.latencyText, { color: activeColors.textSecondary }]}>{item.healthInfo.latency < 5000 ? `${item.healthInfo.latency}ms` : 'Dead?'}</Text>
+                        </View>
+                    )}
+                    {item.healthInfo && item.isTorrent && item.healthInfo.resolution && (
+                        <View style={styles.metricsRow}>
+                            <View style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
+                                <Text style={[styles.metaText, { color: activeColors.primary }]}>{item.healthInfo.resolution}</Text>
+                            </View>
+                        </View>
+                    )}
+                </View>
+            </TVFocusable>
+        );
+    };
+
+    const filteredResults = React.useMemo(() => {
+        return analyzedResults.filter(item => {
+            if (filter === 'all') return true;
+            if (filter === 'direct') return !item.isTorrent;
+            if (filter === 'debrid') return item.isTorrent;
+            return true;
+        });
+    }, [analyzedResults, filter]);
 
     return (
         <View style={[styles.container, { backgroundColor: activeColors.background }]}>
@@ -97,8 +198,38 @@ export default function TVServerSelectionScreen() {
                     </View>
                 </View>
 
-                {loading || !isHydrated ? (
-                    <TVServerSelectionSkeleton />
+                {results.length > 0 && !isAnalyzing && (
+                    <View style={{ flexDirection: 'row', marginBottom: 20, gap: 16 }}>
+                        <TVFocusable 
+                            onPress={() => setFilter('all')} 
+                            style={[styles.tvFilterTab, filter === 'all' && { backgroundColor: activeColors.primary, borderColor: activeColors.primary }]}
+                        >
+                            <Text style={[styles.tvFilterText, filter === 'all' && { color: '#fff' }]}>All Streams</Text>
+                        </TVFocusable>
+                        <TVFocusable 
+                            onPress={() => setFilter('direct')} 
+                            style={[styles.tvFilterTab, filter === 'direct' && { backgroundColor: activeColors.primary, borderColor: activeColors.primary }]}
+                        >
+                            <Text style={[styles.tvFilterText, filter === 'direct' && { color: '#fff' }]}>Direct Streams</Text>
+                        </TVFocusable>
+                        <TVFocusable 
+                            onPress={() => setFilter('debrid')} 
+                            style={[styles.tvFilterTab, filter === 'debrid' && { backgroundColor: activeColors.primary, borderColor: activeColors.primary }]}
+                        >
+                            <Text style={[styles.tvFilterText, filter === 'debrid' && { color: '#fff' }]}>Debrid Torrents</Text>
+                        </TVFocusable>
+                    </View>
+                )}
+
+                {(loading || isAnalyzing || resolvingMagnet) ? (
+                    resolvingMagnet ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={activeColors.primary} />
+                            <Text style={{ color: activeColors.text, marginTop: 16, fontSize: 18, fontFamily: 'Outfit_500Medium' }}>Unrestricting link via Debrid...</Text>
+                        </View>
+                    ) : (
+                        <TVServerSelectionSkeleton />
+                    )
                 ) : results.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <MaterialIcons name="cloud-off" size={64} color={activeColors.textSecondary} />
@@ -129,9 +260,16 @@ export default function TVServerSelectionScreen() {
                             </TVFocusable>
                         )}
                     </View>
+                ) : filteredResults.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <MaterialIcons name="cloud-off" size={64} color={activeColors.textSecondary} />
+                        <Text style={[styles.emptyText, { color: activeColors.text }]}>
+                            No streams found for this filter
+                        </Text>
+                    </View>
                 ) : (
                     <FlatList
-                        data={results}
+                        data={isAnalyzing ? [] : filteredResults}
                         renderItem={renderItem}
                         keyExtractor={(item, index) => `${item.url}-${index}`}
                         contentContainerStyle={styles.list}
@@ -178,7 +316,20 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 36,
         fontWeight: 'bold',
-        fontFamily: 'Outfit_700Bold',
+        fontFamily: 'Outfit_600SemiBold',
+    },
+    tvFilterTab: {
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 30,
+        borderWidth: 2,
+        borderColor: '#334155',
+        backgroundColor: 'transparent',
+    },
+    tvFilterText: {
+        color: '#94a3b8',
+        fontSize: 18,
+        fontFamily: 'Outfit_500Medium',
     },
     subtitle: {
         fontSize: 18,
@@ -235,6 +386,36 @@ const styles = StyleSheet.create({
     },
     serverTitle: {
         fontSize: 14,
+        marginBottom: 8,
+    },
+    metricsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    badgeContainer: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    badgeText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    metaBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    metaText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    latencyText: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginLeft: 4,
     },
     backButton: {
         width: 160,

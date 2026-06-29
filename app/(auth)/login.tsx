@@ -16,19 +16,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Layout } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import axios from 'axios';
 import { useAddonsStore } from '@/store/addonsStore';
 import { handleAuthSuccess, signInWithGoogle, signInAsGuest, normalizeUser } from '@/services/authService';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 
 export default function LoginScreen() {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors } = useTheme();
     const router = useRouter();
     const { setAuth } = useAuthStore();
 
@@ -86,13 +85,18 @@ export default function LoginScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-            <LinearGradient
-                colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {currentColors.isAmoled ? (
+                <View style={StyleSheet.absoluteFill} />
+            ) : (
+                <LinearGradient
+                    colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!currentColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -116,7 +120,8 @@ export default function LoginScreen() {
                         </Text>
                     </View>
 
-                    <BlurView intensity={20} tint="dark" style={styles.formContainer}>
+                    <View style={[styles.formContainer, currentColors.isAmoled ? { backgroundColor: '#000000' } : { overflow: 'hidden' }]}>
+                        {!currentColors.isAmoled && <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                         {error && (
                             <View style={[styles.errorContainer, { backgroundColor: currentColors.error + '20' }]}>
                                 <Text style={[styles.errorText, { color: currentColors.error }]}>{error}</Text>
@@ -125,8 +130,8 @@ export default function LoginScreen() {
 
                         <View style={styles.inputWrapper}>
                             <Text style={[styles.inputLabel, { color: currentColors.textSecondary }]}>Email</Text>
-                            <View style={[styles.inputContainer, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
-                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={[styles.inputContainer, { backgroundColor: currentColors.isAmoled ? '#000' : 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                                {!currentColors.isAmoled && <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                                 <MaterialCommunityIcons name="email-outline" size={20} color={currentColors.textSecondary} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { color: currentColors.text }]}
@@ -142,8 +147,8 @@ export default function LoginScreen() {
 
                         <View style={styles.inputWrapper}>
                             <Text style={[styles.inputLabel, { color: currentColors.textSecondary }]}>Password</Text>
-                            <View style={[styles.inputContainer, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
-                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={[styles.inputContainer, { backgroundColor: currentColors.isAmoled ? '#000' : 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
+                                {!currentColors.isAmoled && <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                                 <MaterialCommunityIcons name="lock-outline" size={20} color={currentColors.textSecondary} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { color: currentColors.text }]}
@@ -212,7 +217,7 @@ export default function LoginScreen() {
                         >
                             <Text style={[styles.skipButtonText, { color: currentColors.textSecondary }]}>Continue as Guest</Text>
                         </TouchableOpacity>
-                    </BlurView>
+                    </View>
 
                     <View style={styles.footer}>
                         <Text style={[styles.footerText, { color: currentColors.textSecondary }]}>

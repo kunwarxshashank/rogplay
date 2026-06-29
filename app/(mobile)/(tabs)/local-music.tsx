@@ -2,20 +2,19 @@ import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from '
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
     Modal, Alert, Dimensions, Platform, RefreshControl, Animated,
-    ActivityIndicator, StatusBar,
+    ActivityIndicator, StatusBar, Pressable
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useMusicPlayerStore } from '@/store/musicPlayerStore';
 import { useLocalPlaylistStore, LocalPlaylist } from '@/store/localPlaylistStore';
 import { useLocalMusic } from '@/hooks/useLocalMusic';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import type { MusicTrack } from '@/components/player/MusicPlayer';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARTWORK_SIZE = 48;
@@ -58,8 +57,7 @@ const SORT_OPTIONS: { key: 'title' | 'artist' | 'duration' | 'modificationTime';
 export default function LocalMusicScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const theme = useSettingsStore(s => s.theme);
-    const activeColors = Colors[theme] || Colors.dark;
+    const { colors: activeColors } = useTheme();
 
     const {
         tracks, filteredTracks, loading, refreshing, searchQuery, setSearchQuery,
@@ -87,6 +85,7 @@ export default function LocalMusicScreen() {
     const musicFavorites = useMemo(() => favoriteItems.filter(f => f.kind === 'music'), [favoriteItems]);
 
     const searchAnim = useRef(new Animated.Value(0)).current;
+    const searchInputRef = useRef<TextInput>(null);
 
     const toggleSearch = useCallback(() => {
         setShowSearch(s => {
@@ -96,10 +95,15 @@ export default function LocalMusicScreen() {
                 duration: 250,
                 useNativeDriver: false,
             }).start();
-            if (!next) setSearchQuery('');
+            if (!next) {
+                setSearchQuery('');
+                searchInputRef.current?.blur();
+            } else {
+                setTimeout(() => searchInputRef.current?.focus(), 100);
+            }
             return next;
         });
-    }, []);
+    }, [searchAnim, setSearchQuery]);
 
     const handlePlayTrack = useCallback((track: MusicTrack, index: number) => {
         const encoded = encodeURIComponent(JSON.stringify(filteredTracks));
@@ -191,40 +195,6 @@ export default function LocalMusicScreen() {
 
     const renderHeader = () => (
         <View>
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                <View>
-                    <Text style={[styles.title, { color: activeColors.text }]}>My Music</Text>
-                    <Text style={[styles.subtitle, { color: activeColors.primary }]}>
-                        {filteredTracks.length} tracks available
-                    </Text>
-                </View>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        onPress={() => setShowFilter(true)}
-                        style={[styles.iconBtn, { backgroundColor: activeColors.surface }]}
-                    >
-                        <MaterialIcons name="filter-list" size={22} color={activeColors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={toggleSearch}
-                        style={[styles.iconBtn, { backgroundColor: activeColors.surface }]}
-                    >
-                        <MaterialIcons name="search" size={22} color={activeColors.text} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Search Bar */}
-            <Animated.View style={[styles.searchContainer, { width: searchWidth, opacity: searchAnim }]}>
-                {showSearch && (
-                    <DebouncedSearchBar
-                        onSearch={setSearchQuery}
-                        colors={activeColors}
-                    />
-                )}
-            </Animated.View>
-
             {/* Action Cards */}
             <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -299,13 +269,54 @@ export default function LocalMusicScreen() {
             <StatusBar barStyle="light-content" />
 
             {/* Dark Luxury Gradient */}
-            <LinearGradient
-                colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {activeColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!activeColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
+
+            {/* Header always visible, outside FlatList to keep search bar stable */}
+            <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                <View>
+                    <Text style={[styles.title, { color: activeColors.text }]}>My Music</Text>
+                    <Text style={[styles.subtitle, { color: activeColors.primary }]}>
+                        {filteredTracks.length} tracks available
+                    </Text>
+                </View>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity
+                        onPress={() => setShowFilter(true)}
+                        style={[styles.iconBtn, { backgroundColor: activeColors.surface }]}
+                    >
+                        <MaterialIcons name="filter-list" size={22} color={activeColors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={toggleSearch}
+                        style={[styles.iconBtn, { backgroundColor: activeColors.surface }]}
+                    >
+                        <MaterialIcons name="search" size={22} color={activeColors.text} />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Search Bar - outside FlatList to prevent remount on re-render */}
+            <Animated.View
+                style={[styles.searchContainer, { width: searchWidth, opacity: searchAnim }]}
+                pointerEvents={showSearch ? 'auto' : 'none'}
+            >
+                <DebouncedSearchBar
+                    onSearch={setSearchQuery}
+                    colors={activeColors}
+                    inputRef={searchInputRef}
+                />
+            </Animated.View>
 
             {loading && tracks.length === 0 ? (
                 <View style={[styles.loadingContainer, { paddingTop: insets.top + 100 }]}>
@@ -346,7 +357,7 @@ export default function LocalMusicScreen() {
                     activeOpacity={1}
                     onPress={() => setShowOptions(false)}
                 >
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                     <View style={[styles.optionsSheet, { backgroundColor: activeColors.surface }]}>
                         {selectedTrack && (
                             <View style={styles.optionsTrackInfo}>
@@ -385,7 +396,7 @@ export default function LocalMusicScreen() {
                     activeOpacity={1}
                     onPress={() => setShowPlaylistPicker(false)}
                 >
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                     <View style={[styles.pickerSheet, { backgroundColor: activeColors.surface }]}>
                         <Text style={[styles.pickerTitle, { color: activeColors.text }]}>Add to Playlist</Text>
 
@@ -440,7 +451,7 @@ export default function LocalMusicScreen() {
                     activeOpacity={1}
                     onPress={() => setShowCreatePlaylist(false)}
                 >
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                     <View style={[styles.createSheet, { backgroundColor: activeColors.card }]}>
                         <Text style={[styles.createTitle, { color: activeColors.text }]}>New Playlist</Text>
                         <TextInput
@@ -476,7 +487,7 @@ export default function LocalMusicScreen() {
                     activeOpacity={1}
                     onPress={() => setShowFilter(false)}
                 >
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                     <View style={[styles.filterSheet, { backgroundColor: activeColors.surface }]}>
                         <Text style={[styles.filterTitle, { color: activeColors.text }]}>Sort & Filter</Text>
 
@@ -523,7 +534,7 @@ export default function LocalMusicScreen() {
                     activeOpacity={1}
                     onPress={() => setShowPlaylists(false)}
                 >
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                     <View style={[styles.pickerSheet, { backgroundColor: activeColors.surface, maxHeight: '70%' }]}>
                         <View style={styles.pickerHeader}>
                             <Text style={[styles.pickerTitle, { color: activeColors.text }]}>Your Playlists</Text>
@@ -606,7 +617,7 @@ export default function LocalMusicScreen() {
     );
 }
 
-const DebouncedSearchBar = memo(({ onSearch, colors }: { onSearch: (q: string) => void; colors: any }) => {
+const DebouncedSearchBar = memo(({ onSearch, colors, inputRef }: { onSearch: (q: string) => void; colors: any; inputRef: React.RefObject<TextInput | null> }) => {
     const [localQuery, setLocalQuery] = useState('');
     const timerRef = useRef<any>(null);
 
@@ -634,12 +645,12 @@ const DebouncedSearchBar = memo(({ onSearch, colors }: { onSearch: (q: string) =
         <View style={[styles.searchBar, { backgroundColor: colors.surface + '80', borderColor: colors.primary + '40' }]}>
             <MaterialIcons name="search" size={20} color={colors.textSecondary} />
             <TextInput
+                ref={inputRef}
                 value={localQuery}
                 onChangeText={onChangeText}
                 placeholder="Search tracks..."
                 placeholderTextColor={colors.textMuted}
                 style={[styles.searchInput, { color: colors.text }]}
-                autoFocus
             />
             {localQuery.length > 0 && (
                 <TouchableOpacity onPress={onClear}>
@@ -864,6 +875,7 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.8)',
         justifyContent: 'flex-end',
     },
     optionsSheet: {

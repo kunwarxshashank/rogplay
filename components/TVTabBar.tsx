@@ -3,20 +3,22 @@ import { View, TouchableOpacity, StyleSheet, Platform, Text, Dimensions } from '
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 import { BlurView } from 'expo-blur';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TV_NAV_WIDTH = SCREEN_WIDTH * 0.15; // 15% of screen width
 
 export function TVTabBar({ state, descriptors, navigation }: any) {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors } = useTheme();
 
     if (!Platform.isTV) return null;
 
     return (
         <View style={styles.tvSidebar}>
-            <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+            {currentColors.isAmoled
+                ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
+                : <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+            }
             <View style={styles.contentContainer}>
                 <View style={styles.brandContainer}>
                     <View style={[styles.logoCircle, { borderColor: `${currentColors.primary}60` }]}>

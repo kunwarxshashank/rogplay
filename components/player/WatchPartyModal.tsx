@@ -16,14 +16,14 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WPUser } from '@/services/watchPartyService';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/hooks/useTheme';
 
 const isTV = Platform.isTV;
 const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── TV-friendly Pressable ──────────────────────────────
 function FocusablePressable({ style, focusedStyle, children, ...props }: any) {
+    const { colors: c } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     if (!isTV) {
         return (
@@ -88,8 +88,6 @@ export default function WatchPartyModal({
     onJoinRoom,
     onLeaveRoom,
 }: WatchPartyModalProps) {
-    const { theme } = useSettingsStore();
-    const c = Colors[theme] || Colors.dark;
     const gradients = c.gradients?.primary || [c.primary, c.accent || c.primary];
 
     const [screen, setScreen] = useState<'menu' | 'join'>('menu');

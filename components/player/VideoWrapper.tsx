@@ -188,55 +188,56 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
     }
 
     if (isVlcRequired && VLCPlayer) {
-        if (Platform.OS === 'android' && appState !== 'active' && !bgPlay) {
-            return <View style={[styles.video, style, { backgroundColor: 'black' }]} />;
-        }
+
+        const isAndroidBg = Platform.OS === 'android' && appState !== 'active' && !bgPlay;
 
         return (
-            <VLCPlayer
-                key={streamUrl}
-                ref={internalRef}
-                style={[styles.video, style]}
-                source={{ ...vlcSource }}
-                initOptions={[...vlcInitOptions]}
-                mediaOptions={[...vlcMediaOptions]}
-                autoplay={true}
-                paused={!isPlaying}
-                rate={playbackSpeed}
-                seek={vlcSeek}
-                volume={volume}
-                muted={isMute}
-                resizeMode={resizeMode}
-                playInBackground={bgPlay}
-                onProgress={(data: any) => {
-                    onProgress(data, true);
-                    if (data?.currentTime > 0) {
-                        onBuffer({ isBuffering: false });
-                    }
-                }}
-                onBuffering={(e: any) => {
-                    if (e?.isBuffering) {
+            <View style={[styles.video, style, { backgroundColor: 'black' }]}>
+                <VLCPlayer
+                    key={streamUrl}
+                    ref={internalRef}
+                    style={isAndroidBg ? { width: 1, height: 1, opacity: 0 } : StyleSheet.absoluteFill}
+                    source={{ ...vlcSource }}
+                    initOptions={[...vlcInitOptions]}
+                    mediaOptions={[...vlcMediaOptions]}
+                    autoplay={true}
+                    paused={!isPlaying || isAndroidBg}
+                    rate={playbackSpeed}
+                    seek={vlcSeek}
+                    volume={volume}
+                    muted={isMute}
+                    resizeMode={resizeMode}
+                    playInBackground={bgPlay}
+                    onProgress={(data: any) => {
+                        onProgress(data, true);
+                        if (data?.currentTime > 0) {
+                            onBuffer({ isBuffering: false });
+                        }
+                    }}
+                    onBuffering={(e: any) => {
+                        if (e?.isBuffering) {
+                            onBuffer({ isBuffering: true });
+                        }
+                    }}
+                    onLoad={(data: any) => {
+                        onLoad(data, true);
                         onBuffer({ isBuffering: true });
-                    }
-                }}
-                onLoad={(data: any) => {
-                    onLoad(data, true);
-                    onBuffer({ isBuffering: true });
-                }}
-                onPlaying={() => onBuffer({ isBuffering: false })}
-                onPaused={() => onBuffer({ isBuffering: false })}
-                onVideoEnd={() => onBuffer({ isBuffering: false })}
-                onError={(e: any) => {
-                    onBuffer({ isBuffering: false });
-                    console.error('VLC Playback Error', e);
-                    const errStr = (typeof e === 'string' && e) || e?.message || '';
-                    setPlaybackError(`Playback error: ${errStr || 'Unknown error'}`);
-                    onError && onError(`Playback error: ${errStr || 'Unknown error'}`);
-                }}
-                audioTrack={selectedAudioTrack}
-                textTrack={vlcTextTrackId}
-                subtitleUri={vlcSubtitleUri}
-            />
+                    }}
+                    onPlaying={() => onBuffer({ isBuffering: false })}
+                    onPaused={() => onBuffer({ isBuffering: false })}
+                    onVideoEnd={() => onBuffer({ isBuffering: false })}
+                    onError={(e: any) => {
+                        onBuffer({ isBuffering: false });
+                        console.error('VLC Playback Error', e);
+                        const errStr = (typeof e === 'string' && e) || e?.message || '';
+                        setPlaybackError(`Playback error: ${errStr || 'Unknown error'}`);
+                        onError && onError(`Playback error: ${errStr || 'Unknown error'}`);
+                    }}
+                    audioTrack={selectedAudioTrack}
+                    textTrack={vlcTextTrackId}
+                    subtitleUri={vlcSubtitleUri}
+                />
+            </View>
         );
     }
 

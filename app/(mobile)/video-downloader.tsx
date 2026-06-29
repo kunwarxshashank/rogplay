@@ -5,10 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Downloader, DownloadProgress, Quality } from '@/services/downloader';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function VideoDownloaderScreen() {
+    const { colors: currentColors } = useTheme();
     const { url: passedUrl, title: passedTitle, headers: passedHeaders } = useLocalSearchParams();
     const [url, setUrl] = useState('');
     const [fileName, setFileName] = useState('');
@@ -22,14 +23,13 @@ export default function VideoDownloaderScreen() {
 
     // Download States
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
     const [progress, setProgress] = useState<DownloadProgress | null>(null);
     const [qualities, setQualities] = useState<Quality[]>([]);
     const [showQualityModal, setShowQualityModal] = useState(false);
     const [qualityResolver, setQualityResolver] = useState<((url: string) => void) | null>(null);
 
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
 
     const addHeader = () => {
         if (!headerKey.trim() || !headerValue.trim()) return;
@@ -75,38 +75,58 @@ export default function VideoDownloaderScreen() {
         setIsDownloading(true);
         setProgress(null);
 
-        try {
-            if (targetUrl.includes('.m3u8')) {
-                await Downloader.downloadHls(
-                    targetUrl,
-                    name,
-                    headersObj,
-                    (p) => setProgress(p),
-                    (qs) => {
-                        return new Promise((resolve) => {
-                            setQualities(qs);
-                            setQualityResolver(() => resolve);
-                            setShowQualityModal(true);
+        if (targetUrl.includes('.m3u8')) {
+            let isPromptingQuality = false;
+
+            Downloader.downloadHls(
+                targetUrl,
+                name,
+                headersObj,
+                (p) => setProgress(p),
+                (qs) => {
+                    isPromptingQuality = true;
+                    return new Promise((resolve) => {
+                        setQualities(qs);
+                        setQualityResolver(() => (selectedUrl: string) => {
+                            resolve(selectedUrl);
+                            setShowQualityModal(false);
+                            router.replace('/downloads');
                         });
-                    }
-                );
-            } else {
-                await Downloader.downloadMp4(
-                    targetUrl,
-                    name,
-                    headersObj,
-                    (p) => setProgress(p)
-                );
-            }
-            Alert.alert('Success', 'Download completed successfully. Check your Downloads tab.');
-            router.push('/downloads');
-        } catch (error: any) {
-            if (error.message !== 'Download cancelled') {
-                Alert.alert('Download Failed', error.message || 'An unknown error occurred');
-            }
-        } finally {
-            setIsDownloading(false);
-            setProgress(null);
+                        setShowQualityModal(true);
+                    });
+                }
+            ).catch((error: any) => {
+                if (error.message !== 'Download cancelled') {
+                    Alert.alert('Download Failed', error.message || 'An unknown error occurred');
+                }
+            }).finally(() => {
+                setIsDownloading(false);
+                setProgress(null);
+            });
+
+            // Check if we bypassed the quality modal (e.g. direct segment playlist)
+            setTimeout(() => {
+                if (!isPromptingQuality) {
+                    router.replace('/downloads');
+                }
+            }, 1000);
+
+        } else {
+            Downloader.downloadMp4(
+                targetUrl,
+                name,
+                headersObj,
+                (p) => setProgress(p)
+            ).catch((error: any) => {
+                if (error.message !== 'Download cancelled') {
+                    Alert.alert('Download Failed', error.message || 'An unknown error occurred');
+                }
+            }).finally(() => {
+                setIsDownloading(false);
+                setProgress(null);
+            });
+
+            router.replace('/downloads');
         }
     };
 
@@ -138,14 +158,23 @@ export default function VideoDownloaderScreen() {
     const handleCancel = () => {
         Downloader.cancel();
         setIsDownloading(false);
+        setIsPaused(false);
+    };
+
+    const handlePause = () => {
+        Downloader.pause();
+        setIsPaused(true);
+    };
+
+    const handleResume = () => {
+        Downloader.resume();
+        setIsPaused(false);
     };
 
     const selectQuality = (url: string) => {
         if (qualityResolver) {
             qualityResolver(url);
-            setShowQualityModal(false);
-            setQualities([]);
-            setQualityResolver(null);
+            // Modal closing and routing is handled in the resolver now
         }
     };
 
@@ -260,9 +289,20 @@ export default function VideoDownloaderScreen() {
                             </>
                         )}
 
-                        <TouchableOpacity style={[styles.cancelBtn, { borderColor: currentColors.border }]} onPress={handleCancel}>
-                            <Text style={{ color: '#ef4444', fontWeight: '700' }}>Cancel Download</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                            {isPaused ? (
+                                <TouchableOpacity style={[styles.cancelBtn, { borderColor: currentColors.border, flex: 1, marginRight: 8, backgroundColor: currentColors.primary }]} onPress={handleResume}>
+                                    <Text style={{ color: '#fff', fontWeight: '700' }}>Resume</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity style={[styles.cancelBtn, { borderColor: currentColors.border, flex: 1, marginRight: 8 }]} onPress={handlePause}>
+                                    <Text style={{ color: currentColors.text, fontWeight: '700' }}>Pause</Text>
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity style={[styles.cancelBtn, { borderColor: currentColors.border, flex: 1, marginLeft: 8 }]} onPress={handleCancel}>
+                                <Text style={{ color: '#ef4444', fontWeight: '700' }}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 ) : (
                     <TouchableOpacity onPress={handleDownload} style={styles.downloadBtn}>

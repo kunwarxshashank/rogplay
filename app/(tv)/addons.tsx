@@ -13,16 +13,15 @@ import {
     Pressable,
     useWindowDimensions,
 } from 'react-native';
-import { Colors } from '@/constants/Colors';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAddonsStore, TMDB_BUILTIN_SOURCE } from '@/store/addonsStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { TVFocusable } from '@/components/TVFocusable';
 import { TVSearchBar } from '@/components/tv/TVSearchBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const hexAlpha = (hex: string, alpha: number) => {
     const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
@@ -60,9 +59,8 @@ const FILTER_ICONS: Record<string, string> = {
 };
 
 export default function TVAddonsScreen() {
+    const { colors: c } = useTheme();
     const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
-    const { theme } = useSettingsStore();
-    const c = Colors[theme] || Colors.dark;
     const gradients = c.gradients || { primary: [c.primary, c.primary] };
     const router = useRouter();
     const { user } = useAuthStore();

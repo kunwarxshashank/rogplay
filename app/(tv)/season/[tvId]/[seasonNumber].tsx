@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { getSeasonDetails } from '@/services/tmdb';
 import { TVFocusable } from '@/components/TVFocusable';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TVEpisodeSkeleton } from '@/components/Skeleton';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -17,43 +17,43 @@ const hexAlpha = (hex: string, alpha: number) => {
 };
 
 export default function TVSeasonScreen() {
-    const { tvId, seasonNumber, showName, backdrop } = useLocalSearchParams();
-    const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
-
-    const [seasonData, setSeasonData] = useState<any>(null);
+    const { colors: activeColors } = useTheme();
+    const { tvId, seasonNumber, showName, backdrop, genre } = useLocalSearchParams();
+    const [episodes, setEpisodes] = useState<any[]>([]);
+    const [seasonInfo, setSeasonInfo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
-        if (tvId && seasonNumber) {
-            fetchSeason();
-        }
+        loadSeasonDetails();
     }, [tvId, seasonNumber]);
 
-    const fetchSeason = async () => {
-        setLoading(true);
+    const loadSeasonDetails = async () => {
         try {
             const data = await getSeasonDetails(tvId as string, Number(seasonNumber));
-            setSeasonData(data);
+            setSeasonInfo(data);
+            setEpisodes(data.episodes || []);
         } catch (error) {
-            console.error(error);
+            console.error('Error loading season:', error);
         } finally {
             setLoading(false);
         }
     };
 
     const handleEpisodePress = (episode: any) => {
+        const query = `${showName || seasonInfo?.name} Episode ${episode.episode_number}`;
         router.push({
             pathname: '/(tv)/server-selection',
             params: {
-                id: tvId,
+                query,
                 type: 'tv',
-                season: seasonData.season_number,
-                episode: episode.episode_number,
-                title: `${showName} - S${seasonData.season_number}E${episode.episode_number} - ${episode.name}`,
-                poster: episode.still_path ? `https://image.tmdb.org/t/p/w500${episode.still_path}` : null,
-                backdrop: backdrop
+                tmdb: tvId as string,
+                season: seasonNumber as string,
+                episode: episode.episode_number.toString(),
+                title: `${showName || seasonInfo?.name} - S${seasonNumber}E${episode.episode_number}`,
+                poster: episode.still_path || seasonInfo?.poster_path,
+                backdrop: seasonInfo?.poster_path || backdrop || '',
+                genre: genre as string,
             }
         });
     };
@@ -76,7 +76,7 @@ export default function TVSeasonScreen() {
         );
     }
 
-    if (!seasonData) return null;
+    if (!seasonInfo) return null;
 
     return (
         <View style={[styles.container, { backgroundColor: activeColors.background }]}>
@@ -89,13 +89,17 @@ export default function TVSeasonScreen() {
                         resizeMode="cover"
                         blurRadius={15}
                     />
-                    <LinearGradient
-                        colors={[
-                            hexAlpha(activeColors.background, 0.7),
-                            activeColors.background
-                        ]}
-                        style={StyleSheet.absoluteFill}
-                    />
+                    {activeColors.isAmoled ? (
+                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                    ) : (
+                        <LinearGradient
+                            colors={[
+                                hexAlpha(activeColors.background, 0.7),
+                                activeColors.background
+                            ]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
                 </View>
             )}
 
@@ -113,11 +117,11 @@ export default function TVSeasonScreen() {
                             {showName?.toString().toUpperCase()}
                         </Text>
                         <Text style={[styles.title, { color: activeColors.text }]}>
-                            {seasonData.name}
+                            {seasonInfo.name}
                         </Text>
                     </View>
-                    <View style={styles.episodeCountBadge}>
-                        <Text style={styles.episodeCountText}>{seasonData.episodes?.length || 0} EPISODES</Text>
+                    <View style={[styles.episodeCountBadge, { backgroundColor: hexAlpha(activeColors.text, 0.1) }]}>
+                        <Text style={styles.episodeCountText}>{seasonInfo.episodes?.length || 0} EPISODES</Text>
                     </View>
                 </View>
             </View>
@@ -126,7 +130,7 @@ export default function TVSeasonScreen() {
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
             >
-                {seasonData.episodes?.map((episode: any, index: number) => (
+                {seasonInfo.episodes?.map((episode: any, index: number) => (
                     <TVFocusable
                         key={episode.id}
                         style={[
@@ -151,10 +155,14 @@ export default function TVSeasonScreen() {
                                 <View style={[styles.epBadge, { backgroundColor: activeColors.primary }]}>
                                     <Text style={styles.epBadgeText}>EP {episode.episode_number}</Text>
                                 </View>
-                                <LinearGradient
-                                    colors={['transparent', 'rgba(0,0,0,0.6)']}
-                                    style={StyleSheet.absoluteFill}
-                                />
+                                {activeColors.isAmoled ? (
+                                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                                ) : (
+                                    <LinearGradient
+                                        colors={['transparent', 'rgba(0,0,0,0.6)']}
+                                        style={StyleSheet.absoluteFill}
+                                    />
+                                )}
                             </View>
                             <View style={styles.episodeInfo}>
                                 <View style={styles.titleRow}>

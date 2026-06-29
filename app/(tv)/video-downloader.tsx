@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Downloader, DownloadProgress, Quality } from '@/services/downloader';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function TVVideoDownloaderScreen() {
+    const { colors: activeColors } = useTheme();
     const { url: passedUrl, title: passedTitle, headers: passedHeaders } = useLocalSearchParams();
     const [url, setUrl] = useState('');
     const [fileName, setFileName] = useState('');
@@ -22,8 +23,6 @@ export default function TVVideoDownloaderScreen() {
     const [qualityResolver, setQualityResolver] = useState<((url: string) => void) | null>(null);
 
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     useEffect(() => {
         if (passedUrl) {
@@ -56,38 +55,57 @@ export default function TVVideoDownloaderScreen() {
         setIsDownloading(true);
         setProgress(null);
 
-        try {
-            if (url.includes('.m3u8')) {
-                await Downloader.downloadHls(
-                    url,
-                    name,
-                    headersObj,
-                    (p) => setProgress(p),
-                    (qs) => {
-                        return new Promise((resolve) => {
-                            setQualities(qs);
-                            setQualityResolver(() => resolve);
-                            setShowQualityModal(true);
+        if (url.includes('.m3u8')) {
+            let isPromptingQuality = false;
+            
+            Downloader.downloadHls(
+                url,
+                name,
+                headersObj,
+                (p) => setProgress(p),
+                (qs) => {
+                    isPromptingQuality = true;
+                    return new Promise((resolve) => {
+                        setQualities(qs);
+                        setQualityResolver(() => (selectedUrl: string) => {
+                            resolve(selectedUrl);
+                            setShowQualityModal(false);
+                            router.replace('/downloads');
                         });
-                    }
-                );
-            } else {
-                await Downloader.downloadMp4(
-                    url,
-                    name,
-                    headersObj,
-                    (p) => setProgress(p)
-                );
-            }
-            Alert.alert('Success', 'Download completed successfully.');
-            // Maybe redirect to downloads list?
-        } catch (error: any) {
-            if (error.message !== 'Download cancelled') {
-                Alert.alert('Download Failed', error.message || 'An unknown error occurred');
-            }
-        } finally {
-            setIsDownloading(false);
-            setProgress(null);
+                        setShowQualityModal(true);
+                    });
+                }
+            ).catch((error: any) => {
+                if (error.message !== 'Download cancelled') {
+                    Alert.alert('Download Failed', error.message || 'An unknown error occurred');
+                }
+            }).finally(() => {
+                setIsDownloading(false);
+                setProgress(null);
+            });
+
+            setTimeout(() => {
+                if (!isPromptingQuality) {
+                    router.replace('/downloads');
+                }
+            }, 1000);
+
+        } else {
+            Downloader.downloadMp4(
+                url,
+                name,
+                headersObj,
+                (p) => setProgress(p)
+            ).catch((error: any) => {
+                if (error.message !== 'Download cancelled') {
+                    Alert.alert('Download Failed', error.message || 'An unknown error occurred');
+                }
+            }).finally(() => {
+                setIsDownloading(false);
+                setProgress(null);
+            });
+            
+            router.replace('/downloads');
         }
     };
 
@@ -99,9 +117,6 @@ export default function TVVideoDownloaderScreen() {
     const selectQuality = (url: string) => {
         if (qualityResolver) {
             qualityResolver(url);
-            setShowQualityModal(false);
-            setQualities([]);
-            setQualityResolver(null);
         }
     };
 

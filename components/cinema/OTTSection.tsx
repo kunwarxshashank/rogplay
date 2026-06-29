@@ -3,12 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, 
 import { Colors } from '@/constants/Colors';
 import { PROVIDERS, PROVIDER_LOGOS, PROVIDER_NAMES } from '@/constants/Providers';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void }) {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors } = useTheme();
 
     return (
         <View style={styles.container}>

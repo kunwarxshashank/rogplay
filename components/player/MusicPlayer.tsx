@@ -9,9 +9,9 @@ import Slider from '@react-native-community/slider';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useMusicPlayerStore, RepeatMode } from '@/store/musicPlayerStore';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IS_TV = Platform.isTV;
@@ -37,9 +37,8 @@ interface MusicPlayerProps {
 }
 
 export default function MusicPlayer({ tracks: propTracks, initialIndex = 0, onBack, addonUrl, addonManifest }: MusicPlayerProps) {
+    const { colors: activeColors } = useTheme();
     const router = useRouter();
-    const theme = useSettingsStore(s => s.theme);
-    const activeColors = Colors[theme] || Colors.dark;
     const { addFavorite, removeFavorite, isFavorite } = useFavoritesStore();
 
     const storeTracks = useMusicPlayerStore(s => s.tracks);
@@ -172,11 +171,15 @@ export default function MusicPlayer({ tracks: propTracks, initialIndex = 0, onBa
                 <Image source={{ uri: currentTrack.poster }} style={StyleSheet.absoluteFill} blurRadius={40} />
             )}
             <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.background + 'B3' }]} />
-            <LinearGradient
-                colors={['transparent', activeColors.background + '99', activeColors.background]}
-                locations={[0, 0.5, 1]}
-                style={StyleSheet.absoluteFill}
-            />
+            {activeColors.isAmoled ? (
+                <View style={StyleSheet.absoluteFill} />
+            ) : (
+                <LinearGradient
+                    colors={['transparent', activeColors.background + '99', activeColors.background]}
+                    locations={[0, 0.5, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
 
             {/* Top bar */}
             <View style={styles.topBar}>

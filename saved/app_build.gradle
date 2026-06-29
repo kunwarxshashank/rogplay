@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.rogplay.org'
+    namespace 'com.rogplay.app'
     defaultConfig {
-        applicationId 'com.rogplay.org'
+        applicationId 'com.rogplay.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 13

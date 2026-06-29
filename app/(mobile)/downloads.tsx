@@ -7,10 +7,10 @@ import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as MediaLibrary from 'expo-media-library';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Downloader } from '@/services/downloader';
+import { Downloader, ActiveDownloadState } from '@/services/downloader';
 import { DownloadItemSkeleton } from '@/components/Skeleton';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 // Accessing properties via cast to bypass temporary lint issues with Expo 52 types
 const filesystem = FileSystem as any;
@@ -25,16 +25,26 @@ interface DownloadedFile {
 }
 
 function useDownloadsLogic() {
+    const { colors: activeColors } = useTheme();
     const [files, setFiles] = useState<DownloadedFile[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentDir, setCurrentDir] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeDownload, setActiveDownload] = useState<ActiveDownloadState | null>(null);
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     useEffect(() => {
         loadDownloads();
+
+        const unsubscribe = Downloader.subscribe((state) => {
+            setActiveDownload(state);
+            // If download finishes and state becomes null, reload the downloads list
+            if (!state) {
+                loadDownloads();
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     const requestPermissions = async () => {
@@ -47,7 +57,6 @@ function useDownloadsLogic() {
         }
         return true;
     };
-
 
     const loadDownloads = async () => {
         const hasPermission = await requestPermissions();
@@ -143,14 +152,14 @@ function useDownloadsLogic() {
 
     return {
         files, loading, searchQuery, setSearchQuery, filteredFiles, loadDownloads, handleDelete, handlePlay,
-        formatSize, activeColors, router
+        formatSize, activeColors, router, activeDownload
     };
 }
 
 export function DownloadsMobile() {
     const {
         loading, searchQuery, setSearchQuery, filteredFiles, loadDownloads, handleDelete, handlePlay,
-        formatSize, activeColors, router
+        formatSize, activeColors, router, activeDownload
     } = useDownloadsLogic();
 
     const renderItem = ({ item }: { item: DownloadedFile }) => (
@@ -235,25 +244,66 @@ export function DownloadsMobile() {
                         <DownloadItemSkeleton key={index} />
                     ))}
                 </View>
-            ) : filteredFiles.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <View style={[styles.emptyIconContainer, { backgroundColor: activeColors.card }]}>
-                        <MaterialIcons name={searchQuery ? "search-off" : "cloud-download"} size={48} color={activeColors.primary} />
-                    </View>
-                    <Text style={[styles.emptyText, { color: activeColors.text }]}>
-                        {searchQuery ? "No matches found" : "No downloads yet"}
-                    </Text>
-                    <Text style={[styles.emptySubtext, { color: activeColors.textSecondary }]}>
-                        {searchQuery ? "Try a different search term" : "Your offline videos will appear here"}
-                    </Text>
-                </View>
             ) : (
                 <FlatList
                     data={filteredFiles}
                     renderItem={renderItem}
                     keyExtractor={item => item.uri}
-                    contentContainerStyle={styles.list}
+                    contentContainerStyle={[styles.list, { flexGrow: 1 }]}
                     showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={(
+                        <View style={styles.emptyState}>
+                            <View style={[styles.emptyIconContainer, { backgroundColor: activeColors.card }]}>
+                                <MaterialIcons name={searchQuery ? "search-off" : "cloud-download"} size={48} color={activeColors.primary} />
+                            </View>
+                            <Text style={[styles.emptyText, { color: activeColors.text }]}>
+                                {searchQuery ? "No matches found" : "No downloads yet"}
+                            </Text>
+                            <Text style={[styles.emptySubtext, { color: activeColors.textSecondary }]}>
+                                {searchQuery ? "Try a different search term" : "Your offline videos will appear here"}
+                            </Text>
+                        </View>
+                    )}
+                    ListHeaderComponent={(
+                        activeDownload ? (
+                            <View style={[styles.activeDownloadCard, { backgroundColor: activeColors.card, borderColor: activeColors.border }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                    <ActivityIndicator size="small" color={activeColors.primary} style={{ marginRight: 10 }} />
+                                    <Text style={[styles.fileName, { color: activeColors.text, flex: 1, marginBottom: 0 }]} numberOfLines={1}>
+                                        {activeDownload.fileName}
+                                    </Text>
+                                </View>
+                                {activeDownload.progress && (
+                                    <>
+                                        <View style={styles.progressBarBg}>
+                                            <View style={[styles.progressBarFill, { backgroundColor: activeColors.primary, width: `${activeDownload.progress.progress * 100}%` }]} />
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                                            <Text style={[styles.statsText, { color: activeColors.textSecondary }]}>{activeDownload.progress.downloadedSize}</Text>
+                                            <Text style={[styles.statsText, { color: activeColors.textSecondary }]}>{Math.round(activeDownload.progress.progress * 100)}%</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, gap: 10 }}>
+                                            {activeDownload.isPaused ? (
+                                                <TouchableOpacity onPress={() => Downloader.resume()} style={[styles.controlBtn, { backgroundColor: activeColors.primary }]}>
+                                                    <MaterialIcons name="play-arrow" size={20} color="#fff" />
+                                                    <Text style={styles.controlBtnText}>Resume</Text>
+                                                </TouchableOpacity>
+                                            ) : (
+                                                <TouchableOpacity onPress={() => Downloader.pause()} style={[styles.controlBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                                                    <MaterialIcons name="pause" size={20} color={activeColors.text} />
+                                                    <Text style={[styles.controlBtnText, { color: activeColors.text }]}>Pause</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                            <TouchableOpacity onPress={() => Downloader.cancel()} style={[styles.controlBtn, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                                                <MaterialIcons name="close" size={20} color="#ef4444" />
+                                                <Text style={[styles.controlBtnText, { color: '#ef4444' }]}>Cancel</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                        ) : null
+                    )}
                 />
             )}
         </SafeAreaView>
@@ -263,7 +313,7 @@ export function DownloadsMobile() {
 export function DownloadsTV() {
     const {
         loading, searchQuery, setSearchQuery, filteredFiles, loadDownloads, handleDelete, handlePlay,
-        formatSize, activeColors, router
+        formatSize, activeColors, router, activeDownload
     } = useDownloadsLogic();
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -341,11 +391,6 @@ export function DownloadsTV() {
                     <View style={styles.list}>
                         <ActivityIndicator size="large" color={activeColors.primary} />
                     </View>
-                ) : filteredFiles.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <MaterialIcons name="cloud-download" size={80} color={activeColors.textSecondary} />
-                        <Text style={[styles.emptyText, { color: activeColors.text, fontSize: 24, marginTop: 20 }]}>No downloads yet</Text>
-                    </View>
                 ) : (
                     <FlatList
                         data={filteredFiles}
@@ -353,7 +398,53 @@ export function DownloadsTV() {
                         keyExtractor={item => item.uri}
                         numColumns={4}
                         key={'tv-downloads'}
-                        contentContainerStyle={{ paddingBottom: 50 }}
+                        contentContainerStyle={[{ paddingBottom: 50 }, filteredFiles.length === 0 && { flexGrow: 1 }]}
+                        ListEmptyComponent={(
+                            <View style={[styles.emptyState, { marginTop: 40 }]}>
+                                <MaterialIcons name="cloud-download" size={80} color={activeColors.textSecondary} />
+                                <Text style={[styles.emptyText, { color: activeColors.text, fontSize: 24, marginTop: 20 }]}>No downloads yet</Text>
+                            </View>
+                        )}
+                        ListHeaderComponent={(
+                            activeDownload ? (
+                                <View style={[styles.activeDownloadCard, { backgroundColor: activeColors.card, borderColor: activeColors.border, margin: 15 }]}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                        <ActivityIndicator size="small" color={activeColors.primary} style={{ marginRight: 10 }} />
+                                        <Text style={[styles.fileName, { color: activeColors.text, flex: 1, marginBottom: 0 }]} numberOfLines={1}>
+                                            {activeDownload.fileName}
+                                        </Text>
+                                    </View>
+                                    {activeDownload.progress && (
+                                        <>
+                                            <View style={styles.progressBarBg}>
+                                                <View style={[styles.progressBarFill, { backgroundColor: activeColors.primary, width: `${activeDownload.progress.progress * 100}%` }]} />
+                                            </View>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                                                <Text style={[styles.statsText, { color: activeColors.textSecondary }]}>{activeDownload.progress.downloadedSize}</Text>
+                                                <Text style={[styles.statsText, { color: activeColors.textSecondary }]}>{Math.round(activeDownload.progress.progress * 100)}%</Text>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, gap: 10 }}>
+                                                {activeDownload.isPaused ? (
+                                                    <TVFocusable onPress={() => Downloader.resume()} style={[styles.controlBtn, { backgroundColor: activeColors.primary }]}>
+                                                        <MaterialIcons name="play-arrow" size={20} color="#fff" />
+                                                        <Text style={styles.controlBtnText}>Resume</Text>
+                                                    </TVFocusable>
+                                                ) : (
+                                                    <TVFocusable onPress={() => Downloader.pause()} style={[styles.controlBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                                                        <MaterialIcons name="pause" size={20} color={activeColors.text} />
+                                                        <Text style={[styles.controlBtnText, { color: activeColors.text }]}>Pause</Text>
+                                                    </TVFocusable>
+                                                )}
+                                                <TVFocusable onPress={() => Downloader.cancel()} style={[styles.controlBtn, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                                                    <MaterialIcons name="close" size={20} color="#ef4444" />
+                                                    <Text style={[styles.controlBtnText, { color: '#ef4444' }]}>Cancel</Text>
+                                                </TVFocusable>
+                                            </View>
+                                        </>
+                                    )}
+                                </View>
+                            ) : null
+                        )}
                     />
                 )}
             </View>
@@ -534,5 +625,41 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 8,
         opacity: 0.6,
+    },
+    activeDownloadCard: {
+        padding: 16,
+        borderRadius: 24,
+        marginBottom: 20,
+        borderWidth: 1,
+        backgroundColor: '#0f1424',
+        borderColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    progressBarBg: {
+        width: '100%',
+        height: 6,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    statsText: {
+        fontSize: 12,
+        fontFamily: 'Inter_600SemiBold',
+    },
+    controlBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        gap: 4,
+    },
+    controlBtnText: {
+        fontSize: 12,
+        fontFamily: 'Outfit_600SemiBold',
+        color: '#fff',
     }
 });

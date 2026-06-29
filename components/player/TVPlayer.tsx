@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { useTVRemote } from '@/hooks/useTVRemote';
 import { MaterialIcons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import PlayerModal, { SpeedModal } from './PlayerModal';
 import SubtitleModal from './SubtitleModal';
@@ -25,9 +24,11 @@ import { usePlayerLogic, UsePlayerLogicProps } from './usePlayerLogic';
 import { VideoWrapper } from './VideoWrapper';
 import { formatEpgTime } from '@/services/epgParser';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/hooks/useTheme';
 
 /** Helper: a Pressable that tracks focus state via onFocus/onBlur */
 function TVPressable({ style, focusedStyle, children, ...props }: any) {
+    const { colors: currentColors } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     return (
         <Pressable
@@ -72,11 +73,11 @@ const PlayerHeader = React.memo(function PlayerHeader({ onBack, isMute, setIsMut
     );
 });
 
-const CenterControls = React.memo(function CenterControls({ isPlaying, handlePlayPause, skip, onLocalSeek, onLocalPause, onLocalPlay, position }: any) {
+const CenterControls = React.memo(function CenterControls({ handleSkipBackward, handleSkipForward, onLocalPause, onLocalPlay, handlePlayPause, isPlaying }: any) {
     return (
         <View style={styles.centerControls} pointerEvents="box-none">
             <TVPressable
-                onPress={() => { skip(false); onLocalSeek((position - 10000) / 1000); }}
+                onPress={handleSkipBackward}
                 style={styles.skipButton}
                 focusedStyle={styles.controlButtonFocused}
                 nativeID="tv-player-rewind"
@@ -103,7 +104,7 @@ const CenterControls = React.memo(function CenterControls({ isPlaying, handlePla
             </TVPressable>
 
             <TVPressable
-                onPress={() => { skip(true); onLocalSeek((position + 10000) / 1000); }}
+                onPress={handleSkipForward}
                 style={styles.skipButton}
                 focusedStyle={styles.controlButtonFocused}
                 nativeID="tv-player-forward"
@@ -245,6 +246,7 @@ const PlaybackProgress = React.memo(function PlaybackProgress({
 });
 
 export default function TVPlayer(props: UsePlayerLogicProps) {
+    const { colors: currentColors } = useTheme();
     const router = useRouter();
     const playerLogic = usePlayerLogic(props);
     const {
@@ -307,10 +309,17 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
         title: props.title || 'Untitled',
     });
 
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
-
     const [progressBarFocused, setProgressBarFocused] = useState(false);
+    
+    const handleSkipBackward = useCallback(() => {
+        skip(false);
+        watchParty.onLocalSeek(Math.max(0, positionRef.current - 10000) / 1000);
+    }, [skip, watchParty, positionRef]);
+
+    const handleSkipForward = useCallback(() => {
+        skip(true);
+        watchParty.onLocalSeek(Math.min(durationRef.current, positionRef.current + 10000) / 1000);
+    }, [skip, watchParty, positionRef, durationRef]);
 
     const resizeModes = ['contain', 'cover', 'stretch'];
     const resizeModeLabels: Record<string, string> = {
@@ -570,15 +579,16 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
                         setIsMute={setIsMute}
                     />
 
-                    <CenterControls
-                        isPlaying={isPlaying}
-                        handlePlayPause={handlePlayPause}
-                        skip={skip}
-                        position={position}
-                        onLocalSeek={watchParty.onLocalSeek}
-                        onLocalPause={watchParty.onLocalPause}
-                        onLocalPlay={watchParty.onLocalPlay}
-                    />
+                    {controlsVisible && (
+                        <CenterControls
+                            handleSkipBackward={handleSkipBackward}
+                            handleSkipForward={handleSkipForward}
+                            onLocalPause={watchParty.onLocalPause}
+                            onLocalPlay={watchParty.onLocalPlay}
+                            handlePlayPause={handlePlayPause}
+                            isPlaying={isPlaying}
+                        />
+                    )}
 
                     {/* Bottom Section */}
                     <View style={styles.bottomSection} pointerEvents="box-none">

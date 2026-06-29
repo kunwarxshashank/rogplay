@@ -4,12 +4,14 @@ import { getExternalIds } from '@/services/tmdb';
 
 export interface StreamResult {
     title: string;
-    url: string;
+    url: string; // For torrents, this could be the magnet link temporarily
     source: string;
     quality?: string;
     type?: string;
     headers?: any;
     userAgent?: string;
+    isTorrent?: boolean;
+    magnetLink?: string;
 }
 
 export function useStreamSources() {
@@ -192,6 +194,7 @@ export function useStreamSources() {
 
                 if (isMovie) {
                     streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}.json`;
+                    console.log(`base: ${baseUrl}`)
                 } else {
                     // Series: format is imdbId:season:episode
                     if (isCustomStremioId && (season === undefined || episode === undefined || imdbId.includes(':season='))) {
@@ -212,16 +215,32 @@ export function useStreamSources() {
                 const streamList = data.streams || [];
 
                 const mapped: StreamResult[] = streamList
-                    .filter((s: any) => s.url)
+                    .filter((s: any) => s.url || s.infoHash || s.magnet)
                     .map((s: any) => {
-                        // Extract quality from title if available (e.g. "720p", "1080p")
-                        const qualityMatch = s.title?.match(/(\d{3,4}p)/i);
+                        const qualityMatch = s.title?.match(/(\d{3,4}p)/i) || s.name?.match(/(\d{3,4}p)/i);
+                        let isTorrent = false;
+                        let magnetLink = '';
+                        let url = s.url || '';
+
+                        if (s.infoHash) {
+                            isTorrent = true;
+                            // Construct standard magnet link if only infoHash is provided
+                            magnetLink = s.magnet || `magnet:?xt=urn:btih:${s.infoHash}&dn=${encodeURIComponent(s.title || 'video')}`;
+                            url = magnetLink; // Temporarily store magnet in url for compatibility if needed
+                        } else if (s.magnet) {
+                            isTorrent = true;
+                            magnetLink = s.magnet;
+                            url = s.magnet;
+                        }
+
                         return {
                             title: s.title || s.name || 'Stremio Stream',
-                            url: s.url,
+                            url: url,
                             source: s.name || addon.title || 'Stremio',
                             quality: qualityMatch ? qualityMatch[1] : undefined,
                             headers: s.behaviorHints?.proxyHeaders || {},
+                            isTorrent,
+                            magnetLink,
                         };
                     });
 

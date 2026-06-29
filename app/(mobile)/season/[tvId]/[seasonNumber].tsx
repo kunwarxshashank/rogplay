@@ -5,10 +5,10 @@ import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAddonsStore } from '@/store/addonsStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { EpisodeSkeleton } from '@/components/Skeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSeasonDetails } from '@/services/tmdb';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -18,14 +18,13 @@ const hexAlpha = (hex: string, alpha: number) => {
 };
 
 export default function SeasonDetailsScreen() {
-    const { tvId, seasonNumber, showName } = useLocalSearchParams();
+    const { colors: currentColors } = useTheme();
+    const { tvId, seasonNumber, showName, genre } = useLocalSearchParams();
     const [episodes, setEpisodes] = useState<any[]>([]);
     const [seasonInfo, setSeasonInfo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const { addons } = useAddonsStore();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
 
     useEffect(() => {
         loadSeasonDetails();
@@ -67,6 +66,7 @@ export default function SeasonDetailsScreen() {
                 title: `${showName || seasonInfo?.name} - S${seasonNumber}E${episode.episode_number}`,
                 poster: episode.still_path || seasonInfo?.poster_path,
                 backdrop: seasonInfo?.poster_path || '',
+                genre: genre as string,
             }
         });
     };
@@ -88,10 +88,14 @@ export default function SeasonDetailsScreen() {
                         <MaterialIcons name="play-circle" size={40} color={currentColors.textSecondary} />
                     </View>
                 )}
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.6)']}
-                    style={StyleSheet.absoluteFill}
-                />
+                {currentColors.isAmoled ? (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                ) : (
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.6)']}
+                        style={StyleSheet.absoluteFill}
+                    />
+                )}
                 <View style={[styles.episodeBadge, { backgroundColor: currentColors.primary }]}>
                     <Text style={styles.episodeBadgeText}>E{item.episode_number}</Text>
                 </View>
@@ -149,10 +153,14 @@ export default function SeasonDetailsScreen() {
                         style={StyleSheet.absoluteFill}
                         blurRadius={20}
                     />
-                    <LinearGradient
-                        colors={['transparent', currentColors.background]}
-                        style={StyleSheet.absoluteFill}
-                    />
+                    {currentColors.isAmoled ? (
+                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                    ) : (
+                        <LinearGradient
+                            colors={['transparent', currentColors.background]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
                 </View>
             )}
 

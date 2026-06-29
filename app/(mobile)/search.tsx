@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, Platform } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,21 +8,20 @@ import { Colors } from '@/constants/Colors';
 import { searchMulti } from '@/services/tmdb';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TVFocusable } from '@/components/TVFocusable';
-import { useSettingsStore } from '@/store/settingsStore';
 import { MovieCardSkeleton, GridSkeleton } from '@/components/Skeleton';
 import MovieCard from '@/components/cinema/MovieCard';
 import MovieList from '@/components/cinema/MovieList';
 
 import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
+import { useTheme } from '@/hooks/useTheme';
 
 function useSearchLogic() {
+    const { colors: activeColors } = useTheme();
     const { query: initialQuery } = useLocalSearchParams();
     const [query, setQuery] = useState(initialQuery as string || '');
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
     const addonConfig = useCinemaAddon();
 
     useEffect(() => {
@@ -121,27 +121,30 @@ export function SearchMobile() {
                     renderItem={() => <MovieCardSkeleton width="100%" />}
                 />
             ) : (
-                <FlatList
-                    data={results}
-                    renderItem={({ item }) => (
-                        <MovieList
-                            title={item.title}
-                            fetchFunction={async () => item.data}
-                            mode="horizontal"
-                            addonType={item.isTmdb ? undefined : addonConfig?.addontype}
-                        />
-                    )}
-                    keyExtractor={(item, index) => `${item.title}-${index}`}
-                    contentContainerStyle={styles.list}
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <MaterialIcons name="search-off" size={64} color={activeColors.textSecondary} />
-                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>
-                                {query ? "No results found" : "Search for something..."}
-                            </Text>
-                        </View>
-                    }
-                />
+                <View style={{ flex: 1, width: '100%' }}>
+                    <FlashList
+                        data={results}
+                        renderItem={({ item }) => (
+                            <MovieList
+                                title={item.title}
+                                fetchFunction={async () => item.data}
+                                mode="horizontal"
+                                addonType={item.isTmdb ? undefined : addonConfig?.addontype}
+                            />
+                        )}
+                        keyExtractor={(item, index) => `${item.title}-${index}`}
+                        contentContainerStyle={styles.list}
+                        estimatedItemSize={300}
+                        ListEmptyComponent={
+                            <View style={styles.empty}>
+                                <MaterialIcons name="search-off" size={64} color={activeColors.textSecondary} />
+                                <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>
+                                    {query ? "No results found" : "Search for something..."}
+                                </Text>
+                            </View>
+                        }
+                    />
+                </View>
             )}
         </SafeAreaView>
     );
@@ -184,28 +187,31 @@ export function SearchTV() {
                 {loading ? (
                     <ActivityIndicator size="large" color={activeColors.primary} style={{ marginTop: 50 }} />
                 ) : (
-                    <FlatList
-                        data={results}
-                        renderItem={({ item }) => (
-                            <MovieList
-                                title={item.title}
-                                fetchFunction={async () => item.data}
-                                mode="horizontal"
-                                addonType={item.isTmdb ? undefined : addonConfig?.addontype}
-                            />
-                        )}
-                        keyExtractor={(item, index) => `${item.title}-${index}`}
-                        contentContainerStyle={[styles.list, { paddingBottom: 50 }]}
-                        key={'tv-search'}
-                        ListEmptyComponent={
-                            <View style={styles.empty}>
-                                <MaterialIcons name="search" size={80} color={activeColors.textSecondary} />
-                                <Text style={[styles.emptyText, { color: activeColors.textSecondary, fontSize: 24, marginTop: 20 }]}>
-                                    {query ? "No results found" : "Search for something..."}
-                                </Text>
-                            </View>
-                        }
-                    />
+                    <View style={{ flex: 1, width: '100%' }}>
+                        <FlashList
+                            data={results}
+                            renderItem={({ item }) => (
+                                <MovieList
+                                    title={item.title}
+                                    fetchFunction={async () => item.data}
+                                    mode="horizontal"
+                                    addonType={item.isTmdb ? undefined : addonConfig?.addontype}
+                                />
+                            )}
+                            keyExtractor={(item, index) => `${item.title}-${index}`}
+                            contentContainerStyle={[styles.list, { paddingBottom: 50 }]}
+                            key={'tv-search'}
+                            estimatedItemSize={300}
+                            ListEmptyComponent={
+                                <View style={styles.empty}>
+                                    <MaterialIcons name="search" size={80} color={activeColors.textSecondary} />
+                                    <Text style={[styles.emptyText, { color: activeColors.textSecondary, fontSize: 24, marginTop: 20 }]}>
+                                        {query ? "No results found" : "Search for something..."}
+                                    </Text>
+                                </View>
+                            }
+                        />
+                    </View>
                 )}
             </View>
         </View>

@@ -2,19 +2,18 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
-import { useSettingsStore } from '@/store/settingsStore';
 import { getMoviesByProvider, getTVByProvider } from '@/services/tmdb';
 import MovieList from '@/components/cinema/MovieList';
 import { TVFocusable } from '@/components/TVFocusable';
 import { PROVIDER_LOGOS } from '@/constants/Providers';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function TVProviderDetailsScreen() {
+    const { colors: currentColors } = useTheme();
     const { providerId, name } = useLocalSearchParams();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
 
     const [activeTab, setActiveTab] = useState<'movie' | 'tv'>('movie');
 

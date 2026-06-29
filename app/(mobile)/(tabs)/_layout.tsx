@@ -6,18 +6,17 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSettingsStore } from '@/store/settingsStore';
 import { BlurView } from 'expo-blur';
 import MiniPlayer from '@/components/player/MiniPlayer';
+import { useTheme } from '@/hooks/useTheme';
 
 const TabItem = React.memo(({ focused, name, activeColor, inactiveColor, iconFamily = 'MaterialIcons' }: any) => {
     const IconComponent = iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
     return <IconComponent name={name} size={28} color={focused ? activeColor : inactiveColor} />;
 });
 
-
 const BackHandlerManager = () => {
     const pathname = usePathname();
     const { confirmExit } = useSettingsStore();
-
-
+    const { colors: currentColors } = useTheme();
 
     useEffect(() => {
 
@@ -58,8 +57,8 @@ const BackHandlerManager = () => {
 };
 
 export default function TabLayout() {
-    const { theme } = useSettingsStore();
-    const currentColors = Colors[theme] || Colors.dark;
+    const { colors: currentColors } = useTheme();
+    const hiddenTabs = useSettingsStore(s => s.hiddenTabs);
 
     const screenOptions = React.useMemo(() => ({
         headerShown: false,
@@ -76,7 +75,9 @@ export default function TabLayout() {
             elevation: 0,
         },
         tabBarBackground: () => (
-            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
+            currentColors.isAmoled
+                ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
+                : <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarActiveTintColor: currentColors.primary,
         tabBarInactiveTintColor: currentColors.textSecondary,
@@ -158,7 +159,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Home',
                         tabBarIcon: homeIcon,
-
+                        href: hiddenTabs.includes('home') ? null : '/(mobile)/(tabs)',
                     }}
                 />
                 <Tabs.Screen
@@ -166,6 +167,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Cinema',
                         tabBarIcon: cinemaIcon,
+                        href: hiddenTabs.includes('cinema') ? null : '/(mobile)/(tabs)/cinema',
                     }}
                 />
                 <Tabs.Screen
@@ -173,6 +175,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Music',
                         tabBarIcon: localMusicIcon,
+                        href: hiddenTabs.includes('local-music') ? null : '/(mobile)/(tabs)/local-music',
                     }}
                 />
                 <Tabs.Screen
@@ -180,6 +183,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Addons',
                         tabBarIcon: addonsIcon,
+                        href: hiddenTabs.includes('addons') ? null : '/(mobile)/(tabs)/addons',
                     }}
                 />
                 <Tabs.Screen
@@ -187,6 +191,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Tools',
                         tabBarIcon: toolsIcon,
+                        href: hiddenTabs.includes('tools') ? null : '/(mobile)/(tabs)/tools',
                     }}
                 />
                 <Tabs.Screen

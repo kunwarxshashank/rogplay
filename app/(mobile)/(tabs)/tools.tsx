@@ -5,14 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import { TVLayout } from '@/components/TVLayout';
+import { useTheme } from '@/hooks/useTheme';
 
 function useToolsLogic() {
+    const { colors: activeColors } = useTheme();
     const router = useRouter();
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
 
     const toolItems = [
         {
@@ -74,13 +73,18 @@ export function ToolsMobile() {
     return (
         <View style={[styles.container, { backgroundColor: activeColors.background }]}>
             {/* Dark Luxury Gradient */}
-            <LinearGradient
-                colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {activeColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!activeColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <View style={styles.header}>
                     <View style={styles.titleRow}>
@@ -143,12 +147,18 @@ export function ToolsTV() {
     return (
         <TVLayout>
             <View style={{ flex: 1, backgroundColor: activeColors.background }}>
-                <LinearGradient
-                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                    locations={[0, 0.25, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
-                <View style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+                {activeColors.isAmoled ? (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                ) : (
+                    <LinearGradient
+                        colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
+                        locations={[0, 0.25, 1]}
+                        style={StyleSheet.absoluteFill}
+                    />
+                )}
+                {!activeColors.isAmoled && (
+                  <View style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+                )}
                 <View style={{ flex: 1, padding: 40 }}>
                     <View style={styles.titleRow}>
                         <Text style={[styles.headerTitle, { color: activeColors.text, fontSize: 40 }]}>Tools</Text>
@@ -237,5 +247,4 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter_400Regular',
     }
 });
-
 

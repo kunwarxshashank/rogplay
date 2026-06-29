@@ -1,6 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/hooks/useTheme';
 import { useEffect } from 'react';
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.m3u8', '.avi', '.ts', '.webm', '.mov', '.flv'];
@@ -13,6 +13,7 @@ function looksLikeVideoPath(path: string): boolean {
 export default function NotFoundScreen() {
   const pathname = usePathname();
   const router = useRouter();
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (!pathname || pathname.startsWith('+') || pathname.startsWith('_')) return;
@@ -26,8 +27,8 @@ export default function NotFoundScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color={Colors.dark.primary || '#2e78b7'} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
     </View>
   );
 }
@@ -38,6 +39,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: Colors.dark.background,
   },
 });

@@ -4,6 +4,8 @@ import axios from 'axios';
 import { Buffer } from 'buffer';
 import { Platform } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import notifee, { AndroidImportance, AndroidForegroundServiceType } from '@notifee/react-native';
+import { DownloadResumable } from 'expo-file-system/legacy';
 
 const INTERNAL_DIR = `${documentDirectory}downloads/`;
 
@@ -19,6 +21,12 @@ export interface Quality {
     resolution: string;
     codecs: string;
     url: string;
+}
+
+export interface ActiveDownloadState {
+    fileName: string;
+    progress: DownloadProgress | null;
+    isPaused: boolean;
 }
 
 
@@ -68,6 +76,140 @@ export class Downloader {
         }
     }
 
+    public static isPaused = false;
+    public static downloadResumable: DownloadResumable | null = null;
+    private static foregroundResolver: (() => void) | null = null;
+
+    public static activeDownload: ActiveDownloadState | null = null;
+    private static stateListeners: ((state: ActiveDownloadState | null) => void)[] = [];
+
+    public static subscribe(listener: (state: ActiveDownloadState | null) => void) {
+        this.stateListeners.push(listener);
+        listener(this.activeDownload);
+        return () => {
+            this.stateListeners = this.stateListeners.filter(l => l !== listener);
+        };
+    }
+
+    private static updateActiveDownload(fileName: string, progress: DownloadProgress | null) {
+        this.activeDownload = { fileName, progress, isPaused: this.isPaused };
+        this.stateListeners.forEach(l => l(this.activeDownload));
+    }
+
+    private static clearActiveDownload() {
+        this.activeDownload = null;
+        this.stateListeners.forEach(l => l(null));
+    }
+
+    private static async startForegroundService(title: string) {
+        if (Platform.OS !== 'android') return;
+        
+        try {
+            const channelId = await notifee.createChannel({
+                id: 'downloads',
+                name: 'Downloads',
+                importance: AndroidImportance.LOW,
+            });
+
+            notifee.registerForegroundService((notification) => {
+                return new Promise((resolve) => {
+                    this.foregroundResolver = resolve as () => void;
+                });
+            });
+
+            await notifee.displayNotification({
+                id: 'download_progress',
+                title: title,
+                body: 'Starting download...',
+                android: {
+                    channelId,
+                    asForegroundService: true,
+                    foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
+                    progress: { max: 100, current: 0 },
+                },
+            });
+        } catch (e) {
+            console.error('Failed to start foreground service', e);
+        }
+    }
+
+    private static async updateForegroundProgress(title: string, progress: number, body: string = 'Downloading...') {
+        if (Platform.OS !== 'android') return;
+        try {
+            await notifee.displayNotification({
+                id: 'download_progress',
+                title: title,
+                body: body,
+                android: {
+                    channelId: 'downloads',
+                    asForegroundService: true,
+                    foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
+                    progress: { max: 100, current: Math.round(progress * 100) },
+                },
+            });
+        } catch (e) {}
+    }
+
+    private static async stopForegroundService(title: string, success: boolean = true) {
+        if (Platform.OS !== 'android') return;
+        try {
+            await notifee.stopForegroundService();
+            await notifee.displayNotification({
+                id: 'download_progress',
+                title: title,
+                body: success ? 'Download Complete' : 'Download Failed / Cancelled',
+                android: {
+                    channelId: 'downloads',
+                },
+            });
+            if (this.foregroundResolver) {
+                this.foregroundResolver();
+                this.foregroundResolver = null;
+            }
+        } catch (e) {}
+    }
+
+    static async pause() {
+        this.isPaused = true;
+        if (this.downloadResumable) {
+            await this.downloadResumable.pauseAsync();
+        }
+        await this.updateForegroundProgress('Video', 0, 'Paused');
+        if (this.activeDownload) {
+            this.updateActiveDownload(this.activeDownload.fileName, this.activeDownload.progress);
+        }
+    }
+
+    static async resume() {
+        this.isPaused = false;
+        if (this.activeDownload) {
+            this.updateActiveDownload(this.activeDownload.fileName, this.activeDownload.progress);
+        }
+        
+        if (this.downloadResumable) {
+            // The resumeAsync returns a promise when download finishes
+            this.downloadResumable.resumeAsync().then(async (result) => {
+                if (result?.uri) {
+                    await this.saveToGallery(result.uri);
+                    await this.stopForegroundService('Video', true);
+                }
+                this.clearActiveDownload();
+            }).catch(() => {
+                this.stopForegroundService('Video', false);
+                this.clearActiveDownload();
+            });
+        }
+    }
+
+    static async cancel() {
+        this.cancelled = true;
+        if (this.downloadResumable) {
+            try { await this.downloadResumable.cancelAsync(); } catch (e) {}
+        }
+        await this.stopForegroundService('Video', false);
+        this.clearActiveDownload();
+    }
+
     static async downloadMp4(
         url: string,
         fileName: string,
@@ -75,31 +217,61 @@ export class Downloader {
         onProgress?: (progress: DownloadProgress) => void
     ) {
         this.cancelled = false;
+        this.isPaused = false;
+        this.updateActiveDownload(fileName, null);
+
+        await this.startForegroundService(fileName);
+
         const dir = await this.getDir();
         const fileUri = dir + fileName;
 
-        const downloadResumable = createDownloadResumable(
+        let lastUpdate = Date.now();
+        this.downloadResumable = createDownloadResumable(
             url,
             fileUri,
             { headers },
             (data) => {
                 if (onProgress) {
                     const progress = data.totalBytesWritten / data.totalBytesExpectedToWrite;
-                    onProgress({
+                    const pObj = {
                         progress,
                         downloadedSize: this.formatSize(data.totalBytesWritten),
                         totalSize: this.formatSize(data.totalBytesExpectedToWrite),
                         speed: 'N/A'
-                    });
+                    };
+                    onProgress(pObj);
+                    this.updateActiveDownload(fileName, pObj);
+                    
+                    // Throttle notification updates to avoid crashing system UI
+                    if (Date.now() - lastUpdate > 1000) {
+                        this.updateForegroundProgress(fileName, progress);
+                        lastUpdate = Date.now();
+                    }
                 }
             }
         );
 
-        const result = await downloadResumable.downloadAsync();
-        if (result?.uri) {
-            await this.saveToGallery(result.uri);
+        try {
+            const result = await this.downloadResumable.downloadAsync();
+            // If the promise resolves because it was paused, do not complete the download
+            if (this.isPaused) {
+                return;
+            }
+            if (result?.uri) {
+                await this.saveToGallery(result.uri);
+                await this.stopForegroundService(fileName, true);
+            }
+            this.clearActiveDownload();
+            return result?.uri;
+        } catch (e) {
+            // If the promise rejects because it was paused, ignore it
+            if (this.isPaused) {
+                return;
+            }
+            await this.stopForegroundService(fileName, false);
+            this.clearActiveDownload();
+            throw e;
         }
-        return result?.uri;
     }
 
     static async downloadHls(
@@ -111,8 +283,14 @@ export class Downloader {
         options: { qualityUrl?: string } = {}
     ): Promise<string | null> {
         this.cancelled = false;
+        this.isPaused = false;
+        this.downloadResumable = null; // HLS doesn't use DownloadResumable yet
+        this.updateActiveDownload(fileName, null);
+
         const dir = await this.getDir();
         const outputPath = dir + fileName.replace('.m3u8', '') + '.ts';
+
+        await this.startForegroundService(fileName);
 
         try {
             let playlistUrl = options.qualityUrl || url;
@@ -142,6 +320,9 @@ export class Downloader {
 
             // Split segments into chunks for concurrent processing
             for (let i = 0; i < totalSegments; i += MAX_CONCURRENT) {
+                while (this.isPaused && !this.cancelled) {
+                    await new Promise(res => setTimeout(res, 500));
+                }
                 if (this.cancelled) break;
 
                 const batch = m3u8Data.segments.slice(i, i + MAX_CONCURRENT);
@@ -165,13 +346,20 @@ export class Downloader {
                             segFile.write(new Uint8Array(response.data));
 
                             downloaded++;
+                            const currentProgress = downloaded / totalSegments;
+                            const pObj = {
+                                progress: currentProgress,
+                                downloadedSize: `${downloaded} / ${totalSegments} segments`,
+                                totalSize: `${totalSegments} segments`,
+                                speed: 'N/A'
+                            };
                             if (onProgress) {
-                                onProgress({
-                                    progress: downloaded / totalSegments,
-                                    downloadedSize: `${downloaded} / ${totalSegments} segments`,
-                                    totalSize: `${totalSegments} segments`,
-                                    speed: 'N/A'
-                                });
+                                onProgress(pObj);
+                            }
+                            this.updateActiveDownload(fileName, pObj);
+                            // Throttle updates for HLS
+                            if (downloaded % Math.max(1, Math.floor(totalSegments / 100)) === 0) {
+                                this.updateForegroundProgress(fileName, currentProgress);
                             }
                             success = true;
                             break; // success, exit retry loop
@@ -193,6 +381,7 @@ export class Downloader {
 
             if (this.cancelled) {
                 await deleteAsync(tempDir, { idempotent: true });
+                await this.stopForegroundService(fileName, false);
                 return null;
             }
 
@@ -204,6 +393,7 @@ export class Downloader {
             const handle = outputFile.open();
 
             try {
+                let mergeProgress = 0;
                 for (let i = 0; i < totalSegments; i++) {
                     if (this.cancelled) break;
 
@@ -220,21 +410,43 @@ export class Downloader {
                         }
                         segmentFile.delete();
                     }
+                    
+                    mergeProgress++;
+                    const pObj = {
+                        progress: mergeProgress / totalSegments,
+                        downloadedSize: `Merging ${mergeProgress} / ${totalSegments}`,
+                        totalSize: `Segments`,
+                        speed: 'N/A'
+                    };
+                    if (onProgress) {
+                        onProgress(pObj);
+                    }
+                    this.updateActiveDownload(fileName, pObj);
+                    if (mergeProgress % Math.max(1, Math.floor(totalSegments / 100)) === 0) {
+                        this.updateForegroundProgress(fileName, mergeProgress / totalSegments, 'Merging File...');
+                    }
                 }
             } finally {
                 handle.close();
             }
 
             await deleteAsync(tempDir, { idempotent: true });
-
-            // Only save if not cancelled
-            if (!this.cancelled) {
-                await this.saveToGallery(outputPath);
+            
+            if (this.cancelled) {
+                await this.stopForegroundService(fileName, false);
+                this.clearActiveDownload();
+                return null;
             }
+
+            await this.saveToGallery(outputPath);
+            await this.stopForegroundService(fileName, true);
+            this.clearActiveDownload();
             return outputPath;
 
         } catch (error) {
             console.error('HLS Download Error:', error);
+            await this.stopForegroundService(fileName, false);
+            this.clearActiveDownload();
             throw error;
         }
     }
@@ -307,14 +519,10 @@ export class Downloader {
         }
     }
 
-    static cancel() {
-        this.cancelled = true;
-    }
-
     private static formatSize(bytes: number) {
         if (bytes === 0) return '0 B';
         const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }

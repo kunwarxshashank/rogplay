@@ -15,8 +15,6 @@ import {
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
-// @ts-ignore
-import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { ListItemSkeleton, FolderSkeleton } from '@/components/Skeleton';
@@ -219,13 +217,18 @@ export function Home() {
     return (
         <View style={[styles.container, { backgroundColor: '#000' }]}>
             {/* Dark Luxury Gradient */}
-            <LinearGradient
-                colors={[currentColors.primary + '30', '#000000FA', '#000000']}
-                locations={[0, 0.25, 1]}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle light flares for premium aesthetic */}
-            <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            {currentColors.isAmoled ? (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+                <LinearGradient
+                    colors={[currentColors.primary + '30', '#000000FA', '#000000']}
+                    locations={[0, 0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+            {!currentColors.isAmoled && (
+              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+            )}
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {renderHeader()}
 
@@ -249,6 +252,7 @@ export function Home() {
                         contentContainerStyle={styles.listContainer}
                         initialNumToRender={10}
                         maxToRenderPerBatch={10}
+                        showsVerticalScrollIndicator={false}
                         windowSize={5}
                         removeClippedSubviews={Platform.OS === 'android'}
                         refreshControl={
@@ -310,7 +314,7 @@ export function Home() {
                                 <MaterialIcons name="close" size={24} color="#fff" />
                             </TouchableOpacity>
                         </View>
-                        <TextInput style={styles.renameInput} value={newFilename} onChangeText={setNewFilename} placeholder="Enter new filename" placeholderTextColor={Colors.dark.textSecondary} autoFocus />
+                        <TextInput style={styles.renameInput} value={newFilename} onChangeText={setNewFilename} placeholder="Enter new filename" placeholderTextColor={currentColors.textSecondary} autoFocus />
                         <View style={styles.modalActions}>
                             <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={() => setShowRenameModal(false)}>
                                 <Text style={styles.modalButtonText}>Cancel</Text>

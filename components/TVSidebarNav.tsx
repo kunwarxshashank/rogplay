@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Pressable,
@@ -9,10 +9,11 @@ import {
     Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colors';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useThemeStore } from '@/store/themeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 
 interface TVSidebarNavProps {
     state: any;
@@ -21,7 +22,6 @@ interface TVSidebarNavProps {
     onSidebarFocusChange?: (expanded: boolean) => void;
 }
 
-// ── Route config ──────────────────────────────────────────────
 const NAV_ITEMS: { route: string; label: string; icon: string; focusIcon: string }[] = [
     { route: 'index', label: 'Home', icon: 'home-variant-outline', focusIcon: 'home-variant' },
     { route: 'search', label: 'Search', icon: 'magnify', focusIcon: 'magnify' },
@@ -31,27 +31,25 @@ const NAV_ITEMS: { route: string; label: string; icon: string; focusIcon: string
     { route: 'account', label: 'Profile', icon: 'account-outline', focusIcon: 'account' },
 ];
 
-const hexAlpha = (hex: string, alpha: number) => {
-    const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
-    return hex + a;
-};
-
-/**
- * TVSidebarNav — Premium glassmorphic sidebar for TV.
- * Fixed 86px icon rail with label tooltips.
- * Features: active indicators, focus glow, gradient accents, smooth animations.
- */
 export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusChange }: TVSidebarNavProps) {
-    const { theme } = useSettingsStore();
-    const c = Colors[theme] || Colors.dark;
+    const { colors: c } = useTheme();
+    const themeStore = useThemeStore();
+    const hiddenTabs = useSettingsStore(s => s.hiddenTabs);
     const gradients = c.gradients || { primary: [c.primary, c.primary] };
+
     const [focusedKey, setFocusedKey] = useState<string | null>(null);
     const [isSidebarFocused, setIsSidebarFocused] = useState(false);
 
-    // Animation refs
     const glowOpacity = useRef(new Animated.Value(0)).current;
     const logoScale = useRef(new Animated.Value(1)).current;
     const sidebarWidth = useRef(new Animated.Value(86)).current;
+
+    const hexAlpha = useCallback((hex: string, alpha: number) => {
+        const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+        return hex + a;
+    }, []);
+
+    const isGlassTheme = themeStore.themePalette === 'glassmorphism';
 
     if (!Platform.isTV) return null;
 
@@ -77,44 +75,48 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
         ]).start();
     }, []);
 
-    // ── Route helpers
     const currentRouteName = state.routes[state.index]?.name;
     const isPlayerRoute = currentRouteName === 'player';
     if (isPlayerRoute) return null;
 
     const visibleRouteEntries = state.routes
         .map((r: any, i: number) => ({ route: r, index: i }))
-        .filter((e: any) => NAV_ITEMS.some(n => n.route === e.route.name));
+        .filter((e: any) => {
+            const navItem = NAV_ITEMS.find(n => n.route === e.route.name);
+            if (!navItem) return false;
+            const tabId = navItem.route === 'index' ? 'home' : navItem.route;
+            return !hiddenTabs.includes(tabId);
+        });
+
+    const sidebarBg = isGlassTheme
+        ? 'rgba(10, 10, 20, 0.6)'
+        : `rgba(0, 0, 0, 0.7)`;
 
     return (
-        <Animated.View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: 'rgba(14, 13, 23, 0.85)' }]}>
-            {/* ── Top gradient wash ─────────────────── */}
+        <Animated.View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: sidebarBg }]}>
+            {/* Glass blur overlay for glassmorphism theme */}
+            {isGlassTheme && (
+                c.isAmoled
+                    ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
+                    : <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            )}
+
             <LinearGradient
                 colors={[hexAlpha(c.primary, 0.06), 'transparent']}
                 style={styles.topWash}
             />
 
-            {/* ── Content ──────────────────────────── */}
             <View style={styles.content}>
-
-                {/* ── Logo ─────────────────────────── */}
                 <View style={styles.logoSection}>
-                    <Animated.View style={[
-                        {
-                            shadowColor: c.primary,
-                            transform: [{ scale: logoScale }],
-                        }
-                    ]}>
+                    <Animated.View style={{ transform: [{ scale: logoScale }] }}>
                         <Image
                             source={require('@/assets/icon.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
-
                     </Animated.View>
                 </View>
 
-                {/* ── Navigation Items ─────────────── */}
                 <View style={styles.navList}>
                     {visibleRouteEntries.map(({ route, index: routeIndex }: any) => {
                         const navConf = NAV_ITEMS.find(n => n.route === route.name)!;
@@ -131,7 +133,7 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                 onPress={() => {
                                     const ev = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                                     if (!isActive && !ev.defaultPrevented) navigation.navigate(route.name);
-                                    onItemBlur(); // collapse rail back to icon-only on select
+                                    onItemBlur();
                                 }}
                                 onFocus={() => onItemFocus(route.name)}
                                 onBlur={() => onItemBlur()}
@@ -140,11 +142,8 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                     isProfile && styles.profileItem,
                                 ]}
                             >
-                                {/* Active accent bar */}
                                 {isActive && (
-                                    <View style={[styles.activeBar, {
-                                        opacity: isFocused ? 1 : 0.5,
-                                    }]}>
+                                    <View style={[styles.activeBar, { opacity: isFocused ? 1 : 0.5 }]}>
                                         <LinearGradient
                                             colors={gradients.primary as any}
                                             start={{ x: 0, y: 0 }}
@@ -154,7 +153,6 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                     </View>
                                 )}
 
-                                {/* Icon or Avatar */}
                                 {isProfile ? (
                                     <View style={[styles.avatarCircle, {
                                         borderColor: isHighlight ? c.primary : 'rgba(255,255,255,0.1)',
@@ -179,13 +177,11 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                                     </View>
                                 )}
 
-                                {/* Label — visible when sidebar is expanded */}
                                 {isSidebarFocused && (
                                     <Animated.Text style={[
                                         styles.navLabel,
                                         {
                                             color: isFocused ? c.primary : c.textSecondary,
-                                            opacity: 1,
                                             fontFamily: 'Inter_600SemiBold',
                                             fontSize: 15,
                                             marginLeft: 14,
@@ -200,15 +196,11 @@ export function TVSidebarNav({ state, descriptors, navigation, onSidebarFocusCha
                         );
                     })}
                 </View>
-
-
-
             </View>
         </Animated.View>
     );
 }
 
-// ── Styles ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     sidebar: {
         position: 'absolute',
@@ -220,18 +212,6 @@ const styles = StyleSheet.create({
         zIndex: 100,
         overflow: 'hidden',
     },
-    darkOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-    },
-    edgeLine: {
-        position: 'absolute',
-        right: 0,
-        top: '10%',
-        bottom: '10%',
-        width: 1,
-        borderRadius: 1,
-    },
     topWash: {
         position: 'absolute',
         top: 0,
@@ -239,16 +219,14 @@ const styles = StyleSheet.create({
         right: 0,
         height: '30%',
     },
-
     content: {
         flex: 1,
         alignItems: 'center',
         paddingTop: '20%',
         paddingBottom: '20%',
         paddingHorizontal: 6,
+        zIndex: 1,
     },
-
-    /* ── Logo ─────────────────────────── */
     logoSection: {
         alignItems: 'center',
         marginBottom: 30,
@@ -257,16 +235,6 @@ const styles = StyleSheet.create({
         width: 45,
         height: 45
     },
-
-    /* ── Divider ──────────────────────── */
-    divider: {
-        width: 32,
-        height: 1,
-        borderRadius: 0.5,
-        marginVertical: 20,
-    },
-
-    /* ── Nav List ─────────────────────── */
     navList: {
         width: '100%',
         flex: 1,
@@ -312,8 +280,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         textAlign: 'center',
     },
-
-    /* ── Profile ──────────────────────── */
     profileItem: {
         marginTop: 2,
     },

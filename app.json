@@ -2,7 +2,7 @@
   "expo": {
     "name": "RogPlay",
     "slug": "rogplay",
-    "version": "6.5.0",
+    "version": "6.6.0",
     "orientation": "default",
     "scheme": "rogplay",
     "icon": "./assets/icon.png",
@@ -15,8 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rogplay.org",
+      "bundleIdentifier": "com.rogplay.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true
@@ -24,8 +28,10 @@
       }
     },
     "android": {
-      "package": "com.rogplay.org",
+      "package": "com.rogplay.app",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 18,
+      "minSdkVersion": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#04070D"
@@ -93,7 +99,12 @@
         "READ_MEDIA_AUDIO",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
-        "android.permission.REQUEST_INSTALL_PACKAGES"
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
       "usesCleartextTraffic": true,
@@ -111,7 +122,8 @@
           "android": {
             "usesCleartextTraffic": true,
             "compileSdkVersion": 35,
-            "targetSdkVersion": 35
+            "targetSdkVersion": 35,
+            "enableMinifyInReleaseBuilds": true
           }
         }
       ],
@@ -140,7 +152,10 @@
       "@react-native-google-signin/google-signin",
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/messaging",
+      "expo-font",
+      "./plugins/withNotifee.js",
+      "./plugins/withUsesFeature.js"
     ]
   }
 }

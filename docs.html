@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rogplay Addon API Documentation</title>
+<style>
+  :root {
+    --bg: #0b0d11;
+    --surface: #12141a;
+    --surface2: #1a1d26;
+    --border: #2a2d37;
+    --text: #e8eaed;
+    --text2: #9aa0a9;
+    --accent: #8b5cf6;
+    --accent2: #6366f1;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --pink: #ec4899;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* ── Layout ─────────────────────────── */
+  .wrapper { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ────────────────────────── */
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .sidebar h2 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text2);
+    padding: 0 20px 12px;
+  }
+  .sidebar nav a {
+    display: block;
+    padding: 7px 20px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .sidebar nav a:hover, .sidebar nav a.active {
+    color: var(--text);
+    background: rgba(139, 92, 246, 0.06);
+    border-left-color: var(--accent);
+  }
+  .sidebar nav a.section { font-weight: 700; color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 18px; margin-top: 8px; border-left: none; pointer-events: none; }
+
+  /* ── Main ───────────────────────────── */
+  .main { flex: 1; max-width: 960px; padding: 48px 56px; }
+  .main h1 { font-size: 32px; font-weight: 800; margin-bottom: 6px; }
+  .main .subtitle { color: var(--text2); font-size: 15px; margin-bottom: 40px; }
+  .main h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 44px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .main h3 { font-size: 17px; font-weight: 600; margin-top: 28px; margin-bottom: 8px; }
+  .main h4 { font-size: 14px; font-weight: 600; margin-top: 20px; margin-bottom: 6px; color: var(--accent); }
+  .main p { margin-bottom: 12px; color: var(--text2); }
+  .main p strong, .main td strong { color: var(--text); }
+
+  /* ── Code ───────────────────────────── */
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 12px 0 20px;
+    tab-size: 2;
+  }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.9em;
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+  pre code { background: none; padding: 0; border-radius: 0; color: inherit; }
+
+  /* ── Tables ─────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    font-weight: 700;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text2);
+  }
+  td:first-child { color: var(--text); font-weight: 500; }
+  td .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .badge-r { background: rgba(239,68,68,0.12); color: var(--red); }
+  .badge-g { background: rgba(16,185,129,0.12); color: var(--green); }
+  .badge-b { background: rgba(59,130,246,0.12); color: var(--blue); }
+  .badge-y { background: rgba(234,179,8,0.12); color: var(--yellow); }
+  .badge-p { background: rgba(139,92,246,0.12); color: var(--accent); }
+  .badge-pk { background: rgba(236,72,153,0.12); color: var(--pink); }
+
+  /* ── Alerts / Info boxes ────────────── */
+  .info {
+    background: rgba(99,102,241,0.06);
+    border-left: 3px solid var(--accent2);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--text2);
+  }
+  .info strong { color: var(--text); }
+
+  /* ── Responsive ─────────────────────── */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px; max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ─── SIDEBAR ────────────────────────── -->
+<aside class="sidebar">
+  <h2>Rogplay Addon API</h2>
+  <nav>
+    <a href="#overview" class="active">Overview</a>
+
+    <a class="section">Addon Types</a>
+    <a href="#type-cinema">Cinema (TMDB)</a>
+    <a href="#type-server">Server Addon</a>
+    <a href="#type-stremio">Stremio</a>
+    <a href="#type-music">Music</a>
+    <a href="#type-subtitles">Subtitles</a>
+    <a href="#type-mapping">Type Detection &amp; Mapping</a>
+
+    <a class="section">Manifest Format</a>
+    <a href="#manifest-rogplay">Rogplay Format</a>
+    <a href="#manifest-stremio">Stremio Format</a>
+    <a href="#manifest-subtitles">Subtitles Format</a>
+
+    <a class="section">API Reference</a>
+    <a href="#api-add">Add Addon</a>
+    <a href="#api-remove">Remove Addon</a>
+    <a href="#api-load">Load Addons</a>
+    <a href="#api-cinema">Active Cinema</a>
+    <a href="#api-fetch">Fetch Catalog</a>
+    <a href="#api-sync">Sync Addons (Backend)</a>
+    <a href="#api-get">Get Addons (Backend)</a>
+
+    <a class="section">Data Model</a>
+    <a href="#model-addon">Addon Interface</a>
+    <a href="#model-manifest">Manifest Schema</a>
+    <a href="#model-user">User Schema</a>
+    <a href="#model-settings">Settings</a>
+
+    <a href="#examples">Full Examples</a>
+    <a href="#builtin">Built-in Addons</a>
+  </nav>
+</aside>
+
+<!-- ─── MAIN ───────────────────────────── -->
+<main class="main">
+
+<h1>Rogplay Addon API</h1>
+<p class="subtitle">Complete documentation for the Rogplay plugin-based content addon system. Addons extend streaming capabilities by providing external catalogs, search, and metadata.</p>
+
+<!-- ── Overview ────────────────────────── -->
+<h2 id="overview">Overview</h2>
+<p>Rogplay's addon system is a <strong>plugin-based content source framework</strong>. Users install addons via JSON manifest URLs that describe catalogs, search endpoints, and metadata sources. The system supports multiple formats including a native Rogplay format, the standard Stremio manifest format, and specialized types for music, subtitles, and live TV.</p>
+
+<p>Addons are managed client-side via a Zustand store (<code>addonsStore.ts</code>), persisted to MMKV (mobile) or localStorage (web), and optionally synced to a backend for cross-device use by premium users.</p>
+
+<div class="info"><strong>Built-in addons:</strong> Two addons ship pre-installed — <strong>TMDB Addon</strong> (cinema catalog) and <strong>OpenSubtitle Addon</strong> (subtitles). These are always prepended and cannot be removed.</div>
+
+<!-- ── Addon Types ─────────────────────── -->
+<h2 id="addon-types">Addon Types</h2>
+<p>Each addon is classified into a <strong>type</strong> at runtime based on its manifest content and URL. The type determines how the addon is rendered, what UI it integrates with, and how its catalogs are fetched.</p>
+
+<h3 id="type-cinema">Cinema (TMDB Addon)</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Identifier</td><td><code>addontype: "tmdbaddon"</code></td></tr>
+  <tr><td>Runtime type</td><td><span class="badge badge-p">cinema</span></td></tr>
+  <tr><td>UI Tab</td><td>Cinema / Home</td></tr>
+  <tr><td>Catalogs</td><td>Direct TMDB API URLs or proxied endpoints. Opened in the main Cinema browsing experience.</td></tr>
+  <tr><td>Search</td><td>Via <code>searchcatalog</code> array with <code>${search}</code> placeholder.</td></tr>
+  <tr><td>Navigation</td><td>Item press → Detail page → Source selection → Player</td></tr>
+</table>
+
+<h3 id="type-server">Server Addon</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Identifier</td><td><code>addontype: "serveraddon"</code></td></tr>
+  <tr><td>Runtime type</td><td><span class="badge badge-b">cinema</span></td></tr>
+  <tr><td>UI Tab</td><td>Cinema / Home</td></tr>
+  <tr><td>Catalogs</td><td>Direct API URLs. Items navigate to <code>/server-selection</code> screen.</td></tr>
+  <tr><td>Navigation</td><td>Item press → Server selection → Player</td></tr>
+</table>
+
+<h3 id="type-stremio">Stremio Addon</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Detection</td><td>URL ends in <code>manifest.json</code> <strong>or</strong> JSON has <code>id</code> + <code>resources</code> + <code>catalogs</code></td></tr>
+  <tr><td>Runtime type</td><td><span class="badge badge-pk">stremio</span> / <span class="badge badge-y">livetv</span> / <span class="badge badge-b">movie</span> / <span class="badge badge-g">series</span></td></tr>
+  <tr><td>UI Tab</td><td>Cinema / Home (or filtered under "Stremio" / "Live TV" tabs)</td></tr>
+  <tr><td>Catalogs</td><td>Auto-generated URLs: <code>{baseUrl}/catalog/{type}/{id}.json</code></td></tr>
+  <tr><td>Search</td><td>Auto-generated from catalog <code>extra</code> with <code>name === "search"</code>: <code>{baseUrl}/catalog/{type}/{id}/search=\${search}.json</code></td></tr>
+  <tr><td>Pagination</td><td><code>{baseUrl}/catalog/{type}/{id}/skip=\${stremioSkip}.json</code> (skip = (page-1) × 20)</td></tr>
+  <tr><td>Navigation</td><td>Custom IDs → <code>/stremio-browser</code>; Standard → Details → Player</td></tr>
+</table>
+
+<h3 id="type-music">Music Addon</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Detection</td><td><code>addontype === "music"</code> <strong>or</strong> <code>name</code>/<code>title</code> contains "music" (case-insensitive)</td></tr>
+  <tr><td>Runtime type</td><td><span class="badge badge-g">music</span></td></tr>
+  <tr><td>UI</td><td>Music player screen</td></tr>
+  <tr><td>Format</td><td>Stremio-like manifest with catalogs</td></tr>
+  <tr><td>Navigation</td><td>Item press → <code>/music-player</code></td></tr>
+</table>
+
+<h3 id="type-subtitles">Subtitles Addon</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Identifier</td><td>Built-in only; <code>source: "opensubtitle-builtin"</code></td></tr>
+  <tr><td>Runtime type</td><td><span class="badge badge-b">subtitles</span></td></tr>
+  <tr><td>UI</td><td>Not shown in Cinema (blocked in <code>handleOpenAddon</code>)</td></tr>
+  <tr><td>Data</td><td><code>subtitles.movie</code> and <code>subtitles.series</code> arrays of URL templates</td></tr>
+</table>
+
+<h3 id="type-mapping">Type Detection &amp; Mapping</h3>
+<p>The store's <code>addAddon()</code> and <code>loadAddons()</code> functions use the following detection priority:</p>
+
+<pre><code>1. Music check        ← addontype === "music" OR name/title contains "music"
+2. Stremio check      ← URL ends in "manifest.json" OR (has id + resources + catalogs)
+   → subtype derived from manifest.types:
+      - includes "tv"/"channel" → livetv
+      - includes "movie"        → movie
+      - includes "series"       → series
+      - otherwise               → stremio
+3. TMDB/Server check  ← addontype === "tmdbaddon" OR "serveraddon" → type: cinema
+4. Generic fallback   ← Array response or single object</code></pre>
+
+<!-- ── Manifest Format ─────────────────── -->
+<h2 id="manifest-formats">Manifest Format</h2>
+
+<h3 id="manifest-rogplay">Rogplay Manifest Format</h3>
+<p>The native Rogplay format used by built-in and community TMDB/Server addons.</p>
+
+<pre><code>{
+  "version": "2.0",
+  "author": "Rogplay",
+  "title": "Addon Name",
+  "addontype": "tmdbaddon | serveraddon | music",
+  "logo": "https://example.com/logo.png",
+  "url": "https://web.rogplay.app",
+  "description": "Description of the addon",
+
+  "resources": ["catalog"],
+  "types": ["series", "movie"],
+  "idPrefixes": ["tmdb", "tt"],
+
+  "settings": {
+    "showfilter": true,
+    "showottsection": true,
+    "showslider": true
+  },
+
+  "slidercatalog": {
+    "url": "https://...api_endpoint..."
+  },
+
+  "catalogs": [
+    {
+      "type": "movie | series",
+      "name": "Trending Movie",
+      "url": "https://.../page=1",
+      "ispagination": true,
+      "paginationurl": "https://.../page=${page}"
+    }
+  ],
+
+  "searchcatalog": [
+    {
+      "name": "Search Result",
+      "searchurl": "https://.../query=${search}&page=1",
+      "ispagination": true,
+      "paginationurl": "https://.../query=${search}&page=${page}"
+    }
+  ]
+}</code></pre>
+
+<h4>Top-level Fields</h4>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>version</code></td><td>string</td><td>no</td><td>Manifest version (e.g. "2.0")</td></tr>
+  <tr><td><code>author</code></td><td>string</td><td>no</td><td>Addon author name</td></tr>
+  <tr><td><code>title</code></td><td>string</td><td><strong>yes</strong></td><td>Display name of the addon</td></tr>
+  <tr><td><code>addontype</code></td><td>string</td><td><strong>yes</strong></td><td><code>"tmdbaddon"</code>, <code>"serveraddon"</code>, or <code>"music"</code></td></tr>
+  <tr><td><code>logo</code></td><td>string (URL)</td><td>no</td><td>Logo image URL for the addon card</td></tr>
+  <tr><td><code>url</code></td><td>string (URL)</td><td>no</td><td>Homepage or base URL</td></tr>
+  <tr><td><code>description</code></td><td>string</td><td>no</td><td>Short description displayed below title</td></tr>
+  <tr><td><code>resources</code></td><td>string[]</td><td>no</td><td>e.g. <code>["catalog"]</code></td></tr>
+  <tr><td><code>types</code></td><td>string[]</td><td>no</td><td>Content types: <code>["series","movie"]</code></td></tr>
+  <tr><td><code>idPrefixes</code></td><td>string[]</td><td>no</td><td>e.g. <code>["tmdb","tt"]</code>, used for ID routing</td></tr>
+  <tr><td><code>settings</code></td><td>object | <br>array[object]</td><td>no</td><td>Cinema UI toggles (see Settings section)</td></tr>
+  <tr><td><code>slidercatalog</code></td><td>object</td><td>no</td><td>Hero slider config: <code>{ url: string }</code></td></tr>
+  <tr><td><code>catalogs</code></td><td>array</td><td>no</td><td>List of content catalog definitions</td></tr>
+  <tr><td><code>searchcatalog</code></td><td>array</td><td>no</td><td>List of search catalog definitions</td></tr>
+  <tr><td><code>subtitles</code></td><td>object</td><td>no</td><td>Subtitle URL templates for movie/series (subtitles type)</td></tr>
+</table>
+
+<h4>Catalog Object (in <code>catalogs[]</code>)</h4>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>type</code></td><td>string</td><td><strong>yes</strong></td><td><code>"movie"</code> or <code>"series"</code></td></tr>
+  <tr><td><code>name</code></td><td>string</td><td><strong>yes</strong></td><td>Section heading in the UI (e.g. "Trending Movie")</td></tr>
+  <tr><td><code>url</code></td><td>string (URL)</td><td><strong>yes</strong></td><td>API endpoint returning items</td></tr>
+  <tr><td><code>ispagination</code></td><td>boolean</td><td>no</td><td>Whether pagination is supported</td></tr>
+  <tr><td><code>paginationurl</code></td><td>string (URL)</td><td>no</td><td>URL with <code>${page}</code> placeholder for paginated requests</td></tr>
+</table>
+
+<h4>Search Catalog Object (in <code>searchcatalog[]</code>)</h4>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>name</code></td><td>string</td><td><strong>yes</strong></td><td>Label for the search section</td></tr>
+  <tr><td><code>searchurl</code></td><td>string (URL)</td><td><strong>yes</strong></td><td>API URL with <code>${search}</code> placeholder</td></tr>
+  <tr><td><code>ispagination</code></td><td>boolean</td><td>no</td><td>Whether pagination is supported</td></tr>
+  <tr><td><code>paginationurl</code></td><td>string (URL)</td><td>no</td><td>URL with <code>${search}</code> and <code>${page}</code> placeholders</td></tr>
+</table>
+
+<h4>Placeholder Variables</h4>
+<table>
+  <tr><th>Variable</th><th>Replaced with</th></tr>
+  <tr><td><code>${page}</code></td><td>Current page number (1, 2, 3...)</td></tr>
+  <tr><td><code>${search}</code></td><td>URL-encoded search query</td></tr>
+  <tr><td><code>${stremioSkip}</code></td><td>Skip value for Stremio pagination: <code>(page - 1) × 20</code></td></tr>
+  <tr><td><code>${tmdbid}</code></td><td>TMDB content ID (subtitles only)</td></tr>
+  <tr><td><code>${imdbid}</code></td><td>IMDB content ID (subtitles only)</td></tr>
+  <tr><td><code>${season}</code></td><td>Season number (subtitles only)</td></tr>
+  <tr><td><code>${episode}</code></td><td>Episode number (subtitles only)</td></tr>
+</table>
+
+<h3 id="manifest-stremio">Stremio Manifest Format</h3>
+<p>Standard Stremio addon manifest. URLs are auto-generated from the manifest fields.</p>
+
+<pre><code>{
+  "id": "com.example.addon",
+  "version": "1.0.0",
+  "name": "Example Addon",
+  "description": "Description",
+  "logo": "https://example.com/logo.png",
+
+  "types": ["movie", "series", "tv", "channel"],
+  "resources": ["catalog", "meta", "stream"],
+  "idPrefixes": ["tt", "custom"],
+
+  "catalogs": [
+    {
+      "type": "movie",
+      "id": "top",
+      "name": "Top Movies",
+      "extra": [
+        { "name": "search", "isRequired": false }
+      ]
+    }
+  ]
+}</code></pre>
+
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>id</code></td><td>string</td><td><strong>yes</strong></td><td>Unique addon identifier</td></tr>
+  <tr><td><code>version</code></td><td>string</td><td>no</td><td>Semantic version</td></tr>
+  <tr><td><code>name</code></td><td>string</td><td><strong>yes</strong></td><td>Display name</td></tr>
+  <tr><td><code>description</code></td><td>string</td><td>no</td><td>Description text</td></tr>
+  <tr><td><code>logo</code></td><td>string (URL)</td><td>no</td><td>Logo URL</td></tr>
+  <tr><td><code>types</code></td><td>string[]</td><td>no</td><td>Content types (determines subtype: <code>movie</code>/<code>series</code>/<code>livetv</code>)</td></tr>
+  <tr><td><code>resources</code></td><td>string[]</td><td><strong>yes</strong></td><td>e.g. <code>["catalog", "meta", "stream"]</code></td></tr>
+  <tr><td><code>idPrefixes</code></td><td>string[]</td><td>no</td><td>Used for ID routing</td></tr>
+  <tr><td><code>catalogs</code></td><td>array</td><td><strong>yes</strong></td><td>Catalog definitions (see below)</td></tr>
+</table>
+
+<h4>Auto-generated URLs for Stremio Catalogs</h4>
+<table>
+  <tr><th>URL Pattern</th><th>Template</th><th>Example</th></tr>
+  <tr><td>Catalog endpoint</td><td><code>{baseUrl}/catalog/{type}/{id}.json</code></td><td><code>https://example.com/catalog/movie/top.json</code></td></tr>
+  <tr><td>Pagination</td><td><code>{baseUrl}/catalog/{type}/{id}/skip=\${stremioSkip}.json</code></td><td><code>.../skip=20.json</code></td></tr>
+  <tr><td>Search (if extra has "search")</td><td><code>{baseUrl}/catalog/{type}/{id}/search=\${search}.json</code></td><td><code>.../search=batman.json</code></td></tr>
+</table>
+<p>The <code>baseUrl</code> is derived by stripping <code>/manifest.json</code> from the addon's source URL.</p>
+
+<h3 id="manifest-subtitles">Subtitles Format</h3>
+<p>The built-in OpenSubtitle addon uses a special <code>subtitles</code> block with URL templates.</p>
+
+<pre><code>{
+  "version": "1.0",
+  "author": "Rogplay",
+  "title": "Open Subtitle",
+  "addontype": "tmdbaddon",
+  "types": ["series", "movie"],
+  "idPrefixes": ["tmdb", "tt"],
+
+  "subtitles": {
+    "movie": [
+      "https://sub.example.com/v2/movie/${tmdbid}",
+      "https://opensubtitles.example.com/subtitles/movie/${imdbid}/videoSize=1105954079.json"
+    ],
+    "series": [
+      "https://opensubtitles.example.com/subtitles/series/${imdbid}:${season}:${episode}/videoSize=1105954079.json",
+      "https://sub.example.com/v2/tv/${tmdbid}/${season}/${episode}"
+    ]
+  }
+}</code></pre>
+
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>subtitles.movie</code></td><td>string[]</td><td>Array of URL templates for movie subtitles</td></tr>
+  <tr><td><code>subtitles.series</code></td><td>string[]</td><td>Array of URL templates for series subtitles</td></tr>
+</table>
+
+<!-- ── API Reference ───────────────────── -->
+<h2 id="api-reference">API Reference</h2>
+
+<h3 id="api-add">Add Addon</h3>
+<p><code>addAddon(url: string) → Promise&lt;boolean&gt;</code></p>
+<p>Installs a new addon by fetching its manifest JSON from the given URL.</p>
+
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>url</code></td><td>string</td><td>URL of the addon manifest JSON. Auto-prepends <code>https://</code> if missing. Handles <code>%2F</code> → <code>/</code> decoding.</td></tr>
+</table>
+
+<table>
+  <tr><th>Result</th><th>Description</th></tr>
+  <tr><td><code>true</code></td><td>Addon fetched and added successfully</td></tr>
+  <tr><td><code>throws Error</code></td><td>"Addon already exists" if URL is already installed; "Failed to fetch addon: ..." on network/manifest errors</td></tr>
+</table>
+
+<p><strong>Flow:</strong></p>
+<pre><code>1. Normalize URL (add https:// if needed, decode %2F)
+2. Check for duplicates in addonUrls[]
+3. GET url (8 second timeout)
+4. Parse JSON and detect addon type (music → Stremio → tmdbaddon/serveraddon → generic)
+5. Create Addon object with source = url
+6. Append to addons[] and addonUrls[]
+7. Persist to local storage (MMKV / localStorage)
+8. Sync with backend (if premium user)
+9. Return true</code></pre>
+
+<h3 id="api-remove">Remove Addon</h3>
+<p><code>removeAddon(sourceUrl: string) → Promise&lt;void&gt;</code></p>
+<p>Removes an installed addon by its source URL. Built-in addons cannot be removed.</p>
+
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>sourceUrl</code></td><td>string</td><td>The <code>source</code> field value (the original manifest URL)</td></tr>
+</table>
+
+<p><strong>Protected sources:</strong> <code>TMDB_BUILTIN_SOURCE</code> and <code>OPENSUBTITLE_SOURCE</code> are silently ignored.</p>
+
+<h3 id="api-load">Load Addons</h3>
+<p><code>loadAddons(incomingUrls?: string[]) → Promise&lt;void&gt;</code></p>
+<p>Initializes the addon store. Called on app mount. Handles caching, network refresh, and backend sync.</p>
+
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>incomingUrls</code></td><td>string[] | undefined</td><td>—</td><td>Optional URLs from deep link or external source. When provided, they replace stored URLs and trigger a backend sync.</td></tr>
+</table>
+
+<p><strong>Flow:</strong></p>
+<pre><code>1. Restore active cinema addon from storage
+2. Determine URL list:
+   a. incomingUrls provided → use them
+   b. Premium user → fetch from backend GET /get-addons/:email
+   c. Non-premium → load from local storage
+3. Deduplicate and filter empty URLs
+4. Load cached addon data from storage for instant display
+5. Fetch fresh manifests from network (concurrency: 4):
+   - Success → parse manifest, detect type, create Addon objects
+   - Failure → fall back to cached data for that URL
+6. Prepend built-in addons (TMDB + OpenSubtitle)
+7. Auto-select TMDB as active cinema addon if none set
+8. Update store state, cache fresh data
+9. If incomingUrls provided, sync with backend</code></pre>
+
+<h3 id="api-cinema">Active Cinema Addon</h3>
+<p><code>setActiveCinemaAddon(url: string) → void</code></p>
+<p>Sets the active addon for the Cinema tab. Persisted to storage.</p>
+
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>url</code></td><td>string</td><td>The <code>source</code> or <code>url</code> field of the addon to make active</td></tr>
+</table>
+
+<p><code>useCinemaAddon() → {...} | null</code></p>
+<p>React hook that resolves the active addon's full configuration:</p>
+
+<pre><code>{
+  addon: Addon,                    // The active addon object
+  settings: {
+    showfilter: boolean,           // Show filter button (default: false)
+    showottsection: boolean,       // Show OTT platform section (default: false)
+    showslider: boolean            // Show hero slider (default: false)
+  },
+  catalogs: Catalog[],             // Mapped catalogs with URLs + pagination
+  searchcatalog: SearchCatalog[],  // Search catalogs (Rogplay + Stremio combined)
+  slidercatalog: object | null,    // Hero slider config
+  addontype: string,               // "tmdbaddon" | "serveraddon" | "stremio" | "music"
+  addonUrl: string,                // The manifest URL
+  addonManifest: string,           // JSON-stringified manifest
+  idPrefixes: string[]             // e.g. ["tmdb", "tt"]
+}</code></pre>
+
+<p><strong>Stremio catalog transformation:</strong> For Stremio-like addons (<code>addontype === "stremio" || "music"</code>), if a catalog has no <code>url</code>, the hook auto-generates catalog, pagination, and search URLs from the manifest.</p>
+
+<h3 id="api-fetch">Fetch Catalog</h3>
+<p><code>fetchAddonCatalog(catalogUrl: string, page?: number, addonType?: string, addonMeta?: { url, manifestStr }) → Promise&lt;Item[]&gt;</code></p>
+<p>Fetches and normalizes items from an addon catalog URL.</p>
+
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>catalogUrl</code></td><td>string</td><td>—</td><td>Catalog URL with optional <code>${page}</code> or <code>${stremioSkip}</code> placeholders</td></tr>
+  <tr><td><code>page</code></td><td>number</td><td>1</td><td>Page number for pagination</td></tr>
+  <tr><td><code>addonType</code></td><td>string</td><td><code>"serveraddon"</code></td><td>Determines how to parse response: <code>"stremio"</code>/<code>"music"</code> → <code>data.metas || data.results || data.items</code>; <code>"tmdbaddon"</code> → <code>data.results</code>; other → fallback chain</td></tr>
+  <tr><td><code>addonMeta</code></td><td>object</td><td>undefined</td><td><code>{ url: string, manifestStr: string }</code> attached to each result item</td></tr>
+</table>
+
+<p><strong>Response normalization:</strong> Each item is mapped to:</p>
+<pre><code>{
+  id: string,                     // Encoded ID (from id/_id/tmdbId/url/logo/title or generated hash)
+  title: string,                  // title || name || label || heading
+  poster_path: string,            // poster_path || poster || logo || background || image || thumbnail || thumb
+  media_type: "tv" | "movie",     // Derived from type/kind fields
+  addonType: string,              // The addonType parameter
+  _addonUrl: string,              // The catalog URL or addonMeta.url
+  _addonManifestStr: string,      // addonMeta.manifestStr
+  ...originalItem                 // All original fields preserved
+}</code></pre>
+
+<p><strong>Error resilience:</strong> If the response is not valid JSON, the function attempts to extract JSON from the raw text by finding the first <code>[</code> or <code>{</code> and trimming to the last matching bracket.</p>
+
+<h3 id="api-sync">Sync Addons (Backend)</h3>
+<p><code>POST /sync-addons</code></p>
+<p>Syncs the user's addon URL list to the server for cross-device access. Only available to premium users.</p>
+
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>email</code></td><td>string</td><td><strong>yes</strong></td><td>User's email address</td></tr>
+  <tr><td><code>addons</code></td><td>string[]</td><td><strong>yes</strong></td><td>Array of addon manifest URLs</td></tr>
+</table>
+
+<p><strong>Response <code>200</code>:</strong></p>
+<pre><code>{
+  "message": "Addons synced successfully",
+  "addons": ["https://url1.json", "https://url2.json"]
+}</code></pre>
+
+<table>
+  <tr><th>Status</th><th>Condition</th></tr>
+  <tr><td><code>400</code></td><td>Missing email or addons not an array</td></tr>
+  <tr><td><code>404</code></td><td>User not found</td></tr>
+  <tr><td><code>500</code></td><td>Server error</td></tr>
+</table>
+
+<h3 id="api-get">Get Addons (Backend)</h3>
+<p><code>GET /get-addons/:email</code></p>
+<p>Retrieves the user's synced addon URLs.</p>
+
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>email</code></td><td>path param</td><td>User's email address</td></tr>
+</table>
+
+<p><strong>Response <code>200</code>:</strong></p>
+<pre><code>{
+  "addons": ["https://url1.json", "https://url2.json"]
+}</code></pre>
+
+<table>
+  <tr><th>Status</th><th>Condition</th></tr>
+  <tr><td><code>404</code></td><td>User not found</td></tr>
+  <tr><td><code>500</code></td><td>Server error</td></tr>
+</table>
+
+<!-- ── Data Model ──────────────────────── -->
+<h2 id="data-model">Data Model</h2>
+
+<h3 id="model-addon">Addon Interface (Runtime)</h3>
+<p>The normalized addon object used throughout the app:</p>
+
+<pre><code>interface Addon {
+  title: string;          // Display name
+  description: string;    // Short description
+  logo: string;           // Logo URL
+  url: string;            // Manifest URL / content URL
+  type: string;           // Runtime type: cinema | stremio | music | livetv | movie | series | subtitles
+  source: string;         // The URL from which this addon was fetched (unique key)
+
+  // Optional runtime fields:
+  id?: string;            // Unique ID (e.g. "tmdb-builtin", "opensubtitle-builtin")
+  addontype?: string;     // Raw manifest addontype: tmdbaddon | serveraddon | music
+  isBuiltin?: boolean;    // true for pre-installed addons
+  manifest?: object;      // Full raw manifest JSON
+
+  [key: string]: any;     // All original manifest fields preserved
+}</code></pre>
+
+<h3 id="model-manifest">Manifest Schema Summary</h3>
+<table>
+  <tr><th>Field</th><th>Rogplay</th><th>Stremio</th><th>Subtitles</th></tr>
+  <tr><td><code>title</code> / <code>name</code></td><td><code>title</code> <span class="badge badge-r">req</span></td><td><code>name</code> <span class="badge badge-r">req</span></td><td><code>title</code></td></tr>
+  <tr><td><code>addontype</code></td><td><span class="badge badge-r">req</span></td><td>—</td><td><code>"tmdbaddon"</code></td></tr>
+  <tr><td><code>catalogs</code></td><td>array <span class="badge badge-b">opt</span></td><td>array <span class="badge badge-r">req</span></td><td>—</td></tr>
+  <tr><td><code>searchcatalog</code></td><td>array <span class="badge badge-b">opt</span></td><td>auto-generated</td><td>—</td></tr>
+  <tr><td><code>slidercatalog</code></td><td>object <span class="badge badge-b">opt</span></td><td>—</td><td>—</td></tr>
+  <tr><td><code>settings</code></td><td>object <span class="badge badge-b">opt</span></td><td>—</td><td>—</td></tr>
+  <tr><td><code>subtitles</code></td><td>—</td><td>—</td><td><span class="badge badge-r">req</span></td></tr>
+  <tr><td><code>id</code></td><td>—</td><td><span class="badge badge-r">req</span></td><td>—</td></tr>
+  <tr><td><code>resources</code></td><td>—</td><td><span class="badge badge-r">req</span></td><td>—</td></tr>
+  <tr><td><code>types</code></td><td><span class="badge badge-b">opt</span></td><td>determines subtype</td><td><span class="badge badge-b">opt</span></td></tr>
+  <tr><td><code>idPrefixes</code></td><td><span class="badge badge-b">opt</span></td><td><span class="badge badge-b">opt</span></td><td><span class="badge badge-b">opt</span></td></tr>
+</table>
+
+<h3 id="model-user">MongoDB User Schema (Backend)</h3>
+<pre><code>{
+  name:        String,       // required, trimmed
+  email:       String,       // required, unique, trimmed
+  password:    String,       // hashed
+  profilepic:  String,       // default URL
+  ispremium:   Boolean,      // default: false
+  addons:      [String],     // Array of manifest URLs (for cross-device sync)
+  favorites:   Array,        // User favorites
+  timestamps:  true          // createdAt, updatedAt
+}</code></pre>
+
+<h3 id="model-settings">Settings Store (Addon-related)</h3>
+<pre><code>interface SettingsState {
+  defaultScreen:        'home' | 'cinema' | 'addons' | 'tools';
+  hasSeenAddonFTUE:     boolean;
+  hiddenTabs:           string[];         // Can hide "addons" tab
+  cinemaContinueWatching: boolean;        // Show continue watching section
+  cinemaPlatforms:      boolean;          // Show OTT platform icons
+  cinemaHomeSlider:     boolean;          // Show hero slider
+  cinemaFilters:        boolean;          // Show filter button
+}</code></pre>
+
+<h4>Cinema Settings (from addon manifest)</h4>
+<p>Extracted from the <code>settings</code> field in the manifest (supports both object and array-of-object formats):</p>
+
+<table>
+  <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>showfilter</code></td><td><code>false</code></td><td>Display genre/type filter buttons in Cinema</td></tr>
+  <tr><td><code>showottsection</code></td><td><code>false</code></td><td>Display OTT platform icon grid</td></tr>
+  <tr><td><code>showslider</code></td><td><code>false</code></td><td>Display hero slider with featured content</td></tr>
+</table>
+
+<!-- ── Full Examples ───────────────────── -->
+<h2 id="examples">Full Examples</h2>
+
+<h3>Rogplay TMDB Addon (Production)</h3>
+<pre><code>{
+  "version": "2.0",
+  "author": "Rogplay",
+  "title": "TMDB Addon",
+  "addontype": "tmdbaddon",
+  "logo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQGqGbl0chqcCZsISHPH6Q6SwHeArKfi4gDfg&s",
+  "url": "https://web.rogplay.app",
+  "description": "Official TMDB Addon to fetch Movie, Series Catalog",
+  "resources": ["catalog"],
+  "types": ["series", "movie"],
+  "idPrefixes": ["tmdb", "tt"],
+  "settings": [{ "showfilter": true, "showottsection": true, "showslider": true }],
+  "slidercatalog": {
+    "url": "https://web.rogplay.app/api/tmdb/tv/popular?api_key=...&language=en-US&page=1"
+  },
+  "catalogs": [
+    {
+      "type": "movie", "name": "Trending Movie",
+      "url": "https://web.rogplay.app/api/tmdb/trending/movie/day?api_key=...&page=1",
+      "ispagination": true,
+      "paginationurl": "https://web.rogplay.app/api/tmdb/trending/movie/day?api_key=...&page=${page}"
+    },
+    {
+      "type": "series", "name": "Trending Series",
+      "url": "https://web.rogplay.app/api/tmdb/trending/tv/day?api_key=...&page=1",
+      "ispagination": true,
+      "paginationurl": "https://web.rogplay.app/api/tmdb/trending/tv/day?api_key=...&page=${page}"
+    },
+    {
+      "type": "movie", "name": "Bollywood",
+      "url": "https://web.rogplay.app/api/tmdb/discover/movie?api_key=...&with_original_language=hi&page=1",
+      "ispagination": true,
+      "paginationurl": "https://web.rogplay.app/api/tmdb/discover/movie?api_key=...&with_original_language=hi&page=${page}"
+    },
+    {
+      "type": "series", "name": "Trending Anime",
+      "url": "https://web.rogplay.app/api/tmdb/discover/tv?api_key=...&with_genres=16&with_original_language=ja&page=1",
+      "ispagination": true,
+      "paginationurl": "https://web.rogplay.app/api/tmdb/discover/tv?api_key=...&with_genres=16&with_original_language=ja&page=${page}"
+    },
+    {
+      "type": "series", "name": "K-Drama",
+      "url": "https://web.rogplay.app/api/tmdb/discover/tv?api_key=...&with_original_language=ko&page=1",
+      "ispagination": true,
+      "paginationurl": "https://web.rogplay.app/api/tmdb/discover/tv?api_key=...&with_original_language=ko&page=${page}"
+    }
+  ],
+  "searchcatalog": [{
+    "name": "Search Result",
+    "searchurl": "https://web.rogplay.app/api/tmdb/search/multi?api_key=...&query=${search}&page=1",
+    "ispagination": true,
+    "paginationurl": "https://web.rogplay.app/api/tmdb/search/multi?api_key=...&query=${search}&page=${page}"
+  }]
+}</code></pre>
+
+<h3>Standard Stremio Addon</h3>
+<pre><code>{
+  "id": "com.stremio.opensubtitles",
+  "version": "1.0.0",
+  "name": "OpenSubtitles",
+  "description": "Subtitles from OpenSubtitles",
+  "logo": "https://example.com/logo.png",
+  "types": ["movie", "series"],
+  "resources": ["catalog", "meta", "stream"],
+  "idPrefixes": ["tt"],
+  "catalogs": [
+    {
+      "type": "movie",
+      "id": "top",
+      "name": "Top Movies",
+      "extra": [{ "name": "search", "isRequired": false }]
+    },
+    {
+      "type": "series",
+      "id": "popular",
+      "name": "Popular Series",
+      "extra": []
+    }
+  ]
+}</code></pre>
+
+<h3>Server Selection Addon</h3>
+<pre><code>{
+  "title": "My Server Addon",
+  "addontype": "serveraddon",
+  "logo": "https://example.com/logo.png",
+  "description": "My custom server addon",
+  "catalogs": [{
+    "type": "movie",
+    "name": "My Catalog",
+    "url": "https://api.example.com/movies?page=1",
+    "ispagination": true,
+    "paginationurl": "https://api.example.com/movies?page=${page}"
+  }]
+}</code></pre>
+
+<h2 id="builtin">Built-in Addons</h2>
+
+<h3>TMDB Addon (cinema)</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td><code>source</code></td><td><code>https://raw.githubusercontent.com/kunwarxshashank/rogplay_addons/refs/heads/main/cinema/tmdbaddon.json</code></td></tr>
+  <tr><td><code>type</code></td><td><span class="badge badge-p">cinema</span></td></tr>
+  <tr><td><code>addontype</code></td><td><code>tmdbaddon</code></td></tr>
+  <tr><td><code>id</code></td><td><code>tmdb-builtin</code></td></tr>
+  <tr><td><code>isBuiltin</code></td><td><code>true</code></td></tr>
+  <tr><td>Removable</td><td>No</td></tr>
+  <tr><td>Catalogs</td><td>5 (Trending Movie, Trending Series, Bollywood, Trending Anime, K-Drama)</td></tr>
+</table>
+
+<h3>OpenSubtitle Addon (subtitles)</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td><code>source</code></td><td><code>opensubtitle-builtin</code></td></tr>
+  <tr><td><code>type</code></td><td><span class="badge badge-b">subtitles</span></td></tr>
+  <tr><td><code>addontype</code></td><td><code>tmdbaddon</code></td></tr>
+  <tr><td><code>id</code></td><td><code>opensubtitle-builtin</code></td></tr>
+  <tr><td><code>isBuiltin</code></td><td><code>true</code></td></tr>
+  <tr><td>Removable</td><td>No</td></tr>
+  <tr><td>Subtitle URLs</td><td>4 total (2 movie + 2 series)</td></tr>
+</table>
+
+<h3>Add-on Browser Filtering</h3>
+<p>The addons screen supports filtering by these categories:</p>
+<table>
+  <tr><th>Filter</th><th>Matched by</th></tr>
+  <tr><td><strong>All</strong></td><td>No filter applied</td></tr>
+  <tr><td><strong>Live TV</strong></td><td><code>type</code> includes <code>"tv"</code> or <code>"live"</code></td></tr>
+  <tr><td><strong>Stremio</strong></td><td><code>type === "stremio"</code> OR has <code>manifest</code> object</td></tr>
+  <tr><td><strong>Cinema</strong></td><td><code>type</code> includes <code>"cinema"</code></td></tr>
+  <tr><td><strong>Movies</strong></td><td><code>type</code> includes <code>"movie"</code></td></tr>
+  <tr><td><strong>NSFW</strong></td><td><code>type</code> includes <code>"nsfw"</code></td></tr>
+  <tr><td><strong>Others</strong></td><td>Does not match any of the above</td></tr>
+</table>
+
+<h3>Environment Variables</h3>
+<table>
+  <tr><th>Variable</th><th>Description</th></tr>
+  <tr><td><code>EXPO_PUBLIC_DB_BASEURL</code></td><td>Backend base URL for sync endpoints (e.g. <code>https://backend.rogplay.app</code>)</td></tr>
+  <tr><td><code>ADDONSTORE_URL</code></td><td>URL to the public addon store index JSON</td></tr>
+  <tr><td><code>LOCAL_ADDONKEY</code></td><td>MMKV/localStorage key for addon URL list (<code>localaddondata</code>)</td></tr>
+  <tr><td><code>JSON_DATAKEY</code></td><td>Storage key for cached addon data (<code>localjsondatakey</code>)</td></tr>
+  <tr><td><code>ADDONURL_KEY</code></td><td>Additional storage key (<code>addonurldata</code>)</td></tr>
+</table>
+
+<br>
+<hr style="border: none; border-top: 1px solid var(--border); margin: 40px 0;">
+<p style="color: var(--text2); font-size: 13px; text-align: center;">Rogplay Addon API Documentation — Generated from codebase analysis</p>
+
+</main>
+</div>
+</body>
+</html>

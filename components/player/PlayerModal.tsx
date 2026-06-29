@@ -12,9 +12,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
+import { useTheme } from '@/hooks/useTheme';
 
 interface Track {
     title?: string;
@@ -45,11 +45,11 @@ interface TrackItemProps {
     isTV: boolean;
     width: number;
     getResponsiveSize: (mobile: number, tablet: number, tv: number) => number;
-    activeColors: any;
+    colors: any;
 }
 
 const TrackItem = React.memo(function TrackItem({
-    track, index, type, selectedIndex, onSelect, isTV, width, getResponsiveSize, activeColors
+    track, index, type, selectedIndex, onSelect, isTV, width, getResponsiveSize, colors: themeColors
 }: TrackItemProps) {
     const isSelected = selectedIndex === index;
 
@@ -72,21 +72,21 @@ const TrackItem = React.memo(function TrackItem({
             autoFlex={false}
             style={[
                 styles.trackItem,
-                isSelected && { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '60' },
+                isSelected && { backgroundColor: themeColors.primary + '20', borderColor: themeColors.primary + '60' },
                 { minHeight: getResponsiveSize(44, 48, 52) }
             ]}
             onPress={() => onSelect(index)}
-            focusedBackgroundColor={activeColors.surface + '40'}
-            focusedBorderColor={activeColors.primary}
+            focusedBackgroundColor={themeColors.surface + '40'}
+            focusedBorderColor={themeColors.primary}
         >
             {({ focused }) => (
                 <View style={styles.trackContentRow}>
                     <View style={styles.trackContent}>
                         <Text style={[
                             styles.trackText,
-                            { color: activeColors.text },
-                            isSelected && { color: activeColors.primary, fontWeight: 'bold' },
-                            focused && { color: activeColors.text, fontWeight: 'bold' },
+                            { color: themeColors.text },
+                            isSelected && { color: themeColors.primary, fontWeight: 'bold' },
+                            focused && { color: themeColors.text, fontWeight: 'bold' },
                             { fontSize: getResponsiveSize(13, 15, 17) }
                         ]}>
                             {displayText}
@@ -94,9 +94,9 @@ const TrackItem = React.memo(function TrackItem({
                         {subText ? (
                             <Text style={[
                                 styles.trackSubText,
-                                { color: activeColors.textSecondary },
-                                isSelected && { color: activeColors.primary + 'CC' },
-                                focused && { color: activeColors.textSecondary },
+                                { color: themeColors.textSecondary },
+                                isSelected && { color: themeColors.primary + 'CC' },
+                                focused && { color: themeColors.textSecondary },
                                 { fontSize: getResponsiveSize(11, 13, 15) }
                             ]}>
                                 {subText}
@@ -107,7 +107,7 @@ const TrackItem = React.memo(function TrackItem({
                         <MaterialIcons
                             name="check-circle"
                             size={getResponsiveSize(18, 20, 22)}
-                            color={activeColors.primary}
+                            color={themeColors.primary}
                         />
                     )}
                 </View>
@@ -127,8 +127,7 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
     onApply,
     onCancel
 }) => {
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
+    const { colors: themeColors } = useTheme();
     const [screenData, setScreenData] = useState(Dimensions.get('window'));
     const [isLandscape, setIsLandscape] = useState(false);
 
@@ -169,7 +168,7 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
             isTV={isTV}
             width={width}
             getResponsiveSize={getResponsiveSize}
-            activeColors={activeColors}
+            colors={themeColors}
         />
     );
 
@@ -195,20 +194,20 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
                         height: shouldUseHorizontalLayout() ? '85%' : '80%',
                         maxWidth: shouldUseHorizontalLayout() ? 1100 : 500,
                         maxHeight: height * 0.9,
-                        backgroundColor: activeColors.background,
-                        borderColor: activeColors.border,
+                        backgroundColor: themeColors.background,
+                        borderColor: themeColors.border,
                     }
                 ]}>
                     <SafeAreaView style={styles.modalContent}>
 
-                        <View style={[styles.header, { borderBottomColor: activeColors.border }]}>
+                        <View style={[styles.header, { borderBottomColor: themeColors.border }]}>
                             <View style={styles.headerLeft}>
                                 <MaterialIcons
                                     name="settings"
                                     size={getResponsiveSize(22, 24, 28)}
-                                    color={activeColors.text}
+                                    color={themeColors.text}
                                 />
-                                <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, 20, 24), color: activeColors.text }]}>
+                                <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, 20, 24), color: themeColors.text }]}>
                                     Player Settings
                                 </Text>
                             </View>
@@ -216,12 +215,12 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
                                 autoFlex={false}
                                 style={styles.closeBtn}
                                 onPress={onCancel}
-                                focusedBackgroundColor={activeColors.error}
+                                focusedBackgroundColor={themeColors.error}
                             >
                                 <MaterialIcons
                                     name="close"
                                     size={getResponsiveSize(22, 24, 28)}
-                                    color={Platform.isTV ? "#fff" : activeColors.text}
+                                    color={Platform.isTV ? "#fff" : themeColors.text}
                                 />
                             </TVFocusable>
                         </View>
@@ -234,12 +233,12 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
                             >
                                 <View style={[
                                     styles.section,
-                                    { backgroundColor: activeColors.surface, borderColor: activeColors.border },
+                                    { backgroundColor: themeColors.surface, borderColor: themeColors.border },
                                     shouldUseHorizontalLayout() && styles.horizontalSection
                                 ]}>
                                     <View style={styles.sectionHeader}>
                                         <MaterialIcons name="audiotrack" size={getResponsiveSize(18, 20, 22)} color="#00C851" />
-                                        <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: activeColors.text }]}>
+                                        <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: themeColors.text }]}>
                                             Audio
                                         </Text>
                                         <View style={[styles.badge, { backgroundColor: '#00C85130' }]}>
@@ -252,19 +251,19 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
                                         audioTracks.map((track, idx) => renderTracks(track, idx, 'audio', selectedAudioTrack, onSelectAudio))
                                     ) : (
                                         <View style={styles.emptyState}>
-                                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No audio tracks available</Text>
+                                            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>No audio tracks available</Text>
                                         </View>
                                     )}
                                 </View>
 
                                 <View style={[
                                     styles.section,
-                                    { backgroundColor: activeColors.surface, borderColor: activeColors.border },
+                                    { backgroundColor: themeColors.surface, borderColor: themeColors.border },
                                     shouldUseHorizontalLayout() && styles.horizontalSection
                                 ]}>
                                     <View style={styles.sectionHeader}>
                                         <MaterialIcons name="high-quality" size={getResponsiveSize(18, 20, 22)} color="#FF6B35" />
-                                        <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: activeColors.text }]}>
+                                        <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(15, 17, 19), color: themeColors.text }]}>
                                             Video
                                         </Text>
                                         <View style={[styles.badge, { backgroundColor: '#FF6B3530' }]}>
@@ -277,23 +276,23 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
                                         videoTracks.map((track, idx) => renderTracks(track, idx, 'video', selectedVideoTrack, onSelectVideo))
                                     ) : (
                                         <View style={styles.emptyState}>
-                                            <Text style={[styles.emptyText, { color: activeColors.textSecondary }]}>No video tracks available</Text>
+                                            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>No video tracks available</Text>
                                         </View>
                                     )}
                                 </View>
                             </ScrollView>
                         </View>
 
-                        <View style={[styles.footer, { borderTopColor: activeColors.border }]}>
+                        <View style={[styles.footer, { borderTopColor: themeColors.border }]}>
                             <TVFocusable
                                 autoFlex={false}
-                                style={[styles.cancelButton, { backgroundColor: activeColors.surface }]}
+                                style={[styles.cancelButton, { backgroundColor: themeColors.surface }]}
                                 onPress={onCancel}
-                                focusedBackgroundColor={activeColors.error}
+                                focusedBackgroundColor={themeColors.error}
                             >
                                 <View style={styles.buttonContent}>
-                                    <MaterialIcons name="close" size={getResponsiveSize(16, 18, 20)} color={activeColors.text} />
-                                    <Text style={[styles.buttonText, { fontSize: getResponsiveSize(14, 16, 18), color: activeColors.text }]}>
+                                    <MaterialIcons name="close" size={getResponsiveSize(16, 18, 20)} color={themeColors.text} />
+                                    <Text style={[styles.buttonText, { fontSize: getResponsiveSize(14, 16, 18), color: themeColors.text }]}>
                                         Cancel
                                     </Text>
                                 </View>
@@ -301,9 +300,9 @@ const PlayerModal: React.FC<PlayerModalProps> = ({
 
                             <TVFocusable
                                 autoFlex={false}
-                                style={[styles.applyButton, { backgroundColor: activeColors.primary }]}
+                                style={[styles.applyButton, { backgroundColor: themeColors.primary }]}
                                 onPress={onApply}
-                                focusedBackgroundColor={activeColors.primary}
+                                focusedBackgroundColor={themeColors.primary}
                                 hasTVPreferredFocus={true}
                             >
                                 <View style={styles.buttonContent}>
@@ -331,8 +330,6 @@ interface SpeedModalProps {
 }
 
 export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onSelectSpeed, selectedSpeed }: SpeedModalProps) {
-    const { theme } = useSettingsStore();
-    const activeColors = Colors[theme] || Colors.dark;
     const [screenData, setScreenData] = useState(Dimensions.get('window'));
     const [currentSpeed, setCurrentSpeed] = useState(selectedSpeed);
 
