@@ -13,6 +13,26 @@ import { useTheme } from '@/hooks/useTheme';
 import { resolveMagnet } from '@/services/debrid';
 import { Alert } from 'react-native';
 
+const getTagsFromTitle = (title: string) => {
+    if (!title) return [];
+    const tags: string[] = [];
+    const languages = ['Hindi', 'English', 'Spanish', 'French', 'Bengali', 'Tamil', 'Telugu', 'Malayalam', 'Kannada', 'Marathi', 'Gujarati', 'Punjabi', 'Urdu', 'Korean', 'Japanese', 'Chinese', 'Multi', 'Dual Audio'];
+    const qualities = ['CAM', 'HDTS', 'DVDScr', 'DVDRip', 'WEBRip', 'WEB-DL', 'BluRay', 'Remux', 'HDRip', 'BDRemux', 'HDTC'];
+
+    languages.forEach(lang => {
+        const regex = new RegExp(`\\b${lang.replace(' ', '\\s*')}\\b`, 'i');
+        if (regex.test(title)) tags.push(lang);
+    });
+
+    qualities.forEach(q => {
+        const regexStr = q === 'WEB-DL' ? '\\bweb-?dl\\b' : `\\b${q}\\b`;
+        const regex = new RegExp(regexStr, 'i');
+        if (regex.test(title)) tags.push(q);
+    });
+
+    return tags;
+};
+
 export default function TVServerSelectionScreen() {
     const { id, type, title, season, episode, poster, backdrop, movieUrl, movieData, genre, query } = useLocalSearchParams();
     const router = useRouter();
@@ -134,26 +154,18 @@ export default function TVServerSelectionScreen() {
                     </Text>
                     <Text style={[styles.serverTitle, { color: activeColors.textSecondary }]} numberOfLines={isFocused ? 0 : 1}>{item.title}</Text>
 
-                    {item.healthInfo && !item.isTorrent && (
+                    {(item.healthInfo?.resolution || getTagsFromTitle(item.title).length > 0) && (
                         <View style={styles.metricsRow}>
-                            <View style={[styles.badgeContainer, { backgroundColor: item.healthInfo.score >= 75 ? '#22c55e20' : item.healthInfo.score >= 50 ? '#eab30820' : '#ef444420' }]}>
-                                <Text style={[styles.badgeText, { color: item.healthInfo.score >= 75 ? '#22c55e' : item.healthInfo.score >= 50 ? '#eab308' : '#ef4444' }]}>
-                                    {item.healthInfo.statusBadge} {item.healthInfo.score}/100
-                                </Text>
-                            </View>
-                            {item.healthInfo.resolution && (
+                            {item.healthInfo?.resolution && (
                                 <View style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
                                     <Text style={[styles.metaText, { color: activeColors.primary }]}>{item.healthInfo.resolution}</Text>
                                 </View>
                             )}
-                            <Text style={[styles.latencyText, { color: activeColors.textSecondary }]}>{item.healthInfo.latency < 5000 ? `${item.healthInfo.latency}ms` : 'Dead?'}</Text>
-                        </View>
-                    )}
-                    {item.healthInfo && item.isTorrent && item.healthInfo.resolution && (
-                        <View style={styles.metricsRow}>
-                            <View style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
-                                <Text style={[styles.metaText, { color: activeColors.primary }]}>{item.healthInfo.resolution}</Text>
-                            </View>
+                            {getTagsFromTitle(item.title).map(tag => (
+                                <View key={tag} style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
+                                    <Text style={[styles.metaText, { color: activeColors.primary }]}>{tag}</Text>
+                                </View>
+                            ))}
                         </View>
                     )}
                 </View>

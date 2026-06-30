@@ -88,6 +88,7 @@ export default function WatchPartyModal({
     onJoinRoom,
     onLeaveRoom,
 }: WatchPartyModalProps) {
+    const { colors: c } = useTheme();
     const gradients = c.gradients?.primary || [c.primary, c.accent || c.primary];
 
     const [screen, setScreen] = useState<'menu' | 'join'>('menu');

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 // By default VLC is our video player, so we set isVlcRequired to true
 // But if the stream type is hls or mp4, we set isVlcRequired to false
 export function useStreamType(url: string, headers: any = {}) {
-    const [streamType, setStreamType] = useState<'hls' | 'mp4' | 'mkv' | 'unknown' | null>(null);
+    const [streamType, setStreamType] = useState<'hls' | 'm3u8' | 'mp4' | 'mkv' | 'mpd' | 'unknown' | null>(null);
     const [isVlcRequired, setIsVlcRequired] = useState(true);
     const [isDetecting, setIsDetecting] = useState(true);
     const headersKeyRef = useRef('');
@@ -23,9 +23,19 @@ export function useStreamType(url: string, headers: any = {}) {
                 return;
             }
 
+
             if (url.includes('.m3u8')) {
                 if (isMounted) {
                     setStreamType('hls');
+                    setIsVlcRequired(false);
+                    setIsDetecting(false);
+                }
+                return;
+            }
+
+            if (url.includes('.mpd')) {
+                if (isMounted) {
+                    setStreamType('mpd');
                     setIsVlcRequired(false);
                     setIsDetecting(false);
                 }
@@ -62,14 +72,18 @@ export function useStreamType(url: string, headers: any = {}) {
                         if (contentType.includes('application/x-mpegURL') || contentType.includes('application/vnd.apple.mpegurl')) {
                             setStreamType('hls');
                             setIsVlcRequired(false);
+                        } else if (contentType.includes('application/dash+xml')) {
+                            setStreamType('mpd');
+                            setIsVlcRequired(false);
                         } else if (contentType.includes('video/mp4')) {
                             setStreamType('mp4');
                             setIsVlcRequired(false);
                         } else if (contentType.includes('video/x-matroska') || contentType.includes('video/mkv') || contentType.includes('audio/eac3')) {
                             setStreamType('mkv');
                             setIsVlcRequired(true);
-                        } else if (contentType.includes('application/octet-stream')) {
-                            setIsVlcRequired(true);
+                        } else {
+                            setStreamType('unknown');
+                            setIsVlcRequired(false);
                         }
                     } else {
                         setStreamType('unknown');

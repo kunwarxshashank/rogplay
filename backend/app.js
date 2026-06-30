@@ -170,11 +170,14 @@ app.post('/validate', async (req, res) => {               // validate email pass
         return res.status(404).json({ message: 'User not found' });
     }
 
-    const { name, email, ispremium } = user;
-    // Fetch subscription details from paymentModel using email
-    const paymentDetails = await paymentModel.findOne({ email: req.body.email }); // Assuming email is stored in paymentModel
-    const subscriptionEnd = paymentDetails ? paymentDetails.subscriptionEnd : null;
-    const subscriptionStart = paymentDetails ? paymentDetails.subscriptionStart : null;
+    let { name, email, ispremium, subscriptionStart, subscriptionEnd } = user;
+    
+    // Check if subscription has expired
+    if (ispremium && subscriptionEnd && new Date(subscriptionEnd) < new Date()) {
+        ispremium = false;
+        await userModel.updateOne({ email: email }, { $set: { ispremium: false } });
+    }
+
     bcrypt.compare(req.body.password, user.password, function (err, result) {
         if (err) {
             return res.status(500).json({ message: 'Error while comparing passwords' });
@@ -218,11 +221,13 @@ app.post('/userinfo', async (req, res) => {               // validate email pass
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        const { name, email, ispremium } = user;
-        // Fetch subscription details from paymentModel using email
-        const paymentDetails = await paymentModel.findOne({ email: req.body.email }); // Assuming email is stored in paymentModel
-        const subscriptionEnd = paymentDetails ? paymentDetails.subscriptionEnd : null;
-        const subscriptionStart = paymentDetails ? paymentDetails.subscriptionStart : null;
+        let { name, email, ispremium, subscriptionStart, subscriptionEnd } = user;
+        
+        // Check if subscription has expired
+        if (ispremium && subscriptionEnd && new Date(subscriptionEnd) < new Date()) {
+            ispremium = false;
+            await userModel.updateOne({ email: email }, { $set: { ispremium: false } });
+        }
 
         if (user) {
             let token = jwt.sign({ email: user.email }, process.env.JWT_SECRET);
@@ -251,6 +256,31 @@ app.post('/userinfo', async (req, res) => {               // validate email pass
     }
 });
 
+
+app.get('/contributors', async (req, res) => {
+    try {
+        const contributors = await userModel.find({ ispremium: true }, 'name').sort({ subscriptionStart: 1 });
+        return res.status(200).json(contributors);
+    } catch (error) {
+        console.error('Error fetching contributors:', error);
+        return res.status(500).json({ error: 'An error occurred while fetching contributors.' });
+    }
+});
+
+app.post('/transactions', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required.' });
+    }
+
+    try {
+        const transactions = await paymentModel.find({ email }).sort({ createdAt: -1 });
+        return res.status(200).json(transactions);
+    } catch (error) {
+        console.error('Transaction history error:', error);
+        return res.status(500).json({ error: 'An error occurred while fetching transactions.' });
+    }
+});
 
 
 
@@ -337,8 +367,17 @@ const checkSubscriptionValidity = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await userModel.findOne({ email: decoded.email });
 
-        if (!user || !user.ispremium || new Date(user.subscriptionEnd) < new Date()) {
+        if (!user) {
+            return res.status(401).json({ error: 'User not found.' });
+        }
+
+        if (user.ispremium && user.subscriptionEnd && new Date(user.subscriptionEnd) < new Date()) {
+            await userModel.updateOne({ email: user.email }, { $set: { ispremium: false } });
             return res.status(403).json({ error: 'Your subscription has expired. Please renew.' });
+        }
+
+        if (!user.ispremium) {
+            return res.status(403).json({ error: 'You do not have an active subscription.' });
         }
 
         req.user = user; // Add user info to the request

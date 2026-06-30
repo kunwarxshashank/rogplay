@@ -88,14 +88,10 @@ export default function SeasonDetailsScreen() {
                         <MaterialIcons name="play-circle" size={40} color={currentColors.textSecondary} />
                     </View>
                 )}
-                {currentColors.isAmoled ? (
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-                ) : (
-                    <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.6)']}
-                        style={StyleSheet.absoluteFill}
-                    />
-                )}
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.6)']}
+                    style={StyleSheet.absoluteFill}
+                />
                 <View style={[styles.episodeBadge, { backgroundColor: currentColors.primary }]}>
                     <Text style={styles.episodeBadgeText}>E{item.episode_number}</Text>
                 </View>
@@ -153,14 +149,10 @@ export default function SeasonDetailsScreen() {
                         style={StyleSheet.absoluteFill}
                         blurRadius={20}
                     />
-                    {currentColors.isAmoled ? (
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-                    ) : (
-                        <LinearGradient
-                            colors={['transparent', currentColors.background]}
-                            style={StyleSheet.absoluteFill}
-                        />
-                    )}
+                    <LinearGradient
+                        colors={['transparent', currentColors.background]}
+                        style={StyleSheet.absoluteFill}
+                    />
                 </View>
             )}
 

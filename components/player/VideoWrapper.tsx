@@ -228,7 +228,7 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                     onVideoEnd={() => onBuffer({ isBuffering: false })}
                     onError={(e: any) => {
                         onBuffer({ isBuffering: false });
-                        console.error('VLC Playback Error', e);
+                        console.warn('VLC Playback Error', e);
                         const errStr = (typeof e === 'string' && e) || e?.message || '';
                         setPlaybackError(`Playback error: ${errStr || 'Unknown error'}`);
                         onError && onError(`Playback error: ${errStr || 'Unknown error'}`);
@@ -269,7 +269,7 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
             }}
             selectedTextTrack={selectedTextTrackProps}
             onError={(e: any) => {
-                console.error('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });
+                console.warn('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });
                 const errMsg = e?.error?.errorString || e?.message || 'Unknown error';
                 setPlaybackError(`Playback error: ${errMsg}`);
                 onError && onError(`Playback error: ${errMsg}`);

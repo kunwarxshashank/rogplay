@@ -141,16 +141,12 @@ export default function TVDetailsScreen() {
                 )}
 
                 {/* Dark gradient overlay */}
-                {c.isAmoled ? (
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-                ) : (
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
-                        style={StyleSheet.absoluteFill}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                    />
-                )}
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                />
 
                 {/* Top badges row */}
                 <View style={styles.seasonBadgesRow}>
@@ -189,24 +185,18 @@ export default function TVDetailsScreen() {
                 blurRadius={1}
             />
             {/* Gradient overlays */}
-            {c.isAmoled ? (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-            ) : (
-                <>
-                    <LinearGradient
-                        colors={['transparent', c.background]}
-                        style={StyleSheet.absoluteFill}
-                        start={{ x: 0, y: 0.2 }}
-                        end={{ x: 0, y: 0.85 }}
-                    />
-                    <LinearGradient
-                        colors={[`${c.background}DD`, 'transparent', `${c.background}AA`]}
-                        style={StyleSheet.absoluteFill}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0.6, y: 0 }}
-                    />
-                </>
-            )}
+            <LinearGradient
+                colors={['transparent', c.background]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 0, y: 0.85 }}
+            />
+            <LinearGradient
+                colors={[`${c.background}DD`, 'transparent', `${c.background}AA`]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.6, y: 0 }}
+            />
 
             {/* ── Main Content (no scroll) ─────────────── */}
             <View style={styles.mainContent}>

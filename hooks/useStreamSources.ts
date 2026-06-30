@@ -17,7 +17,7 @@ export interface StreamResult {
 export function useStreamSources() {
     const addons = useAddonsStore(s => s.addons);
     const [results, setResults] = useState<StreamResult[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const abortRef = useRef<AbortController | null>(null);
 
     // Cleanup AbortController on unmount

@@ -7,6 +7,8 @@ const userSchema = mongoose.Schema({
     password: { type: String },
     profilepic: { type: String, default: "https://cdn-icons-png.flaticon.com/512/3541/3541871.png" },
     ispremium: { type: Boolean, default: false },
+    subscriptionStart: { type: Date },
+    subscriptionEnd: { type: Date },
     addons: { type: [String], default: [] },
     favorites: { type: Array, default: [] }
 },

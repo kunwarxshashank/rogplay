@@ -112,16 +112,12 @@ export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 't
 
                     {isFullscreen ? (
                         <>
-                            {c.isAmoled ? (
-                                <View style={StyleSheet.absoluteFill} />
-                            ) : (
-                                <LinearGradient
-                                    colors={['transparent', c.background]}
-                                    start={{ x: 0, y: 0.3 }}
-                                    end={{ x: 0, y: 1 }}
-                                    style={StyleSheet.absoluteFill}
-                                />
-                            )}
+                            <LinearGradient
+                                colors={['transparent', c.background]}
+                                start={{ x: 0, y: 0.3 }}
+                                end={{ x: 0, y: 1 }}
+                                style={StyleSheet.absoluteFill}
+                            />
                             <LinearGradient
                                 colors={[c.primary + '30', 'transparent']}
                                 start={{ x: 0, y: 0 }}
@@ -174,16 +170,12 @@ export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 't
                         </>
                     ) : (
                         <>
-                            {c.isAmoled ? (
-                                <View style={styles.gradientOverlay} />
-                            ) : (
                                 <LinearGradient
                                     colors={[c.background + 'F2', c.background + 'BF', c.background + '4D', 'transparent']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 0.7, y: 0 }}
                                     style={styles.gradientOverlay}
                                 />
-                            )}
                             <LinearGradient
                                 colors={['transparent', c.background + '66', c.background + 'F2', c.background]}
                                 start={{ x: 0, y: 0.3 }}

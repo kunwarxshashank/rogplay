@@ -95,14 +95,10 @@ export default function DetailsScreen() {
                     source={{ uri: `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${details.backdrop_path}` }}
                     style={styles.backdrop}
                 >
-                    {currentColors.isAmoled ? (
-                        <View style={[styles.gradient, { backgroundColor: '#000' }]} />
-                    ) : (
-                        <LinearGradient
-                            colors={['transparent', currentColors.background]}
-                            style={styles.gradient}
-                        />
-                    )}
+                    <LinearGradient
+                        colors={['transparent', currentColors.background]}
+                        style={styles.gradient}
+                    />
                     <SafeAreaView style={styles.headerSafeArea}>
                         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                             <MaterialIcons name="arrow-back" size={24} color="#fff" />
