@@ -4,7 +4,27 @@ import axios from 'axios';
 import { Buffer } from 'buffer';
 import { Platform } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
-import notifee, { AndroidImportance, AndroidForegroundServiceType } from '@notifee/react-native';
+let notifee: any = null;
+let AndroidImportance: any = { LOW: 2, DEFAULT: 3, HIGH: 4, MIN: 1 };
+let AndroidForegroundServiceType: any = { FOREGROUND_SERVICE_TYPE_DATA_SYNC: 1 };
+
+try {
+    const NotifeeModule = require('@notifee/react-native');
+    notifee = NotifeeModule.default || NotifeeModule;
+    AndroidImportance = NotifeeModule.AndroidImportance || AndroidImportance;
+    AndroidForegroundServiceType = NotifeeModule.AndroidForegroundServiceType || AndroidForegroundServiceType;
+} catch (e) {
+    console.warn('Notifee native module not found, mocking notifee.', e);
+    notifee = {
+        requestPermission: async () => ({ authorizationStatus: 1 }),
+        createChannel: async () => 'mock-channel',
+        displayNotification: async () => { },
+        cancelNotification: async () => { },
+        registerForegroundService: () => { },
+        onForegroundEvent: () => () => { },
+        onBackgroundEvent: () => () => { },
+    };
+}
 import { DownloadResumable } from 'expo-file-system/legacy';
 
 const INTERNAL_DIR = `${documentDirectory}downloads/`;
@@ -103,7 +123,7 @@ export class Downloader {
 
     private static async startForegroundService(title: string) {
         if (Platform.OS !== 'android') return;
-        
+
         try {
             const channelId = await notifee.createChannel({
                 id: 'downloads',
@@ -147,7 +167,7 @@ export class Downloader {
                     progress: { max: 100, current: Math.round(progress * 100) },
                 },
             });
-        } catch (e) {}
+        } catch (e) { }
     }
 
     private static async stopForegroundService(title: string, success: boolean = true) {
@@ -166,7 +186,7 @@ export class Downloader {
                 this.foregroundResolver();
                 this.foregroundResolver = null;
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     static async pause() {
@@ -185,7 +205,7 @@ export class Downloader {
         if (this.activeDownload) {
             this.updateActiveDownload(this.activeDownload.fileName, this.activeDownload.progress);
         }
-        
+
         if (this.downloadResumable) {
             // The resumeAsync returns a promise when download finishes
             this.downloadResumable.resumeAsync().then(async (result) => {
@@ -204,7 +224,7 @@ export class Downloader {
     static async cancel() {
         this.cancelled = true;
         if (this.downloadResumable) {
-            try { await this.downloadResumable.cancelAsync(); } catch (e) {}
+            try { await this.downloadResumable.cancelAsync(); } catch (e) { }
         }
         await this.stopForegroundService('Video', false);
         this.clearActiveDownload();
@@ -241,7 +261,7 @@ export class Downloader {
                     };
                     onProgress(pObj);
                     this.updateActiveDownload(fileName, pObj);
-                    
+
                     // Throttle notification updates to avoid crashing system UI
                     if (Date.now() - lastUpdate > 1000) {
                         this.updateForegroundProgress(fileName, progress);
@@ -410,7 +430,7 @@ export class Downloader {
                         }
                         segmentFile.delete();
                     }
-                    
+
                     mergeProgress++;
                     const pObj = {
                         progress: mergeProgress / totalSegments,
@@ -431,7 +451,7 @@ export class Downloader {
             }
 
             await deleteAsync(tempDir, { idempotent: true });
-            
+
             if (this.cancelled) {
                 await this.stopForegroundService(fileName, false);
                 this.clearActiveDownload();

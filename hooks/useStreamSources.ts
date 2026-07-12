@@ -1,5 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
+import { usePluginsStore } from '@/store/pluginsStore';
+import { executeNuvioPlugin } from '@/services/pluginEngine';
 import { getExternalIds } from '@/services/tmdb';
 
 export interface StreamResult {
@@ -16,6 +18,8 @@ export interface StreamResult {
 
 export function useStreamSources() {
     const addons = useAddonsStore(s => s.addons);
+    const scrapers = usePluginsStore(s => s.scrapers);
+    const enabledScrapers = useMemo(() => scrapers.filter(sc => sc.enabled && sc.rawCode), [scrapers]);
     const [results, setResults] = useState<StreamResult[]>([]);
     const [loading, setLoading] = useState(true);
     const abortRef = useRef<AbortController | null>(null);
@@ -317,7 +321,43 @@ export function useStreamSources() {
             }
         });
 
-        await Promise.allSettled([...stremioPromises, ...cinemaPromises]);
+        // ─── Fetch from Nuvio Plugins (Local JS) ──────────────────────────
+        const nuvioPromises = enabledScrapers.map(async (scraper) => {
+            if (!tmdbId) return;
+            try {
+                const nuvioType = isMovie ? 'movie' : 'tv';
+                console.log(`Executing Nuvio Plugin: ${scraper.name} for ${tmdbId}`);
+                
+                const rawStreams = await executeNuvioPlugin(
+                    scraper.rawCode!,
+                    String(tmdbId),
+                    nuvioType,
+                    season ? Number(season) : null,
+                    episode ? Number(episode) : null
+                );
+                
+                if (signal.aborted) return;
+                
+                if (rawStreams && rawStreams.length > 0) {
+                    const mapped: StreamResult[] = rawStreams
+                        .filter(s => s.url || s.link)
+                        .map(s => ({
+                            title: s.name || s.title || scraper.name,
+                            url: s.url || s.link,
+                            source: s.source || scraper.name,
+                            quality: s.quality || (typeof s.quality === 'number' ? `${s.quality}p` : undefined),
+                            headers: s.headers || {},
+                        }));
+                    if (mapped.length > 0) {
+                        addResults(mapped, cinemaSourceNames);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error executing Nuvio Plugin ${scraper.name}:`, error);
+            }
+        });
+
+        await Promise.allSettled([...stremioPromises, ...cinemaPromises, ...nuvioPromises]);
         setLoading(false);
     }, [addons]);
 

@@ -29,6 +29,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useAddonsStore } from '@/store/addonsStore';
+import { usePluginsStore } from '@/store/pluginsStore';
 import { useRouter, useSegments } from 'expo-router';
 import { AppUpdateModal } from '@/components/AppUpdateModal';
 import { AppToast } from '@/components/AppToast';
@@ -97,6 +98,7 @@ export default function RootLayout() {
         useAddonsStore.getState().loadAddons().catch(err => {
             console.error('Failed to preload addons:', err);
         });
+        usePluginsStore.getState().loadRepos();
     }, []);
 
     useEffect(() => {
@@ -113,8 +115,8 @@ export default function RootLayout() {
                 return;
             }
 
-            if (url.startsWith('rogplay://')) {
-                const path = url.replace('rogplay://', '');
+            if (url.startsWith('rogplay://') || url.startsWith('stremio://')) {
+                const path = url.replace('rogplay://', '').replace('stremio://', '');
                 if (path.toLowerCase().endsWith('.json')) {
                     const addonUrl = `https://${path}`;
                     useAddonsStore.getState().addAddon(addonUrl)

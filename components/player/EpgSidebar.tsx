@@ -275,6 +275,10 @@ const EpgSidebar = React.memo(function EpgSidebar({
 
     useEffect(() => {
         if (!visible) return;
+        
+        // Immediately update now when the sidebar becomes visible
+        setNow(new Date());
+        
         const interval = setInterval(() => {
             setNow(new Date());
         }, 60000);
@@ -366,12 +370,12 @@ const EpgSidebar = React.memo(function EpgSidebar({
                                 <Text style={styles.progressTime}>{formatEpgTime(currentProg.end)}</Text>
                             </View>
                         </View>
-                    ) : (
+                    ) : !nextProg ? (
                         <Text style={styles.noDataText}>No program data</Text>
-                    )}
+                    ) : null}
                     
                     {nextProg && (
-                        <Text style={styles.nextPlayingText} numberOfLines={1}>
+                        <Text style={[styles.nextPlayingText, !currentProg && { marginTop: 2 }]} numberOfLines={1}>
                             Up Next: {nextProg.title} ({formatEpgTime(nextProg.start)})
                         </Text>
                     )}
@@ -441,7 +445,7 @@ const EpgSidebar = React.memo(function EpgSidebar({
                     initialNumToRender={12}
                     maxToRenderPerBatch={10}
                     windowSize={5}
-                    extraData={visiblePrograms}
+                    extraData={{ visiblePrograms, now }}
                 />
             </Animated.View>
         </View>

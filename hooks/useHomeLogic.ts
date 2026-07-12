@@ -11,7 +11,7 @@ import { Colors } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useThemeStore, computeThemeColors } from '@/store/themeStore';
-
+import { storage } from '@/store/mmkv';
 export interface VideoWithThumbnail extends MediaLibrary.Asset {
     thumbnailUri?: string;
 }
@@ -163,6 +163,68 @@ export function useHomeLogic() {
         }
     };
 
+
+    const loadThumbnails = (videoList: VideoWithThumbnail[]) => {
+        if (thumbTimeoutRef.current) {
+            clearTimeout(thumbTimeoutRef.current);
+        }
+        thumbTimeoutRef.current = setTimeout(async () => {
+            if (!mountedRef.current) return;
+            try {
+                await ensureCacheDir();
+
+                // Phase 1: Load all cached thumbnails rapidly
+                const withCache = await Promise.all(videoList.map(async (video) => {
+                    const cached = await getCachedThumbnail(video.id);
+                    return cached ? { ...video, thumbnailUri: cached } : video;
+                }));
+
+                if (!mountedRef.current) return;
+
+                setVideos(prev => {
+                    return prev.map(v => {
+                        const cachedItem = withCache.find(c => c.id === v.id);
+                        return cachedItem && cachedItem.thumbnailUri ? { ...v, thumbnailUri: cachedItem.thumbnailUri } : v;
+                    });
+                });
+
+                // Phase 2: Generate missing thumbnails in small batches
+                const batchSize = 4;
+                for (let i = 0; i < withCache.length; i += batchSize) {
+                    if (!mountedRef.current) return;
+                    const batch = withCache.slice(i, i + batchSize);
+                    const missingInBatch = batch.filter(v => !v.thumbnailUri);
+
+                    if (missingInBatch.length === 0) continue;
+
+                    const generated = await Promise.all(
+                        missingInBatch.map(async (video) => {
+                            const thumbnailUri = await generateThumbnail(video.uri, video.id);
+                            return { id: video.id, thumbnailUri };
+                        })
+                    );
+
+                    const validGenerated = generated.filter(g => g.thumbnailUri);
+
+                    if (validGenerated.length > 0) {
+                        setVideos(prev => {
+                            const newVideos = [...prev];
+                            validGenerated.forEach(g => {
+                                const index = newVideos.findIndex(v => v.id === g.id);
+                                if (index !== -1) {
+                                    newVideos[index] = { ...newVideos[index], thumbnailUri: g.thumbnailUri };
+                                }
+                            });
+                            return newVideos;
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Error in background thumbnail generation:', err);
+            }
+        }, 50);
+    };
+
     const loadVideos = async () => {
         try {
             if (!permissionResponse || permissionResponse.status !== 'granted') {
@@ -173,7 +235,27 @@ export function useHomeLogic() {
                 }
             }
 
-            setLoading(true);
+            // --- INSTANT CACHE LOAD ---
+            try {
+                const cachedString = storage?.getString('cached_local_videos');
+                if (cachedString) {
+                    const cachedVideos = JSON.parse(cachedString);
+                    if (Array.isArray(cachedVideos) && cachedVideos.length > 0) {
+                        setVideos(cachedVideos);
+                        setFilteredVideos(cachedVideos);
+                        setLoading(false);
+                        loadThumbnails(cachedVideos);
+                    } else {
+                        setLoading(true);
+                    }
+                } else {
+                    setLoading(true);
+                }
+            } catch (e) {
+                setLoading(true);
+            }
+
+            // --- BACKGROUND FETCH ---
             const media = await MediaLibrary.getAssetsAsync({
                 mediaType: MediaLibrary.MediaType.video,
                 first: 100, // You can increase this if needed
@@ -182,66 +264,21 @@ export function useHomeLogic() {
 
             // Set videos instantly without thumbnails
             const instantVideos = media.assets.map(asset => ({ ...asset, thumbnailUri: undefined as string | undefined }));
+
+            // Save to cache for next time
+            try {
+                if (storage) {
+                    storage.set('cached_local_videos', JSON.stringify(instantVideos));
+                }
+            } catch (e) { }
+
             setVideos(instantVideos);
             setFilteredVideos(instantVideos);
             setLoading(false);
 
-            // Load thumbnails asynchronously (deferred to avoid blocking UI)
-            thumbTimeoutRef.current = setTimeout(async () => {
-                if (!mountedRef.current) return;
-                try {
-                    await ensureCacheDir();
+            // Load thumbnails asynchronously
+            loadThumbnails(instantVideos);
 
-                    // Phase 1: Load all cached thumbnails rapidly
-                    const withCache = await Promise.all(instantVideos.map(async (video) => {
-                        const cached = await getCachedThumbnail(video.id);
-                        return cached ? { ...video, thumbnailUri: cached } : video;
-                    }));
-
-                    if (!mountedRef.current) return;
-
-                    setVideos(prev => {
-                        return prev.map(v => {
-                            const cachedItem = withCache.find(c => c.id === v.id);
-                            return cachedItem && cachedItem.thumbnailUri ? { ...v, thumbnailUri: cachedItem.thumbnailUri } : v;
-                        });
-                    });
-
-                    // Phase 2: Generate missing thumbnails in small batches
-                    const batchSize = 4;
-                    for (let i = 0; i < withCache.length; i += batchSize) {
-                        if (!mountedRef.current) return;
-                        const batch = withCache.slice(i, i + batchSize);
-                        const missingInBatch = batch.filter(v => !v.thumbnailUri);
-
-                        if (missingInBatch.length === 0) continue;
-
-                        const generated = await Promise.all(
-                            missingInBatch.map(async (video) => {
-                                const thumbnailUri = await generateThumbnail(video.uri, video.id);
-                                return { id: video.id, thumbnailUri };
-                            })
-                        );
-
-                        const validGenerated = generated.filter(g => g.thumbnailUri);
-
-                        if (validGenerated.length > 0) {
-                            setVideos(prev => {
-                                const newVideos = [...prev];
-                                validGenerated.forEach(g => {
-                                    const index = newVideos.findIndex(v => v.id === g.id);
-                                    if (index !== -1) {
-                                        newVideos[index] = { ...newVideos[index], thumbnailUri: g.thumbnailUri };
-                                    }
-                                });
-                                return newVideos;
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error in background thumbnail generation:', err);
-                }
-            }, 50);
         } catch (error) {
             console.error('Error loading videos:', error);
             setLoading(false);

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { storage } from './mmkv';
 import axios from 'axios';
 import { useAuthStore } from './authStore';
+import { usePluginsStore } from './pluginsStore';
 
 const LOCAL_ADDONKEY = 'localaddondata';
 const JSON_DATAKEY = 'localjsondatakey';
@@ -250,6 +251,14 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                             id: data.id || url,
                             manifest: data
                         }];
+                    } else if (data.scrapers && Array.isArray(data.scrapers)) {
+                        // This is a Nuvio Plugin Repo! It was synced via the unified addon list.
+                        // Ensure pluginsStore downloads it without adding it as a Stremio addon.
+                        const pluginsStore = usePluginsStore.getState();
+                        if (!pluginsStore.repos.some(r => r.repoUrl === url)) {
+                            pluginsStore.addRepo(url).catch(e => console.warn('Failed to add synced plugin repo:', e));
+                        }
+                        return [];
                     } else if (isStremioUrl || (data.id && data.resources && data.catalogs)) {
                         items = [{
                             title: data.name || data.title,
@@ -375,6 +384,17 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                     id: data.id || finalUrl,
                     manifest: data
                 }];
+            } else if (data.scrapers && Array.isArray(data.scrapers)) {
+                // It's a Nuvio Plugin Repo! Delegate JS downloading to pluginsStore.
+                await usePluginsStore.getState().addRepo(finalUrl);
+                
+                // Track the URL in addonsStore so it syncs across devices
+                const newUrls = [...addonUrls, finalUrl];
+                set({ addonUrls: newUrls });
+                storage.set(LOCAL_ADDONKEY, JSON.stringify(newUrls));
+                get().syncWithBackend();
+                
+                return true;
             } else if (isStremioUrl || (data.id && data.resources && data.catalogs)) {
                 // Stremio Manifest
                 isStremio = true;
@@ -429,15 +449,17 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             console.warn('Cannot remove built-in addon');
             return;
         }
-        const { addonUrls, addons } = get();
-        const newUrls = addonUrls.filter(u => u !== sourceUrl);
-        const newAddons = addons.filter(a => a.source !== sourceUrl);
+        const { addons, addonUrls } = get();
+        const updatedUrls = addonUrls.filter(u => u !== sourceUrl);
+        const updatedAddons = addons.filter(a => a.source !== sourceUrl);
 
-        set({ addons: newAddons, addonUrls: newUrls });
-        storage.set(LOCAL_ADDONKEY, JSON.stringify(newUrls));
-        storage.set(JSON_DATAKEY, JSON.stringify(newAddons));
+        set({ addonUrls: updatedUrls, addons: updatedAddons });
+        storage.set(LOCAL_ADDONKEY, JSON.stringify(updatedUrls));
+        storage.set(JSON_DATAKEY, JSON.stringify(updatedAddons));
 
-        // Sync with backend if logged in
-        get().syncWithBackend();
+        // Just in case it was a plugin, remove it from pluginsStore too
+        usePluginsStore.getState().removeRepo(sourceUrl).catch(() => {});
+
+        await get().syncWithBackend();
     }
 }));
