@@ -2,9 +2,12 @@
   "expo": {
     "name": "RogPlay",
     "slug": "rogplay",
-    "version": "6.6.0",
+    "version": "7.0.0",
     "orientation": "default",
-    "scheme": "rogplay",
+    "scheme": [
+      "rogplay",
+      "stremio"
+    ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -30,7 +33,7 @@
     "android": {
       "package": "com.rogplay.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 18,
+      "versionCode": 20,
       "minSdkVersion": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -59,6 +62,12 @@
         },
         {
           "action": "VIEW",
+          "data": {
+            "scheme": "stremio"
+          }
+        },
+        {
+          "action": "VIEW",
           "category": [
             "DEFAULT",
             "BROWSABLE"
@@ -72,6 +81,20 @@
             },
             {
               "mimeType": "application/vnd.apple.mpegurl"
+            }
+          ]
+        },
+        {
+          "action": "SEND",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "video/*"
+            },
+            {
+              "mimeType": "text/plain"
             }
           ]
         },

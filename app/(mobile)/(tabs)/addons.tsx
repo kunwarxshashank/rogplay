@@ -4,6 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAddonsStore, TMDB_BUILTIN_SOURCE } from '@/store/addonsStore';
+import { usePluginsStore } from '@/store/pluginsStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -14,14 +15,17 @@ import { BrowserAddonSkeleton } from '@/components/Skeleton';
 import { AddonsFTUE } from '@/components/addons/AddonsFTUE';
 import { useTheme } from '@/hooks/useTheme';
 
-const FILTERS = ['All', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
+const FILTERS = ['All', 'Plugins', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
 
 function useAddonsLogic() {
     const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
+    const { repos, addRepo, removeRepo, isLoading: isPluginsLoading, scrapers, toggleScraper } = usePluginsStore();
     const { user } = useAuthStore();
     const isPremium = user?.isPremium || false;
 
     const [modalVisible, setModalVisible] = useState(false);
+    const [pluginModalVisible, setPluginModalVisible] = useState(false);
+    const [selectedPluginRepo, setSelectedPluginRepo] = useState<string | null>(null);
     const [newUrl, setNewUrl] = useState('');
     const [adding, setAdding] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -51,7 +55,10 @@ function useAddonsLogic() {
     const [refreshing, setRefreshing] = useState(false);
     const onRefresh = async () => {
         setRefreshing(true);
-        await loadAddons();
+        await Promise.all([
+            loadAddons(),
+            usePluginsStore.getState().loadRepos()
+        ]);
         setRefreshing(false);
     };
 
@@ -69,20 +76,33 @@ function useAddonsLogic() {
         }
     };
 
+    const allAddons = useMemo(() => {
+        const pluginAddons = repos.map(repo => ({
+            title: repo.name,
+            description: repo.scrapers.map(s => s.name).join(', ') || 'Nuvio Repository',
+            type: 'plugin',
+            source: repo.repoUrl,
+            logo: repo.scrapers[0]?.logo || 'https://via.placeholder.com/60',
+            version: repo.version
+        }));
+        return [...addons, ...pluginAddons];
+    }, [addons, repos]);
+
     const filteredAddons = useMemo(() => {
-        return addons.filter(item => {
+        return allAddons.filter(item => {
             const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase());
             const type = item.type?.toLowerCase() || 'others';
             let matchesFilter = true;
 
             if (selectedFilter !== 'All') {
-                if (selectedFilter === 'Live TV') matchesFilter = type.includes('tv') || type.includes('live');
+                if (selectedFilter === 'Plugins') matchesFilter = type === 'plugin';
+                else if (selectedFilter === 'Live TV') matchesFilter = type.includes('tv') || type.includes('live');
                 else if (selectedFilter === 'Stremio') matchesFilter = type === 'stremio' || !!item.manifest;
                 else if (selectedFilter === 'Cinema') matchesFilter = type.includes('cinema');
                 else if (selectedFilter === 'Movies') matchesFilter = type.includes('movie');
                 else if (selectedFilter === 'NSFW') matchesFilter = type.includes('nsfw');
                 else if (selectedFilter === 'Others') {
-                    const isKnown = type.includes('tv') || type.includes('live') || type === 'stremio' ||
+                    const isKnown = type === 'plugin' || type.includes('tv') || type.includes('live') || type === 'stremio' ||
                         !!item.manifest || type.includes('cinema') || type.includes('movie') ||
                         type.includes('nsfw');
                     matchesFilter = !isKnown;
@@ -91,12 +111,21 @@ function useAddonsLogic() {
 
             return matchesSearch && matchesFilter;
         });
-    }, [addons, searchQuery, selectedFilter]);
+    }, [allAddons, searchQuery, selectedFilter]);
 
     const handleOpenAddon = (item: any) => {
         if (item.type === 'subtitles') return;
+        if (item.type === 'plugin') {
+            setSelectedPluginRepo(item.source);
+            setPluginModalVisible(true);
+            return;
+        }
         setActiveCinemaAddon(item.url || item.source);
         router.push('/cinema');
+    };
+
+    const handleRemoveAddon = (item: any) => {
+        removeAddon(item.source);
     };
 
     const hasSeenAddonFTUE = useSettingsStore(state => state.hasSeenAddonFTUE);
@@ -104,10 +133,10 @@ function useAddonsLogic() {
     const setHasSeenAddonFTUE = useSettingsStore(state => state.setHasSeenAddonFTUE);
 
     return {
-        addons, activeColors, theme, modalVisible, setModalVisible, newUrl, setNewUrl, adding, setAdding,
-        searchQuery, setSearchQuery, selectedFilter, setSelectedFilter, router, isLoading, filteredAddons,
-        handleAdd, handleOpenAddon, removeAddon, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
-        refreshing, onRefresh
+        addons: allAddons, activeColors, theme, modalVisible, setModalVisible, newUrl, setNewUrl, adding, setAdding,
+        searchQuery, setSearchQuery, selectedFilter, setSelectedFilter, router, isLoading: isLoading || isPluginsLoading, filteredAddons,
+        handleAdd, handleOpenAddon, handleRemoveAddon, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
+        refreshing, onRefresh, pluginModalVisible, setPluginModalVisible, selectedPluginRepo, scrapers, toggleScraper
     };
 }
 
@@ -115,8 +144,8 @@ export function AddonsMobile() {
     const {
         addons, activeColors, theme, modalVisible, setModalVisible, newUrl, setNewUrl, adding,
         searchQuery, setSearchQuery, selectedFilter, setSelectedFilter, isLoading, filteredAddons,
-        handleAdd, handleOpenAddon, removeAddon, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
-        refreshing, onRefresh
+        handleAdd, handleOpenAddon, handleRemoveAddon, isPremium, hasSeenAddonFTUE, setHasSeenAddonFTUE,
+        refreshing, onRefresh, pluginModalVisible, setPluginModalVisible, selectedPluginRepo, scrapers, toggleScraper
     } = useAddonsLogic();
 
     const isFtueVisible = !hasSeenAddonFTUE && Platform.OS !== 'web';
@@ -143,7 +172,7 @@ export function AddonsMobile() {
                 {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                 <View style={styles.logoContainer}>
                     <Image
-                        source={{ uri: item.logo || 'https://via.placeholder.com/60' }}
+                        source={item.logo ? { uri: item.logo } : require('@/assets/images/icon.png')}
                         style={styles.logo}
                     />
                     {item.type === 'nsfw' && (
@@ -157,18 +186,20 @@ export function AddonsMobile() {
                     <Text style={[styles.desc, { color: activeColors.textSecondary }]} numberOfLines={2}>{item.description}</Text>
                     <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                         <View style={[styles.badge,
-                        item.type === 'livetv' ? { backgroundColor: 'rgba(234, 179, 8, 0.15)' } :
-                            item.type === 'movie' ? { backgroundColor: 'rgba(59, 130, 246, 0.15)' } :
-                                item.type === 'cinema' ? { backgroundColor: 'rgba(139, 92, 246, 0.15)' } :
-                                    item.type === 'stremio' ? { backgroundColor: 'rgba(236, 72, 153, 0.15)' } :
-                                        { backgroundColor: 'rgba(148, 163, 184, 0.15)' }
+                        item.type === 'plugin' ? { backgroundColor: 'rgba(234, 88, 12, 0.15)' } :
+                            item.type === 'livetv' ? { backgroundColor: 'rgba(234, 179, 8, 0.15)' } :
+                                item.type === 'movie' ? { backgroundColor: 'rgba(59, 130, 246, 0.15)' } :
+                                    item.type === 'cinema' ? { backgroundColor: 'rgba(139, 92, 246, 0.15)' } :
+                                        item.type === 'stremio' ? { backgroundColor: 'rgba(236, 72, 153, 0.15)' } :
+                                            { backgroundColor: 'rgba(148, 163, 184, 0.15)' }
                         ]}>
                             <Text style={[styles.badgeText,
-                            item.type === 'livetv' ? { color: '#eab308' } :
-                                item.type === 'movie' ? { color: '#3b82f6' } :
-                                    item.type === 'cinema' ? { color: '#8b5cf6' } :
-                                        item.type === 'stremio' ? { color: '#ec4899' } :
-                                            { color: activeColors.textSecondary }
+                            item.type === 'plugin' ? { color: '#ea580c' } :
+                                item.type === 'livetv' ? { color: '#eab308' } :
+                                    item.type === 'movie' ? { color: '#3b82f6' } :
+                                        item.type === 'cinema' ? { color: '#8b5cf6' } :
+                                            item.type === 'stremio' ? { color: '#ec4899' } :
+                                                { color: activeColors.textSecondary }
                             ]}>{item.type?.toUpperCase() || 'OTHER'}</Text>
                         </View>
                         {isBuiltin && (
@@ -179,12 +210,14 @@ export function AddonsMobile() {
                         )}
                     </View>
                 </View>
-                {!isBuiltin && (
-                    <TouchableOpacity onPress={() => removeAddon(item.source)} style={styles.deleteBtn}>
-                        <MaterialIcons name="delete-outline" size={24} color={activeColors.error} />
-                    </TouchableOpacity>
-                )}
-            </TouchableOpacity>
+                {
+                    !isBuiltin && (
+                        <TouchableOpacity onPress={() => handleRemoveAddon(item)} style={styles.deleteBtn}>
+                            <MaterialIcons name="delete-outline" size={24} color={activeColors.error} />
+                        </TouchableOpacity>
+                    )
+                }
+            </TouchableOpacity >
         );
     };
 
@@ -201,7 +234,7 @@ export function AddonsMobile() {
                 />
             )}
             {!activeColors.isAmoled && (
-              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
             )}
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <View style={styles.header}>
@@ -323,7 +356,7 @@ export function AddonsMobile() {
 
                                 <View style={styles.modalActions}>
                                     <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
-                                        {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
+                                        {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Extension</Text>}
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -351,11 +384,74 @@ export function AddonsMobile() {
 
                                 <View style={styles.modalActions}>
                                     <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: activeColors.primary }]} onPress={handleAdd} disabled={adding}>
-                                        {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Expansion</Text>}
+                                        {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Install Extension</Text>}
                                     </TouchableOpacity>
                                 </View>
                             </View>
                         </BlurView>
+                    )}
+                </Modal>
+
+                <Modal visible={pluginModalVisible} transparent animationType="slide">
+                    {activeColors.isAmoled ? (
+                        <View style={[styles.modalOverlay, { backgroundColor: '#000', justifyContent: 'flex-end', padding: 0 }]}>
+                            <View style={[styles.bottomSheet, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={[styles.modalTitle, { color: activeColors.text }]}>Configure Plugin</Text>
+                                    <TouchableOpacity onPress={() => setPluginModalVisible(false)} style={styles.closeBtn}>
+                                        <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+                                    {scrapers.filter(s => s.sourceRepoUrl === selectedPluginRepo).map((scraper) => (
+                                        <View key={scraper.id} style={[styles.scraperCard, { borderColor: activeColors.border, backgroundColor: activeColors.background }]}>
+                                            <Image source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} style={styles.scraperLogo} />
+                                            <View style={styles.scraperInfo}>
+                                                <Text style={[styles.scraperName, { color: activeColors.text }]}>{scraper.name} <Text style={{ fontSize: 10, color: activeColors.textSecondary }}>v{scraper.version}</Text></Text>
+                                                <Text style={[styles.scraperDesc, { color: activeColors.textSecondary }]} numberOfLines={2}>{scraper.description}</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.toggleBtn, { backgroundColor: scraper.enabled ? activeColors.primary : activeColors.surface, borderColor: activeColors.border }]}
+                                                onPress={() => toggleScraper(scraper.id)}
+                                            >
+                                                <MaterialIcons name={scraper.enabled ? "check" : "power-settings-new"} size={20} color={scraper.enabled ? "#fff" : activeColors.textSecondary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={[styles.modalOverlay, { justifyContent: 'flex-end', padding: 0 }]}>
+                            <BlurView intensity={30} tint={theme.includes('light') ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />
+                            <View style={[styles.bottomSheet, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={[styles.modalTitle, { color: activeColors.text }]}>Configure Plugin</Text>
+                                    <TouchableOpacity onPress={() => setPluginModalVisible(false)} style={styles.closeBtn}>
+                                        <MaterialIcons name="close" size={20} color={activeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+                                    {scrapers.filter(s => s.sourceRepoUrl === selectedPluginRepo).map((scraper) => (
+                                        <View key={scraper.id} style={[styles.scraperCard, { borderColor: activeColors.border, backgroundColor: activeColors.background }]}>
+                                            <Image source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} style={styles.scraperLogo} />
+                                            <View style={styles.scraperInfo}>
+                                                <Text style={[styles.scraperName, { color: activeColors.text }]}>{scraper.name} <Text style={{ fontSize: 10, color: activeColors.textSecondary }}>v{scraper.version}</Text></Text>
+                                                <Text style={[styles.scraperDesc, { color: activeColors.textSecondary }]} numberOfLines={2}>{scraper.description}</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.toggleBtn, { backgroundColor: scraper.enabled ? activeColors.primary : activeColors.surface, borderColor: activeColors.border }]}
+                                                onPress={() => toggleScraper(scraper.id)}
+                                            >
+                                                <MaterialIcons name={scraper.enabled ? "check" : "power-settings-new"} size={20} color={scraper.enabled ? "#fff" : activeColors.textSecondary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        </View>
                     )}
                 </Modal>
 
@@ -622,6 +718,50 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontFamily: 'Outfit_700Bold',
         fontSize: 16,
+    },
+    bottomSheet: {
+        width: '100%',
+        maxHeight: '80%',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 24,
+        borderTopWidth: 1,
+    },
+    scraperCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderRadius: 20,
+        marginBottom: 12,
+        borderWidth: 1,
+    },
+    scraperLogo: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        backgroundColor: '#1a1a1a',
+    },
+    scraperInfo: {
+        flex: 1,
+        marginLeft: 16,
+        marginRight: 12,
+    },
+    scraperName: {
+        fontSize: 16,
+        fontFamily: 'Outfit_600SemiBold',
+    },
+    scraperDesc: {
+        fontSize: 12,
+        marginTop: 2,
+        fontFamily: 'Inter_400Regular',
+    },
+    toggleBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     }
 });
 

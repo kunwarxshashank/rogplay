@@ -279,7 +279,7 @@ export default function LocalMusicScreen() {
                 />
             )}
             {!activeColors.isAmoled && (
-              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
+                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
             )}
 
             {/* Header always visible, outside FlatList to keep search bar stable */}
@@ -322,7 +322,7 @@ export default function LocalMusicScreen() {
                 <View style={[styles.loadingContainer, { paddingTop: insets.top + 100 }]}>
                     <ActivityIndicator size="large" color={activeColors.primary} />
                     <Text style={[styles.loadingText, { color: activeColors.textSecondary }]}>
-                        Scanning device...
+                        Scanning Music...
                     </Text>
                 </View>
             ) : (

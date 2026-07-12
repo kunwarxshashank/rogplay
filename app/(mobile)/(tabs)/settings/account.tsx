@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Modal, Dimensions, Linking, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Colors, Layout } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios from 'axios';
 import { PlansModal } from '@/components/PlansModal';
+import { TransactionHistoryModal } from '@/components/TransactionHistoryModal';
 import { useTheme } from '@/hooks/useTheme';
 
 const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
@@ -20,8 +21,9 @@ const { width } = Dimensions.get('window');
 export default function AccountScreen() {
     const { colors: currentColors } = useTheme();
     const router = useRouter();
-    const { user, logout } = useAuthStore();
+    const { user, logout, setAuth } = useAuthStore();
     const [isModalVisible, setModalVisible] = useState(false);
+    const [isTransactionModalVisible, setTransactionModalVisible] = useState(false);
     const isGuest = !user || user.id === 'guest';
 
     const isPremium = user?.isPremium || false;
@@ -29,6 +31,36 @@ export default function AccountScreen() {
     const [isScannerVisible, setScannerVisible] = useState(false);
     const [scanning, setScanning] = useState(false);
     const { token } = useAuthStore();
+
+    useEffect(() => {
+        if (!user || user.id === 'guest') return;
+
+        const refreshUserInfo = async () => {
+            try {
+                const response = await axios.post(`${DB_BASEURL}/userinfo`, {
+                    email: user.email,
+                    bat: "highrisk"
+                });
+
+                if (response.status === 200 && response.data?.data) {
+                    const data = response.data.data;
+                    const updatedUser = {
+                        ...user,
+                        isPremium: data.ispremium || false,
+                        subscriptionStart: data.subscriptionStart,
+                        subscriptionEnd: data.subscriptionEnd,
+                    };
+                    if (token) {
+                        setAuth(token, updatedUser);
+                    }
+                }
+            } catch (error) {
+                console.error('Error refreshing user info:', error);
+            }
+        };
+
+        refreshUserInfo();
+    }, []);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'N/A';
@@ -135,7 +167,7 @@ export default function AccountScreen() {
                     <View style={styles.statusRow}>
                         <View style={styles.statusItem}>
                             <Text style={styles.statusLabel}>Status</Text>
-                            <Text style={styles.statusValue}>{isPremium ? 'ROBINHOOD' : 'HUMAN'}</Text>
+                            <Text style={styles.statusValue}>{isPremium ? 'CONTRIBUTOR' : 'USER'}</Text>
                         </View>
                         <View style={styles.statusDivider} />
                         <View style={styles.statusItem}>
@@ -206,6 +238,23 @@ export default function AccountScreen() {
                                     </View>
                                 </View>
                                 <MaterialIcons name="qr-code-scanner" size={20} color={currentColors.textSecondary} />
+                            </View>
+                        </TVFocusable>
+                    )}
+
+                    {user && user.id !== 'guest' && (
+                        <TVFocusable onPress={() => setTransactionModalVisible(true)} style={styles.authItemWrapper}>
+                            <View style={[styles.authItem, { backgroundColor: currentColors.surface }]}>
+                                <View style={styles.authItemLeft}>
+                                    <View style={[styles.authIconCircle, { backgroundColor: `${currentColors.primary}15` }]}>
+                                        <MaterialIcons name="history" size={20} color={currentColors.primary} />
+                                    </View>
+                                    <View>
+                                        <Text style={[styles.authItemLabel, { color: currentColors.text }]}>Transaction History</Text>
+                                        <Text style={[styles.authItemDesc, { color: currentColors.textSecondary }]}>View your past subscriptions</Text>
+                                    </View>
+                                </View>
+                                <MaterialIcons name="chevron-right" size={20} color={currentColors.textSecondary} />
                             </View>
                         </TVFocusable>
                     )}
@@ -290,6 +339,14 @@ export default function AccountScreen() {
                 visible={isModalVisible}
                 onClose={() => setModalVisible(false)}
                 currentColors={currentColors}
+            />
+
+            {/* Transaction History Modal */}
+            <TransactionHistoryModal
+                visible={isTransactionModalVisible}
+                onClose={() => setTransactionModalVisible(false)}
+                currentColors={currentColors}
+                userEmail={user?.email || ''}
             />
         </SafeAreaView>
     );

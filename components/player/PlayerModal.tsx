@@ -333,7 +333,7 @@ export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onS
     const [screenData, setScreenData] = useState(Dimensions.get('window'));
     const [currentSpeed, setCurrentSpeed] = useState(selectedSpeed);
 
-    const quickSpeeds = [0.25, 1.0, 1.5, 2.0, 3.0];
+    const quickSpeeds = [0.25, 1.0, 1.5, 2.0];
 
     useEffect(() => {
         setCurrentSpeed(selectedSpeed);

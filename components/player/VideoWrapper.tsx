@@ -37,11 +37,79 @@ interface VideoWrapperProps {
     duration: number; // For VLC seek fraction calculations
 }
 
+const getFriendlyErrorMessage = (rawError: string): string => {
+    if (!rawError) return "An error occurred while trying to play this video. Please try a different server.";
+
+    const err = rawError.toLowerCase();
+
+    // If it's a Source error from ExoPlayer (which encompasses 403, 404, bad HTTP status, etc)
+    if (err.includes('source error') || err.includes('404') || err.includes('403') || err.includes('forbidden') || err.includes('bad_http_status')) {
+        return "Source Error: The stream is unavailable, forbidden, or broken. Try a different server.";
+    }
+
+    if (err.includes('timeout') || err.includes('network') || err.includes('connection') || err.includes('socket') || err.includes('unknownhost')) {
+        return "Network connection issue. Please check your internet or try a different server.";
+    }
+
+    if (err.includes('unrecognized') || err.includes('unsupported') || err.includes('malformed')) {
+        return "Source Error: This video format is unsupported by your device.";
+    }
+    if (err.includes('drm') || err.includes('license')) {
+        return "This stream is protected (DRM) and cannot be played.";
+    }
+    if (err.includes('mediacodec') || err.includes('decoder')) {
+        return "Your device does not support decoding this video format.";
+    }
+    if (err.includes('behindlivewindow')) {
+        return "Live stream interrupted. Please retry.";
+    }
+
+    return "The video failed to play. Please select a different stream or server.";
+};
+
 const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoWrapper(props, ref) {
     const { streamUrl, headersData, drmData, newDrmType, isPlaying, playbackSpeed, volume, isMute, resizeMode, bgPlay, importedSubtitles, allTextTracks, selectedAudioTrack, selectedVideoTrack, selectedTextTrack, onProgress, onBuffer, onLoad, onError, onTextTracks, style, duration } = props;
 
+    const safeStreamUrl = React.useMemo(() => {
+        if (!streamUrl) return streamUrl;
+        try {
+            return encodeURI(decodeURI(streamUrl));
+        } catch (e) {
+            return streamUrl.replace(/ /g, '%20').replace(/\[/g, '%5B').replace(/\]/g, '%5D');
+        }
+    }, [streamUrl]);
+
+    const finalHeaders = React.useMemo(() => {
+        const headers = { ...(headersData || {}) };
+        if (safeStreamUrl) {
+            try {
+                const parsedUrl = new URL(safeStreamUrl);
+                const referer = safeStreamUrl;
+                const origin = parsedUrl.origin;
+
+                let hasReferer = false;
+                let hasOrigin = false;
+                let hasUserAgent = false;
+
+                // Case-insensitive check
+                for (const key in headers) {
+                    if (key.toLowerCase() === 'referer') hasReferer = true;
+                    if (key.toLowerCase() === 'origin') hasOrigin = true;
+                    if (key.toLowerCase() === 'user-agent') hasUserAgent = true;
+                }
+
+                if (!hasReferer) headers['Referer'] = referer;
+                if (!hasOrigin) headers['Origin'] = origin;
+                if (!hasUserAgent) headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+            } catch (e) {
+                // Ignore URL parsing errors
+            }
+        }
+        return headers;
+    }, [safeStreamUrl, headersData]);
+
+    const { isVlcRequired, isDetecting, streamType } = useStreamType(safeStreamUrl, finalHeaders);
     const internalRef = useRef<any>(null);
-    const { isVlcRequired, isDetecting } = useStreamType(streamUrl, headersData);
     const { theme } = useSettingsStore();
     const [vlcSeek, setVlcSeek] = useState<number>(0);
     const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -56,11 +124,11 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
     }, []);
 
     const vlcSource = React.useMemo(() => ({
-        uri: streamUrl,
-        headers: headersData,
-        isNetwork: !!(streamUrl && streamUrl.startsWith('http')),
+        uri: safeStreamUrl,
+        headers: finalHeaders,
+        isNetwork: !!(safeStreamUrl && safeStreamUrl.startsWith('http')),
         autoplay: true,
-    }), [streamUrl, headersData]);
+    }), [safeStreamUrl, finalHeaders]);
 
     const vlcInitOptions = React.useMemo(() => [
         "--codec=hw",
@@ -71,6 +139,8 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         "--drop-late-frames",
         "--skip-frames",
         "--avcodec-hw=any",
+        "--http-reconnect",
+        "--adaptive-use-access",
         "--rtsp-tcp",
         "--aout=opensles",
         "--audio-resampler=soxr",
@@ -82,7 +152,9 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
     ], []);
 
     const vlcMediaOptions = React.useMemo(() => [
-        ":network-caching=2000",
+        ":network-caching=3000",
+        ":live-caching=3000",
+        ":http-reconnect",
         ":clock-jitter=0",
         ":no-osd",
     ], []);
@@ -154,17 +226,42 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         }
     }));
 
-    const videoSource = React.useMemo(() => ({
-        uri: streamUrl,
-        headers: headersData,
-        textTracks: importedSubtitles,
-        drm: drmData ? {
-            type: newDrmType,
-            licenseServer: drmData,
-        } : undefined
-    }), [streamUrl, headersData, importedSubtitles, drmData, newDrmType]);
+    const videoSource = React.useMemo(() => {
+        const src: any = { uri: safeStreamUrl };
 
-    if (isDetecting || !streamUrl) {
+        const streamUrlLower = safeStreamUrl ? safeStreamUrl.toLowerCase() : '';
+        if (streamType === 'hls' && !streamUrlLower.includes('.m3u8')) src.type = 'm3u8';
+        if (streamType === 'mpd' && !streamUrlLower.includes('.mpd')) src.type = 'mpd';
+        if (streamType === 'mp4' && !streamUrlLower.includes('.mp4')) src.type = 'mp4';
+
+        if (finalHeaders && Object.keys(finalHeaders).length > 0) {
+            // Ensure all header values are strings
+            const safeHeaders: Record<string, string> = {};
+            for (const key in finalHeaders) {
+                if (finalHeaders[key] !== undefined && finalHeaders[key] !== null) {
+                    safeHeaders[key] = String(finalHeaders[key]);
+                }
+            }
+            if (Object.keys(safeHeaders).length > 0) {
+                src.headers = safeHeaders;
+            }
+        }
+
+        if (importedSubtitles && importedSubtitles.length > 0) {
+            src.textTracks = importedSubtitles;
+        }
+
+        if (drmData) {
+            src.drm = {
+                type: newDrmType,
+                licenseServer: drmData,
+            };
+        }
+
+        return src;
+    }, [safeStreamUrl, finalHeaders, importedSubtitles, drmData, newDrmType, streamType]);
+
+    if (isDetecting || !safeStreamUrl) {
         return (
             <View style={[styles.loaderContainer, style]}>
                 <ActivityIndicator size="large" color="white" />
@@ -194,9 +291,9 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         return (
             <View style={[styles.video, style, { backgroundColor: 'black' }]}>
                 <VLCPlayer
-                    key={streamUrl}
+                    key={safeStreamUrl}
                     ref={internalRef}
-                    style={isAndroidBg ? { width: 1, height: 1, opacity: 0 } : StyleSheet.absoluteFill}
+                    style={isAndroidBg ? [StyleSheet.absoluteFill, { opacity: 0 }] : StyleSheet.absoluteFill}
                     source={{ ...vlcSource }}
                     initOptions={[...vlcInitOptions]}
                     mediaOptions={[...vlcMediaOptions]}
@@ -207,7 +304,7 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                     volume={volume}
                     muted={isMute}
                     resizeMode={resizeMode}
-                    playInBackground={bgPlay}
+                    playInBackground={true} // ALWAYS true to bypass ReactVlcPlayerView's buggy onHostPause that crashes when Surface is destroyed
                     onProgress={(data: any) => {
                         onProgress(data, true);
                         if (data?.currentTime > 0) {
@@ -228,10 +325,11 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                     onVideoEnd={() => onBuffer({ isBuffering: false })}
                     onError={(e: any) => {
                         onBuffer({ isBuffering: false });
-                        console.error('VLC Playback Error', e);
+                        console.warn('VLC Playback Error', e);
                         const errStr = (typeof e === 'string' && e) || e?.message || '';
-                        setPlaybackError(`Playback error: ${errStr || 'Unknown error'}`);
-                        onError && onError(`Playback error: ${errStr || 'Unknown error'}`);
+                        const friendlyMsg = getFriendlyErrorMessage(errStr);
+                        setPlaybackError(friendlyMsg);
+                        onError && onError(friendlyMsg);
                     }}
                     audioTrack={selectedAudioTrack}
                     textTrack={vlcTextTrackId}
@@ -269,10 +367,13 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
             }}
             selectedTextTrack={selectedTextTrackProps}
             onError={(e: any) => {
-                console.error('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });
-                const errMsg = e?.error?.errorString || e?.message || 'Unknown error';
-                setPlaybackError(`Playback error: ${errMsg}`);
-                onError && onError(`Playback error: ${errMsg}`);
+                console.warn('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });
+                const errorStr = e?.error?.errorString || '';
+                const causeStr = e?.error?.cause?.message || e?.error?.errorException || e?.error?.errorStackTrace || '';
+                const errMsg = `${errorStr} ${causeStr}` || e?.message || 'Unknown error';
+                const friendlyMsg = getFriendlyErrorMessage(errMsg);
+                setPlaybackError(friendlyMsg);
+                onError && onError(friendlyMsg);
             }}
         />
     );

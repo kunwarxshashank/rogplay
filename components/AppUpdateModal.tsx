@@ -11,7 +11,10 @@ import {
     BackHandler,
     ActivityIndicator,
     Alert,
+    TouchableOpacity,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { zustandStorage } from '@/store/mmkv';
 import * as Updates from 'expo-updates';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,6 +34,7 @@ interface UpdateConfig {
     versionname?: string;
     /** When set, update is offered if this is greater than the installed app `versionCode` (recommended for APK sideload). */
     androidVersionCode?: number;
+    releaseNotes?: string[];
 }
 
 function getInstalledAndroidVersionCode(): number {
@@ -66,6 +70,15 @@ export function AppUpdateModal() {
     useEffect(() => {
         const checkForUpdate = async () => {
             try {
+                const ignoredAtStr = await zustandStorage.getItem('lastUpdateIgnoredAt');
+                if (ignoredAtStr) {
+                    const ignoredAt = parseInt(ignoredAtStr, 10);
+                    if (Date.now() - ignoredAt < 3 * 24 * 60 * 60 * 1000) {
+                        console.log('[AppUpdate] Snoozed for 3 days, skipping update check.');
+                        return;
+                    }
+                }
+
                 if (!__DEV__) {
                     try {
                         const update = await Updates.checkForUpdateAsync();
@@ -99,11 +112,20 @@ export function AppUpdateModal() {
 
     useEffect(() => {
         if (visible) {
-            const backAction = () => true;
+            const backAction = () => {
+                // If they press back button, we can either ignore or treat as snooze
+                handleClose();
+                return true;
+            };
             const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
             return () => backHandler.remove();
         }
     }, [visible]);
+
+    const handleClose = () => {
+        zustandStorage.setItem('lastUpdateIgnoredAt', Date.now().toString());
+        setVisible(false);
+    };
 
     const handleUpdate = async () => {
         if (isOtaAvailable) {
@@ -208,15 +230,26 @@ export function AppUpdateModal() {
         <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
             <View style={styles.overlay}>
                 <View style={[styles.container, Platform.isTV && styles.tvContainer, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
-                {Platform.OS !== 'web' && !currentColors.isAmoled && (
-                    <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
-                )}
-                {!currentColors.isAmoled && (
-                    <LinearGradient
-                        colors={currentColors.gradients.surface || ['#1e293b', '#0f172a']}
-                        style={StyleSheet.absoluteFill}
-                    />
-                )}
+                    {Platform.OS !== 'web' && !currentColors.isAmoled && (
+                        <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
+                    )}
+                    {!currentColors.isAmoled && (
+                        <LinearGradient
+                            colors={currentColors.gradients.surface || ['#1e293b', '#0f172a']}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
+
+                    {!apkBusy && !isUpdatingOta && (
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={handleClose}
+                            activeOpacity={0.7}
+                        >
+                            <MaterialCommunityIcons name="close-circle" size={30} color={currentColors.text} />
+                        </TouchableOpacity>
+                    )}
+
                     <Image
                         source={require('../assets/images/appupdate.png')}
                         style={styles.illustration}
@@ -224,12 +257,12 @@ export function AppUpdateModal() {
                     />
 
                     <View style={styles.content}>
-                        <Text style={[styles.title, { color: currentColors.text }]}>Update Required</Text>
-                        <Text style={[styles.subtitle, { color: currentColors.textSecondary }]}>
+                        <Text style={[styles.title, { color: currentColors.text }]}>Update Available</Text>
+                        {/* <Text style={[styles.subtitle, { color: currentColors.textSecondary }]}>
                             {isOtaAvailable
                                 ? 'A minor update is available. Please apply it to continue using the app.'
-                                : `A new version of ${config?.appname} is available. Please update to continue using the app.`}
-                        </Text>
+                                : `A new version of ${config?.appname} is available.`}
+                        </Text> */}
 
                         {!isOtaAvailable && config && (
                             <View style={styles.versionBadge}>
@@ -243,40 +276,19 @@ export function AppUpdateModal() {
                             </View>
                         )}
 
-                        {apkBusy && (
-                            <View style={styles.progressBlock}>
-                                <Text style={[styles.progressLabel, { color: currentColors.textSecondary }]}>
-                                    Downloading update…
-                                </Text>
-                                {downloadPercent !== null ? (
-                                    <>
-                                        <View style={[styles.progressTrack, { borderColor: currentColors.border }]}>
-                                            <View
-                                                style={[
-                                                    styles.progressFill,
-                                                    {
-                                                        width: `${downloadPercent}%`,
-                                                        backgroundColor: currentColors.primary,
-                                                    },
-                                                ]}
-                                            />
-                                        </View>
-                                        <Text style={[styles.progressPct, { color: currentColors.text }]}>
-                                            {downloadPercent}%
-                                        </Text>
-                                    </>
-                                ) : (
-                                    <View style={styles.progressPending}>
-                                        <ActivityIndicator size="small" color={currentColors.primary} />
-                                        <Text style={[styles.progressPendingText, { color: currentColors.text }]}>
-                                            {apkDownloadedBytes > 0
-                                                ? `${formatBytes(apkDownloadedBytes)} downloaded`
-                                                : 'Connecting...'}
-                                        </Text>
+                        {!isOtaAvailable && config?.releaseNotes && config.releaseNotes.length > 0 && (
+                            <View style={styles.releaseNotesContainer}>
+                                <Text style={[styles.releaseNotesTitle, { color: currentColors.text }]}>What's New</Text>
+                                {config.releaseNotes.map((note, index) => (
+                                    <View key={index} style={styles.releaseNoteItem}>
+                                        <View style={[styles.bullet, { backgroundColor: currentColors.primary }]} />
+                                        <Text style={[styles.releaseNoteText, { color: currentColors.textSecondary }]}>{note}</Text>
                                     </View>
-                                )}
+                                ))}
                             </View>
                         )}
+
+
 
                         <View style={styles.buttonStack}>
                             <TVFocusable
@@ -296,8 +308,32 @@ export function AppUpdateModal() {
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
                                     >
-                                        {isUpdatingOta || apkBusy ? (
+                                        {apkBusy && downloadPercent !== null && (
+                                            <View
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    width: `${downloadPercent}%`,
+                                                    backgroundColor: 'rgba(255,255,255,0.25)',
+                                                    borderRadius: 16,
+                                                }}
+                                            />
+                                        )}
+                                        {isUpdatingOta ? (
                                             <ActivityIndicator color="#fff" size="small" />
+                                        ) : apkBusy ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                                <ActivityIndicator color="#fff" size="small" style={{ marginRight: 12 }} />
+                                                <Text style={styles.buttonText}>
+                                                    {downloadPercent !== null
+                                                        ? `Downloading... ${downloadPercent}%`
+                                                        : apkDownloadedBytes > 0
+                                                            ? `Downloading... ${formatBytes(apkDownloadedBytes)}`
+                                                            : 'Connecting...'}
+                                                </Text>
+                                            </View>
                                         ) : (
                                             <Text style={styles.buttonText}>
                                                 {isOtaAvailable ? 'Apply Update' : 'Update Now'}
@@ -485,5 +521,42 @@ const styles = StyleSheet.create({
     secondaryButtonText: {
         fontSize: 16,
         fontFamily: 'Outfit_500Medium',
+    },
+    releaseNotesContainer: {
+        width: '100%',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 24,
+    },
+    releaseNotesTitle: {
+        fontSize: 16,
+        fontFamily: 'Outfit_600SemiBold',
+        marginBottom: 12,
+    },
+    releaseNoteItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 8,
+    },
+    bullet: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginTop: 6,
+        marginRight: 10,
+    },
+    releaseNoteText: {
+        fontSize: 14,
+        fontFamily: 'Inter_400Regular',
+        flex: 1,
+        lineHeight: 20,
+    },
+    closeButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 10,
+        borderRadius: 20,
     },
 });

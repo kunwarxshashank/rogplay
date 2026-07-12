@@ -13,8 +13,9 @@ import {
     Pressable,
     useWindowDimensions,
 } from 'react-native';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAddonsStore, TMDB_BUILTIN_SOURCE } from '@/store/addonsStore';
+import { usePluginsStore } from '@/store/pluginsStore';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { TVFocusable } from '@/components/TVFocusable';
 import { TVSearchBar } from '@/components/tv/TVSearchBar';
@@ -28,12 +29,13 @@ const hexAlpha = (hex: string, alpha: number) => {
     return hex + a;
 };
 
-const FILTERS = ['All', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
+const FILTERS = ['All', 'Plugins', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
 
 // Type color mapping
 const TYPE_COLORS: Record<string, { color: string; gradient: [string, string]; icon: string }> = {
     livetv: { color: '#eab308', gradient: ['#eab308', '#fbbf24'], icon: 'live-tv' },
     live: { color: '#eab308', gradient: ['#eab308', '#fbbf24'], icon: 'live-tv' },
+    plugin: { color: '#ea580c', gradient: ['#ea580c', '#f97316'], icon: 'extension' },
     movie: { color: '#3b82f6', gradient: ['#3b82f6', '#60a5fa'], icon: 'movie' },
     cinema: { color: '#8b5cf6', gradient: ['#8b5cf6', '#a78bfa'], icon: 'theaters' },
     stremio: { color: '#ec4899', gradient: ['#ec4899', '#f472b6'], icon: 'extension' },
@@ -50,6 +52,7 @@ const getTypeConfig = (type?: string) => {
 // Filter icon mapping
 const FILTER_ICONS: Record<string, string> = {
     'All': 'apps',
+    'Plugins': 'extension',
     'Live TV': 'live-tv',
     'Stremio': 'extension',
     'Cinema': 'theaters',
@@ -61,12 +64,15 @@ const FILTER_ICONS: Record<string, string> = {
 export default function TVAddonsScreen() {
     const { colors: c } = useTheme();
     const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
+    const { repos, addRepo, removeRepo, isLoading: isPluginsLoading, scrapers, toggleScraper } = usePluginsStore();
     const gradients = c.gradients || { primary: [c.primary, c.primary] };
     const router = useRouter();
     const { user } = useAuthStore();
     const isPremium = user?.isPremium || false;
 
     const [modalVisible, setModalVisible] = useState(false);
+    const [pluginModalVisible, setPluginModalVisible] = useState(false);
+    const [selectedPluginRepo, setSelectedPluginRepo] = useState<string | null>(null);
     const [newUrl, setNewUrl] = useState('');
     const [adding, setAdding] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -90,12 +96,16 @@ export default function TVAddonsScreen() {
 
     const manualRefresh = async () => {
         setRefreshing(true);
-        await loadAddons();
+        await Promise.all([
+            loadAddons(),
+            usePluginsStore.getState().loadRepos()
+        ]);
         setRefreshing(false);
     };
 
     useEffect(() => {
         loadAddons();
+        usePluginsStore.getState().loadRepos();
         const handleDeepLink = (event: { url: string }) => {
             let data = Linking.parse(event.url);
             if (data.path) {
@@ -123,24 +133,46 @@ export default function TVAddonsScreen() {
 
     const handleOpenAddon = (item: any) => {
         if (item.type === 'subtitles') return;
+        if (item.type === 'plugin') {
+            setSelectedPluginRepo(item.source);
+            setPluginModalVisible(true);
+            return;
+        }
         setActiveCinemaAddon(item.url || item.source);
         router.push('/cinema');
     };
 
+    const handleRemoveAddon = (item: any) => {
+        removeAddon(item.source);
+    };
+
+    const allAddons = useMemo(() => {
+        const pluginAddons = repos.map(repo => ({
+            title: repo.name,
+            description: repo.scrapers.map(s => s.name).join(', ') || 'Nuvio Repository',
+            type: 'plugin',
+            source: repo.repoUrl,
+            logo: repo.scrapers[0]?.logo || 'https://via.placeholder.com/60',
+            version: repo.version
+        }));
+        return [...addons, ...pluginAddons];
+    }, [addons, repos]);
+
     const filteredAddons = useMemo(() => {
-        return addons.filter(item => {
+        return allAddons.filter(item => {
             const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase());
             const type = item.type?.toLowerCase() || 'others';
             let matchesFilter = true;
 
             if (selectedFilter !== 'All') {
-                if (selectedFilter === 'Live TV') matchesFilter = type.includes('tv') || type.includes('live');
+                if (selectedFilter === 'Plugins') matchesFilter = type === 'plugin';
+                else if (selectedFilter === 'Live TV') matchesFilter = type.includes('tv') || type.includes('live');
                 else if (selectedFilter === 'Stremio') matchesFilter = type === 'stremio' || !!item.manifest;
                 else if (selectedFilter === 'Cinema') matchesFilter = type.includes('cinema');
                 else if (selectedFilter === 'Movies') matchesFilter = type.includes('movie');
                 else if (selectedFilter === 'NSFW') matchesFilter = type.includes('nsfw');
                 else if (selectedFilter === 'Others') {
-                    const isKnown = type.includes('tv') || type.includes('live') || type === 'stremio' ||
+                    const isKnown = type === 'plugin' || type.includes('tv') || type.includes('live') || type === 'stremio' ||
                         !!item.manifest || type.includes('cinema') || type.includes('movie') ||
                         type.includes('nsfw');
                     matchesFilter = !isKnown;
@@ -149,7 +181,7 @@ export default function TVAddonsScreen() {
 
             return matchesSearch && matchesFilter;
         });
-    }, [addons, searchQuery, selectedFilter]);
+    }, [allAddons, searchQuery, selectedFilter]);
 
     const renderItem = ({ item, index }: { item: any; index: number }) => {
         const typeConfig = getTypeConfig(item.type);
@@ -167,7 +199,7 @@ export default function TVAddonsScreen() {
                         }
                         Alert.alert('Remove Addon?', `Remove ${item.title}?`, [
                             { text: 'Cancel', style: 'cancel' },
-                            { text: 'Remove', onPress: () => removeAddon(item.source) }
+                            { text: 'Remove', onPress: () => handleRemoveAddon(item) }
                         ]);
                     }}
                     nativeID={`tv-addon-${index}`}
@@ -193,16 +225,10 @@ export default function TVAddonsScreen() {
                             <View style={styles.cardBody}>
                                 {/* Logo */}
                                 <View style={[styles.logoWrap, { borderColor: hexAlpha(typeConfig.color, 0.2) }]}>
-                                    {item.logo ? (
-                                        <Image
-                                            source={{ uri: item.logo }}
-                                            style={styles.logo}
-                                        />
-                                    ) : (
-                                        <View style={[styles.logoPlaceholder, { backgroundColor: hexAlpha(typeConfig.color, 0.12) }]}>
-                                            <MaterialIcons name={typeConfig.icon as any} size={28} color={typeConfig.color} />
-                                        </View>
-                                    )}
+                                    <Image
+                                        source={item.logo ? { uri: item.logo } : require('@/assets/images/icon.png')}
+                                        style={styles.logo}
+                                    />
                                     {item.type === 'nsfw' && (
                                         <View style={styles.nsfwBadge}>
                                             <Text style={styles.nsfwText}>18+</Text>
@@ -250,7 +276,7 @@ export default function TVAddonsScreen() {
                         style={styles.deleteBtn}
                         onPress={() => Alert.alert('Remove Addon?', `Remove ${item.title}?`, [
                             { text: 'Cancel', style: 'cancel' },
-                            { text: 'Remove', onPress: () => removeAddon(item.source) }
+                            { text: 'Remove', onPress: () => handleRemoveAddon(item) }
                         ])}
                         nativeID={`tv-addon-del-${index}`}
                         focusedBackgroundColor={hexAlpha(c.error || '#f43f5e', 0.15)}
@@ -393,7 +419,7 @@ export default function TVAddonsScreen() {
 
             {/* ── Content Grid ─────────────────────────── */}
             <View style={styles.gridArea}>
-                {isLoading ? (
+                {isLoading || isPluginsLoading ? (
                     <View style={styles.loadingContainer}>
                         <View style={[styles.loadingCard, { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
                             <ActivityIndicator size="large" color={c.primary} />
@@ -524,6 +550,80 @@ export default function TVAddonsScreen() {
                                                 <Text style={styles.installBtnText}>Install Addon</Text>
                                             </View>
                                         )}
+                                    </View>
+                                )}
+                            </TVFocusable>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Plugin Config Modal ──────────────────────── */}
+            <Modal visible={pluginModalVisible} transparent animationType="fade" onRequestClose={() => setPluginModalVisible(false)}>
+                <Pressable style={styles.modalOverlay} onPress={() => setPluginModalVisible(false)}>
+                    <Pressable style={[styles.modalCard, { backgroundColor: c.surface, borderColor: c.border, width: 450, maxHeight: '80%' }]} onPress={() => { }}>
+                        <View style={styles.modalHeaderRow}>
+                            <View style={[styles.modalIconWrap, { backgroundColor: hexAlpha('#ea580c', 0.12) }]}>
+                                <MaterialIcons name="extension" size={22} color="#ea580c" />
+                            </View>
+                            <View>
+                                <Text style={[styles.modalTitle, { color: c.text }]}>Configure Plugin</Text>
+                                <Text style={[styles.modalSubtitle, { color: c.textSecondary }]}>
+                                    Enable or disable individual scrapers
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={[styles.modalDivider, { backgroundColor: c.border }]} />
+
+                        <ScrollView style={{ paddingHorizontal: 20 }}>
+                            {scrapers.filter(s => s.sourceRepoUrl === selectedPluginRepo).map((scraper, index) => (
+                                <TVFocusable
+                                    key={scraper.id}
+                                    style={{ borderRadius: 14, marginBottom: 8 }}
+                                    onPress={() => toggleScraper(scraper.id)}
+                                    focusedBackgroundColor="rgba(255,255,255,0.08)"
+                                    focusedScale={1.02}
+                                    autoFlex={false}
+                                    nativeID={`tv-scraper-${index}`}
+                                    hasTVPreferredFocus={index === 0}
+                                >
+                                    {({ focused }) => (
+                                        <View style={[{
+                                            flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 14,
+                                            borderWidth: 1, borderColor: focused ? c.textSecondary : 'rgba(255,255,255,0.05)',
+                                            backgroundColor: focused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'
+                                        }]}>
+                                            <Image source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#1a1a1a' }} />
+                                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                                <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{scraper.name}</Text>
+                                                <Text style={{ fontSize: 12, color: c.textSecondary }} numberOfLines={1}>{scraper.description}</Text>
+                                            </View>
+                                            <View style={[{
+                                                width: 32, height: 32, borderRadius: 16, borderWidth: 1,
+                                                justifyContent: 'center', alignItems: 'center',
+                                                backgroundColor: scraper.enabled ? c.primary : 'transparent',
+                                                borderColor: scraper.enabled ? c.primary : 'rgba(255,255,255,0.1)'
+                                            }]}>
+                                                <MaterialIcons name={scraper.enabled ? "check" : "power-settings-new"} size={16} color={scraper.enabled ? "#fff" : c.textSecondary} />
+                                            </View>
+                                        </View>
+                                    )}
+                                </TVFocusable>
+                            ))}
+                        </ScrollView>
+
+                        <View style={[styles.modalActions, { marginTop: 12 }]}>
+                            <TVFocusable
+                                style={[styles.modalActionBtn, { flex: 1 }]}
+                                onPress={() => setPluginModalVisible(false)}
+                                focusedBackgroundColor="rgba(255,255,255,0.08)"
+                                focusedScale={1.02}
+                                autoFlex={false}
+                            >
+                                {({ focused }) => (
+                                    <View style={[styles.cancelBtn, { width: '100%', backgroundColor: focused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)' }]}>
+                                        <Text style={[styles.cancelBtnText, { color: c.text }]}>Done</Text>
                                     </View>
                                 )}
                             </TVFocusable>

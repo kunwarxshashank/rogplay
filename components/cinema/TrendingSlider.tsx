@@ -74,14 +74,14 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur }: any) => {
                     source={{ uri: imageUrl }}
                     style={styles.poster}
                 />
-                <View style={[styles.gradientImageLook, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
-                    {!currentColors.isAmoled && (
-                        <LinearGradient
-                            colors={['transparent', 'rgba(6, 9, 18, 0.6)', 'rgba(6, 9, 18, 0.95)']}
-                            locations={[0.2, 0.7, 1]}
-                            style={StyleSheet.absoluteFill}
-                        />
-                    )}
+                <View style={styles.gradientImageLook}>
+                    <LinearGradient
+                        colors={currentColors.isAmoled 
+                            ? ['transparent', 'rgba(0, 0, 0, 0.6)', 'rgba(0, 0, 0, 0.95)']
+                            : ['transparent', 'rgba(6, 9, 18, 0.6)', 'rgba(6, 9, 18, 0.95)']}
+                        locations={[0.2, 0.7, 1]}
+                        style={StyleSheet.absoluteFill}
+                    />
                     <View style={styles.imageContentWrap}>
                         <Text style={[styles.title, { fontSize: isFocused ? 28 : 20 }]} numberOfLines={isFocused ? 2 : 1}>
                             {item.title || item.name}
@@ -218,16 +218,16 @@ function TrendingSlider({ fullScreen = false, variant = 'traditional' }: Trendin
                         style={styles.poster}
                     />
 
-                    <View style={[styles.gradient, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
-                        {!currentColors.isAmoled && (
-                            <LinearGradient
-                                colors={variant === 'fullscreen'
-                                    ? ['transparent', currentColors.background + '99', currentColors.background]
+                    <View style={styles.gradient}>
+                        <LinearGradient
+                            colors={variant === 'fullscreen'
+                                ? ['transparent', currentColors.background + '99', currentColors.background]
+                                : currentColors.isAmoled
+                                    ? ['transparent', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.9)', '#000000']
                                     : ['transparent', 'rgba(6, 9, 18, 0.4)', 'rgba(6, 9, 18, 0.9)', '#060912']}
-                                locations={variant === 'fullscreen' ? [0, 0.7, 1] : [0, 0.5, 0.8, 1]}
-                                style={StyleSheet.absoluteFill}
-                            />
-                        )}
+                            locations={variant === 'fullscreen' ? [0, 0.7, 1] : [0, 0.5, 0.8, 1]}
+                            style={StyleSheet.absoluteFill}
+                        />
                         <View style={styles.contentWrap}>
                             <View style={[styles.badge, variant === 'fullscreen' && { backgroundColor: currentColors.primary + '30' }]}>
                                 <Text style={[styles.badgeText, variant === 'fullscreen' && { color: currentColors.primary }]}>TRENDING</Text>
