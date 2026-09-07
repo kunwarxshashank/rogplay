@@ -7,7 +7,7 @@ export const PROVIDERS = {
     APPLETV: 450,
     HBOMAX: 460,
     ZEE5: 461,
-    PARAMOUNT: 462
+    PARAMOUNT: 4330
 };
 
 export const PROVIDER_LOGOS: any = {

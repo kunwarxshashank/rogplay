@@ -3,6 +3,8 @@ import { useAddonsStore } from '@/store/addonsStore';
 import { usePluginsStore } from '@/store/pluginsStore';
 import { executeNuvioPlugin } from '@/services/pluginEngine';
 import { getExternalIds } from '@/services/tmdb';
+import { analyzeAndSortStreams, StreamResultWithHealth } from '@/services/streamHealthEngine';
+import type { HealthInfo } from '@/services/streamHealthEngine';
 
 export interface StreamResult {
     title: string;
@@ -16,13 +18,95 @@ export interface StreamResult {
     magnetLink?: string;
 }
 
+// ─── Progressive health check helper ─────────────────────────────────
+// Takes a small batch of newly scraped streams, health-checks them,
+// then merges + sorts them into the existing results array.
+async function healthCheckAndMerge(
+    newStreams: StreamResult[],
+    existingRef: React.MutableRefObject<StreamResultWithHealth[]>,
+    setResults: React.Dispatch<React.SetStateAction<StreamResultWithHealth[]>>,
+    signal?: AbortSignal,
+): Promise<void> {
+    if (!newStreams.length || signal?.aborted) return;
+
+    // Health-check this small batch (concurrency = batch size, they're already small)
+    const checked = await analyzeAndSortStreams(newStreams, {
+        signal,
+        batchSize: newStreams.length,
+    });
+
+    if (signal?.aborted) return;
+
+    // Merge into existing results, deduplicate by URL
+    const merged = [...existingRef.current];
+    for (const item of checked) {
+        if (!merged.some(m => m.url === item.url)) {
+            merged.push(item);
+        }
+    }
+
+    // Sort: Alive (by score desc) → Unchecked → Dead
+    merged.sort((a, b) => {
+        const getStatus = (x: StreamResultWithHealth) => {
+            if (!x.healthInfo) return 1;
+            if (x.healthInfo.isAlive) return 2;
+            return 0;
+        };
+        const sa = getStatus(a);
+        const sb = getStatus(b);
+        if (sa !== sb) return sb - sa;
+        if (sa === 1) return 0;
+        return (b.healthInfo?.score || 0) - (a.healthInfo?.score || 0);
+    });
+
+    existingRef.current = merged;
+    setResults([...merged]);
+}
+
+/**
+ * Runs an array of async tasks with a concurrency limit.
+ * As soon as one task finishes, the next one starts — keeps N slots busy.
+ */
+async function runWithConcurrency(
+    tasks: (() => Promise<void>)[],
+    limit: number,
+    signal?: AbortSignal,
+): Promise<void> {
+    let index = 0;
+
+    const runNext = async (): Promise<void> => {
+        while (index < tasks.length) {
+            if (signal?.aborted) return;
+            const currentIndex = index++;
+            await tasks[currentIndex]();
+        }
+    };
+
+    // Launch `limit` workers that each pull from the task queue
+    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => runNext());
+    await Promise.all(workers);
+}
+
+const streamCache = new Map<string, StreamResultWithHealth[]>();
+
 export function useStreamSources() {
     const addons = useAddonsStore(s => s.addons);
     const scrapers = usePluginsStore(s => s.scrapers);
     const enabledScrapers = useMemo(() => scrapers.filter(sc => sc.enabled && sc.rawCode), [scrapers]);
-    const [results, setResults] = useState<StreamResult[]>([]);
+    const [results, setResults] = useState<StreamResultWithHealth[]>([]);
     const [loading, setLoading] = useState(true);
+    const [healthChecking, setHealthChecking] = useState(false);
+    const [healthProgress, setHealthProgress] = useState({ checked: 0, total: 0 });
+    const [currentLog, setCurrentLog] = useState<string>('');
     const abortRef = useRef<AbortController | null>(null);
+
+    // Mutable ref that always points to the latest merged results so
+    // concurrent scrapers can safely read the most current list.
+    const resultsRef = useRef<StreamResultWithHealth[]>([]);
+
+    // Track how many sources we've health-checked for progress UI
+    const checkedCountRef = useRef(0);
+    const totalCountRef = useRef(0);
 
     // Cleanup AbortController on unmount
     useEffect(() => {
@@ -34,18 +118,24 @@ export function useStreamSources() {
         };
     }, []);
 
-    const addResults = (newItems: StreamResult[], cinemaSources: Set<string> = new Set()) => {
-        setResults(prev => {
-            const combined = [...prev, ...newItems];
-            const unique = combined.filter((v, i, a) => a.findIndex(t => (t.url === v.url)) === i);
-            return unique.sort((a, b) => {
-                const aIsCinema = cinemaSources.has(a.source);
-                const bIsCinema = cinemaSources.has(b.source);
-                if (aIsCinema === bIsCinema) return 0;
-                return aIsCinema ? -1 : 1;
-            });
-        });
-    };
+    /**
+     * Called by each scraper when it produces results.
+     * Health-checks the batch immediately, then merges into the UI.
+     */
+    const pushResults = useCallback(async (
+        newItems: StreamResult[],
+        signal?: AbortSignal,
+    ) => {
+        if (!newItems.length || signal?.aborted) return;
+
+        totalCountRef.current += newItems.length;
+        setHealthProgress(prev => ({ ...prev, total: totalCountRef.current }));
+
+        await healthCheckAndMerge(newItems, resultsRef, setResults, signal);
+
+        checkedCountRef.current += newItems.length;
+        setHealthProgress({ checked: checkedCountRef.current, total: totalCountRef.current });
+    }, []);
 
     const searchStreams = useCallback(async (
         query: string,
@@ -57,6 +147,22 @@ export function useStreamSources() {
         movieData?: string,
         serverAddonUrl?: string
     ) => {
+        if (!query && !tmdbId && !directUrl && !movieData && !serverAddonUrl) {
+            setLoading(false);
+            setHealthChecking(false);
+            return;
+        }
+
+        const cacheKey = `${tmdbId}-${season}-${episode}-${type}-${directUrl || ''}-${serverAddonUrl || ''}`;
+        if (streamCache.has(cacheKey)) {
+            const cached = streamCache.get(cacheKey)!;
+            setResults(cached);
+            resultsRef.current = cached;
+            setLoading(false);
+            setHealthChecking(false);
+            return;
+        }
+
         // Cancel previous request
         if (abortRef.current) {
             abortRef.current.abort();
@@ -67,18 +173,14 @@ export function useStreamSources() {
 
         setLoading(true);
         setResults([]);
-
-
-        //  ──────────────── ROG MOVIE ADDONS ────────────────
+        resultsRef.current = [];
+        checkedCountRef.current = 0;
+        totalCountRef.current = 0;
+        setHealthChecking(true);
+        setHealthProgress({ checked: 0, total: 0 });
+        setCurrentLog('');
 
         const isMovie = type === 'movie' || type === 'rogmovie';
-
-
-        //  ────────────────────────  Cinema Addons  ────────────────────────
-        const cinemaAddons = addons.filter(addon => addon.type === 'cinema');
-        const cinemaSourceNames = new Set(cinemaAddons.map(addon => addon.title));
-
-
 
         // ─── Direct URL / RogMovie handling ──────────────
         if (type === 'rogmovie' && (directUrl || movieData)) {
@@ -107,18 +209,18 @@ export function useStreamSources() {
                         source: 'RogMovie',
                         quality: 'HD'
                     }));
-                    addResults(mapped, cinemaSourceNames);
+                    await pushResults(mapped, signal);
                 }
             } catch (e) {
                 console.error("Failed to fetch rogmovie data:", e, "URL:", directUrl);
             }
         } else if (directUrl) {
-            addResults([{
+            await pushResults([{
                 title: 'Default Server',
                 url: directUrl,
                 source: 'Addon Provider',
                 quality: 'Auto'
-            }], cinemaSourceNames);
+            }], signal);
         }
 
         // ─── Server Addon: direct stream URL fetch (DesiHub-style) ──────────
@@ -141,7 +243,7 @@ export function useStreamSources() {
                                 source: 'Server Addon',
                                 quality: s.quality || 'Auto'
                             }));
-                        addResults(mapped, cinemaSourceNames);
+                        await pushResults(mapped, signal);
                     }
                 }
             } catch (e) {
@@ -149,8 +251,7 @@ export function useStreamSources() {
             }
         }
 
-
-        // ─── Stremio Addons (movie/series with manifest) ────────
+        // ─── Resolve IMDb ID if needed for Stremio addons ───────
         const stremioAddons = addons.filter(addon => {
             if (!addon.manifest) return false;
             const catalogs = addon.manifest.catalogs || [];
@@ -160,17 +261,14 @@ export function useStreamSources() {
             return hasMovieCatalog || hasSeriesCatalog;
         });
 
-        // ─── Resolve IMDb ID if needed for Stremio addons ───────
         let imdbId: string | null = null;
         let isCustomStremioId = false;
 
         if (stremioAddons.length > 0 && tmdbId) {
             const tmdbStr = String(tmdbId);
             if (tmdbStr.startsWith('tt')) {
-                // Already an IMDb ID
                 imdbId = tmdbStr;
             } else if (!isNaN(Number(tmdbStr))) {
-                // Fetch IMDb ID from TMDB API
                 try {
                     const tmdbType = isMovie ? 'movie' : 'tv';
                     const externalIds = await getExternalIds(tmdbType, tmdbStr);
@@ -180,186 +278,206 @@ export function useStreamSources() {
                     console.error('Failed to fetch IMDb ID from TMDB:', err);
                 }
             } else {
-                // Custom Stremio ID like kisskh:123
                 imdbId = tmdbStr;
                 isCustomStremioId = true;
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        //  CONCURRENT BATCHED SCRAPING (3 at a time)
+        //  Each scraper is wrapped as an async task. We run up to 3
+        //  concurrently. As soon as any task finishes, its results are
+        //  health-checked and merged into the UI immediately.
+        // ═══════════════════════════════════════════════════════════════
 
+        const CONCURRENCY = 3;
+        const cinemaAddons = addons.filter(addon => addon.type === 'cinema');
 
-        // ─── Fetch from Stremio addons ──────────────────────────
-        const stremioPromises = stremioAddons.map(async (addon) => {
-            if (!imdbId) return;
-            try {
-                const baseUrl = addon.url.replace('/manifest.json', '');
-                const stremioType = isMovie ? 'movie' : 'series';
-                let streamUrl: string;
+        // Build a unified task list from all scraper categories
+        type ScraperTask = () => Promise<void>;
+        const tasks: ScraperTask[] = [];
 
-                if (isMovie) {
-                    streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}.json`;
-                    console.log(`base: ${baseUrl}`)
-                } else {
-                    // Series: format is imdbId:season:episode
-                    if (isCustomStremioId && (season === undefined || episode === undefined || imdbId.includes(':season='))) {
-                        // Some custom stream requests might just take imdbId straight or format it differently
-                        // But usually Stremio standard is imdbId:season:episode even for custom IDs
+        // ─── Stremio addon tasks ────────────────────────────────────
+        for (const addon of stremioAddons) {
+            if (!imdbId) continue;
+            tasks.push(async () => {
+                if (signal.aborted) return;
+                try {
+                    const baseUrl = addon.url.replace('/manifest.json', '');
+                    const stremioType = isMovie ? 'movie' : 'series';
+                    let streamUrl: string;
+
+                    if (isMovie) {
                         streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}.json`;
                     } else {
-                        streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}:${season}:${episode}.json`;
-                    }
-                }
-
-                console.log(`STREMIO FETCHING: ${streamUrl}`);
-                if (signal.aborted) return;
-                const res = await fetch(streamUrl, { signal });
-                if (!res.ok) return;
-
-                const data = await res.json();
-                const streamList = data.streams || [];
-
-                const mapped: StreamResult[] = streamList
-                    .filter((s: any) => s.url || s.infoHash || s.magnet)
-                    .map((s: any) => {
-                        const qualityMatch = s.title?.match(/(\d{3,4}p)/i) || s.name?.match(/(\d{3,4}p)/i);
-                        let isTorrent = false;
-                        let magnetLink = '';
-                        let url = s.url || '';
-
-                        if (s.infoHash) {
-                            isTorrent = true;
-                            // Construct standard magnet link if only infoHash is provided
-                            magnetLink = s.magnet || `magnet:?xt=urn:btih:${s.infoHash}&dn=${encodeURIComponent(s.title || 'video')}`;
-                            url = magnetLink; // Temporarily store magnet in url for compatibility if needed
-                        } else if (s.magnet) {
-                            isTorrent = true;
-                            magnetLink = s.magnet;
-                            url = s.magnet;
+                        if (isCustomStremioId && (season === undefined || episode === undefined || imdbId!.includes(':season='))) {
+                            streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}.json`;
+                        } else {
+                            streamUrl = `${baseUrl}/stream/${stremioType}/${imdbId}:${season}:${episode}.json`;
                         }
+                    }
 
-                        return {
-                            title: s.title || s.name || 'Stremio Stream',
-                            url: url,
-                            source: s.name || addon.title || 'Stremio',
-                            quality: qualityMatch ? qualityMatch[1] : undefined,
-                            headers: s.behaviorHints?.proxyHeaders || {},
-                            isTorrent,
-                            magnetLink,
-                        };
-                    });
+                    setCurrentLog(`Fetching Stremio: ${addon.title}`);
+                    const res = await fetch(streamUrl, { signal });
+                    if (!res.ok) return;
 
-                if (mapped.length > 0) {
-                    addResults(mapped, cinemaSourceNames);
-                }
-            } catch (error) {
-                console.error(`Error fetching Stremio streams from ${addon.title}:`, error);
-            }
-        });
+                    const data = await res.json();
+                    const streamList = data.streams || [];
 
+                    const mapped: StreamResult[] = streamList
+                        .filter((s: any) => s.url || s.infoHash || s.magnet)
+                        .map((s: any) => {
+                            const qualityMatch = s.title?.match(/(\d{3,4}p)/i) || s.name?.match(/(\d{3,4}p)/i);
+                            let isTorrent = false;
+                            let magnetLink = '';
+                            let url = s.url || '';
 
-
-        // ─── Fetch from cinema/mapping addons ───────────────────
-        const cinemaPromises = cinemaAddons.map(async (addon) => {
-            try {
-                if (signal.aborted) return;
-                console.log(`Checking addon: ${addon.title} (${addon.url})`);
-                const response = await fetch(addon.url, { signal });
-                const json = await response.json();
-
-                if (!Array.isArray(json)) return;
-
-                const firstItem = json[0];
-                // Check if this is a mapping addon (has movieurl/tvurl templates)
-                if (firstItem && (firstItem.movieurl || firstItem.tvurl)) {
-                    // This is a mapping addon, use TMDB if available
-                    if (tmdbId) {
-                        const mappingPromises = json.map(async (mapping) => {
-                            try {
-                                const fetchUrl = isMovie
-                                    ? mapping.movieurl?.replace('${tmdb}', String(tmdbId))
-                                    : mapping.tvurl
-                                        ?.replace('${tmdb}', String(tmdbId))
-                                        ?.replace('${season}', String(season))
-                                        ?.replace('${episode}', String(episode));
-
-                                if (!fetchUrl) return;
-
-                                console.log(`CINEMA FETCHING: ${fetchUrl}`);
-                                const res = await fetch(fetchUrl, { signal });
-                                if (!res.ok) return;
-
-                                const sourceData = await res.json();
-                                if (Array.isArray(sourceData)) {
-                                    const mapped = sourceData.map(item => ({
-                                        title: item[mapping.title || 'title'] || item.title || 'Unknown',
-                                        url: item[mapping.url || 'url'] || item.url,
-                                        type: item[mapping.type || 'type'] || item.type,
-                                        headers: item.headers || {},
-                                        source: addon.title
-                                    }));
-                                    addResults(mapped, cinemaSourceNames);
-                                }
-                            } catch (err) {
-                                console.error(`Error fetching streams from ${addon.title} mapping:`, err);
+                            if (s.infoHash) {
+                                isTorrent = true;
+                                magnetLink = s.magnet || `magnet:?xt=urn:btih:${s.infoHash}&dn=${encodeURIComponent(s.title || 'video')}`;
+                                url = magnetLink;
+                            } else if (s.magnet) {
+                                isTorrent = true;
+                                magnetLink = s.magnet;
+                                url = s.magnet;
                             }
+
+                            return {
+                                title: s.title || s.name || 'Stremio Stream',
+                                url: url,
+                                source: s.name || addon.title || 'Stremio',
+                                quality: qualityMatch ? qualityMatch[1] : undefined,
+                                headers: s.behaviorHints?.proxyHeaders || {},
+                                isTorrent,
+                                magnetLink,
+                            };
                         });
-                        await Promise.all(mappingPromises);
-                    }
-                } else {
-                    // This is a direct content list or search result list
-                    const filtered = json.filter((item: any) =>
-                        item.title && String(item.title).toLowerCase().includes(String(query).toLowerCase())
-                    );
-                    const mapped = filtered.map((item: any) => ({
-                        ...item,
-                        source: addon.title
-                    }));
-                    addResults(mapped, cinemaSourceNames);
-                }
-            } catch (error) {
-                console.error(`Error fetching from ${addon.title}:`, error);
-            }
-        });
 
-        // ─── Fetch from Nuvio Plugins (Local JS) ──────────────────────────
-        const nuvioPromises = enabledScrapers.map(async (scraper) => {
-            if (!tmdbId) return;
-            try {
-                const nuvioType = isMovie ? 'movie' : 'tv';
-                console.log(`Executing Nuvio Plugin: ${scraper.name} for ${tmdbId}`);
-                
-                const rawStreams = await executeNuvioPlugin(
-                    scraper.rawCode!,
-                    String(tmdbId),
-                    nuvioType,
-                    season ? Number(season) : null,
-                    episode ? Number(episode) : null
-                );
-                
-                if (signal.aborted) return;
-                
-                if (rawStreams && rawStreams.length > 0) {
-                    const mapped: StreamResult[] = rawStreams
-                        .filter(s => s.url || s.link)
-                        .map(s => ({
-                            title: s.name || s.title || scraper.name,
-                            url: s.url || s.link,
-                            source: s.source || scraper.name,
-                            quality: s.quality || (typeof s.quality === 'number' ? `${s.quality}p` : undefined),
-                            headers: s.headers || {},
-                        }));
                     if (mapped.length > 0) {
-                        addResults(mapped, cinemaSourceNames);
+                        await pushResults(mapped, signal);
+                    }
+                } catch (error) {
+                    if (!signal.aborted) {
+                        console.error(`Error fetching Stremio streams from ${addon.title}:`, error);
                     }
                 }
-            } catch (error) {
-                console.error(`Error executing Nuvio Plugin ${scraper.name}:`, error);
-            }
-        });
+            });
+        }
 
-        await Promise.allSettled([...stremioPromises, ...cinemaPromises, ...nuvioPromises]);
+        // ─── Cinema / mapping addon tasks ───────────────────────────
+        for (const addon of cinemaAddons) {
+            tasks.push(async () => {
+                if (signal.aborted) return;
+                try {
+                    setCurrentLog(`Checking: ${addon.title}`);
+                    const response = await fetch(addon.url, { signal });
+                    const json = await response.json();
+
+                    if (!Array.isArray(json)) return;
+
+                    const firstItem = json[0];
+                    if (firstItem && (firstItem.movieurl || firstItem.tvurl)) {
+                        if (tmdbId) {
+                            // Process mappings concurrently within this addon (max 3)
+                            const mappingTasks = json.map((mapping: any) => async () => {
+                                if (signal.aborted) return;
+                                try {
+                                    const fetchUrl = isMovie
+                                        ? mapping.movieurl?.replace('${tmdb}', String(tmdbId))
+                                        : mapping.tvurl
+                                            ?.replace('${tmdb}', String(tmdbId))
+                                            ?.replace('${season}', String(season))
+                                            ?.replace('${episode}', String(episode));
+
+                                    if (!fetchUrl) return;
+
+                                    setCurrentLog(`Fetching Cinema: ${addon.title}`);
+                                    const res = await fetch(fetchUrl, { signal });
+                                    if (!res.ok) return;
+
+                                    const sourceData = await res.json();
+                                    if (Array.isArray(sourceData)) {
+                                        const mapped = sourceData.map((item: any) => ({
+                                            title: item[mapping.title || 'title'] || item.title || 'Unknown',
+                                            url: item[mapping.url || 'url'] || item.url,
+                                            type: item[mapping.type || 'type'] || item.type,
+                                            headers: item.headers || {},
+                                            source: addon.title
+                                        }));
+                                        await pushResults(mapped, signal);
+                                    }
+                                } catch (err) {
+                                    console.error(`Error fetching streams from ${addon.title} mapping:`, err);
+                                }
+                            });
+                            await runWithConcurrency(mappingTasks, CONCURRENCY, signal);
+                        }
+                    } else {
+                        const filtered = json.filter((item: any) =>
+                            item.title && String(item.title).toLowerCase().includes(String(query).toLowerCase())
+                        );
+                        const mapped = filtered.map((item: any) => ({
+                            ...item,
+                            source: addon.title
+                        }));
+                        await pushResults(mapped, signal);
+                    }
+                } catch (error) {
+                    if (!signal.aborted) {
+                        console.error(`Error fetching from ${addon.title}:`, error);
+                    }
+                }
+            });
+        }
+
+        // ─── Nuvio Plugin tasks ─────────────────────────────────────
+        for (const scraper of enabledScrapers) {
+            if (!tmdbId) continue;
+            tasks.push(async () => {
+                if (signal.aborted) return;
+                try {
+                    const nuvioType = isMovie ? 'movie' : 'tv';
+                    setCurrentLog(`Searching with: ${scraper.name}`);
+
+                    const rawStreams = await executeNuvioPlugin(
+                        scraper.rawCode!,
+                        String(tmdbId),
+                        nuvioType,
+                        season ? Number(season) : null,
+                        episode ? Number(episode) : null
+                    );
+
+                    if (signal.aborted) return;
+
+                    if (rawStreams && rawStreams.length > 0) {
+                        const mapped: StreamResult[] = rawStreams
+                            .filter(s => s.url || s.link)
+                            .map(s => ({
+                                title: s.name || s.title || scraper.name,
+                                url: s.url || s.link,
+                                source: s.source || scraper.name,
+                                quality: s.quality || (typeof s.quality === 'number' ? `${s.quality}p` : undefined),
+                                headers: s.headers || {},
+                            }));
+                        if (mapped.length > 0) {
+                            await pushResults(mapped, signal);
+                        }
+                    }
+                } catch (error) {
+                    if (!signal.aborted) {
+                        console.error(`Error executing Nuvio Plugin ${scraper.name}:`, error);
+                    }
+                }
+            });
+        }
+
+        // ─── Run all tasks with concurrency limit of 3 ─────────────
+        await runWithConcurrency(tasks, CONCURRENCY, signal);
+
         setLoading(false);
-    }, [addons]);
+        setHealthChecking(false);
+        setCurrentLog('Finished scanning');
+    }, [addons, enabledScrapers, pushResults]);
 
-    return { results, loading, searchStreams };
+    return { results, loading, searchStreams, healthChecking, healthProgress, currentLog };
 }

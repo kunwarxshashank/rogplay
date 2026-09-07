@@ -11,7 +11,6 @@ import {
     Dimensions,
     Image,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -95,7 +94,7 @@ export default function LoginScreen() {
                 />
             )}
             {!currentColors.isAmoled && (
-              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
             )}
 
             <KeyboardAvoidingView
@@ -120,8 +119,7 @@ export default function LoginScreen() {
                         </Text>
                     </View>
 
-                    <View style={[styles.formContainer, currentColors.isAmoled ? { backgroundColor: '#000000' } : { overflow: 'hidden' }]}>
-                        {!currentColors.isAmoled && <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
+                    <View style={[styles.formContainer, { backgroundColor: currentColors.isAmoled ? '#000000' : 'rgba(255, 255, 255, 0.03)' }]}>
                         {error && (
                             <View style={[styles.errorContainer, { backgroundColor: currentColors.error + '20' }]}>
                                 <Text style={[styles.errorText, { color: currentColors.error }]}>{error}</Text>
@@ -130,8 +128,7 @@ export default function LoginScreen() {
 
                         <View style={styles.inputWrapper}>
                             <Text style={[styles.inputLabel, { color: currentColors.textSecondary }]}>Email</Text>
-                            <View style={[styles.inputContainer, { backgroundColor: currentColors.isAmoled ? '#000' : 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
-                                {!currentColors.isAmoled && <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
+                            <View style={[styles.inputContainer, { backgroundColor: currentColors.isAmoled ? '#000' : 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}>
                                 <MaterialCommunityIcons name="email-outline" size={20} color={currentColors.textSecondary} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { color: currentColors.text }]}
@@ -147,8 +144,7 @@ export default function LoginScreen() {
 
                         <View style={styles.inputWrapper}>
                             <Text style={[styles.inputLabel, { color: currentColors.textSecondary }]}>Password</Text>
-                            <View style={[styles.inputContainer, { backgroundColor: currentColors.isAmoled ? '#000' : 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}>
-                                {!currentColors.isAmoled && <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
+                            <View style={[styles.inputContainer, { backgroundColor: currentColors.isAmoled ? '#000' : 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}>
                                 <MaterialCommunityIcons name="lock-outline" size={20} color={currentColors.textSecondary} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { color: currentColors.text }]}
@@ -328,7 +324,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: Layout.spacing.lg,
+        marginBottom: Layout.spacing.md,
     },
     loginButtonText: {
         fontFamily: 'Outfit_600SemiBold',
@@ -338,7 +334,7 @@ const styles = StyleSheet.create({
     dividerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: Layout.spacing.lg,
+        marginBottom: Layout.spacing.md,
     },
     divider: {
         flex: 1,

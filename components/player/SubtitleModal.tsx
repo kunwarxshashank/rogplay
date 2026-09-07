@@ -158,7 +158,15 @@ const SubtitleModal: React.FC<SubtitleModalProps> = ({
     };
 
     const allTracks = React.useMemo(() => {
-        return [{ title: 'OFF', language: 'OFF' }, ...textTracks];
+        const uniqueTracks = textTracks.reduce((acc: any[], current: any) => {
+            const x = acc.find(item => (item.title === current.title && item.language === current.language) || (item.id && item.id === current.id));
+            if (!x) {
+                return acc.concat([current]);
+            } else {
+                return acc;
+            }
+        }, []);
+        return [{ title: 'OFF', language: 'OFF' }, ...uniqueTracks];
     }, [textTracks]);
 
     const keyExtractor = useCallback((item: any, index: number) => {

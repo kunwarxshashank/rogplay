@@ -60,6 +60,8 @@ export const useFavoritesStore = create<FavoritesState>()(
                         await axios.post(`${DB_BASEURL}/sync-favorites`, {
                             email: user.email,
                             favorites: items
+                        }, {
+                            headers: { Authorization: `Bearer ${token}` }
                         });
                     } catch (error) {
                         console.error('Failed to sync favorites with backend', error);
@@ -72,7 +74,9 @@ export const useFavoritesStore = create<FavoritesState>()(
                 if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123') {
                     set({ isLoading: true });
                     try {
-                        const response = await axios.get(`${DB_BASEURL}/get-favorites/${user.email}`);
+                        const response = await axios.get(`${DB_BASEURL}/get-favorites/${user.email}`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
                         if (response.data && response.data.favorites) {
                             const remoteFavs: FavoriteItem[] = response.data.favorites;
                             const localFavs = get().items;
@@ -100,6 +104,8 @@ export const useFavoritesStore = create<FavoritesState>()(
                                 await axios.post(`${DB_BASEURL}/sync-favorites`, {
                                     email: user.email,
                                     favorites: merged
+                                }, {
+                                    headers: { Authorization: `Bearer ${token}` }
                                 });
                             }
                         }

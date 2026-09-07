@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
+import { cachedFetch } from '@/services/asyncCache';
 
 export function useCinemaAddon() {
     const addons = useAddonsStore(s => s.addons);
@@ -106,14 +107,23 @@ export function useCinemaAddon() {
 }
 
 export async function fetchAddonCatalog(catalogUrl: string, page: number = 1, addonType: string = 'serveraddon', addonMeta?: { url: string, manifestStr: string }) {
+    if (!catalogUrl) return [];
+    let urlWithPage = catalogUrl;
+    if (urlWithPage.includes('${stremioSkip}')) {
+        const skipValue = (page - 1) * 20;
+        urlWithPage = urlWithPage.replace('${stremioSkip}', skipValue.toString());
+    }
+    urlWithPage = urlWithPage.replace('${page}', page.toString());
+
+    // Cache + de-dupe: several list sections often request the same catalog on
+    // mount; this avoids redundant network calls and re-fetches on tab return.
+    return cachedFetch(`addonCatalog|${addonType}|${urlWithPage}`, () =>
+        fetchAddonCatalogRaw(urlWithPage, catalogUrl, addonType, addonMeta)
+    );
+}
+
+async function fetchAddonCatalogRaw(urlWithPage: string, catalogUrl: string, addonType: string, addonMeta?: { url: string, manifestStr: string }) {
     try {
-        if (!catalogUrl) return [];
-        let urlWithPage = catalogUrl;
-        if (urlWithPage.includes('${stremioSkip}')) {
-            const skipValue = (page - 1) * 20;
-            urlWithPage = urlWithPage.replace('${stremioSkip}', skipValue.toString());
-        }
-        urlWithPage = urlWithPage.replace('${page}', page.toString());
         const response = await fetch(urlWithPage);
 
         // Try parsing as JSON; fall back to extracting JSON from text when server returns HTML

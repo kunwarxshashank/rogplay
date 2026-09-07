@@ -19,8 +19,7 @@ const hexAlpha = (hex: string, alpha: number) => {
 const THEMES: { id: ThemeId; name: string; color: string; gradient: readonly [string, string]; icon: any; desc: string }[] = [
     { id: 'amoled', name: 'AMOLED', color: '#000000', gradient: ['#000000', '#1a1a2e'], icon: 'brightness-1', desc: 'Pure black, max battery' },
     { id: 'glassmorphism', name: 'Glassmorphism', color: '#6366f1', gradient: ['rgba(99,102,241,0.3)', 'rgba(99,102,241,0.1)'], icon: 'blur', desc: 'Frosted glass depth' },
-    { id: 'material3', name: 'Material 3', color: '#8b5cf6', gradient: ['#8b5cf6', '#6d28d9'], icon: 'material-design', desc: 'Dynamic color system' },
-    { id: 'minimal', name: 'Minimal', color: '#ffffff', gradient: ['#1a1a1a', '#0c0c0c'], icon: 'circle-outline', desc: 'Clean, content-first' },
+    { id: 'gradient', name: 'Gradient', color: '#10b981', gradient: ['#1a1a2e', '#0a0a0f'], icon: 'gradient', desc: 'Premium dynamic gradients' },
     { id: 'cinema', name: 'Cinema', color: '#ef4444', gradient: ['#ef4444', '#050508'], icon: 'theater', desc: 'Theater-inspired drama' },
 ];
 
@@ -30,7 +29,7 @@ const LAYOUT_ITEMS: { id: HomeLayoutId; name: string; icon: any; desc: string }[
     { id: 'netflix', name: 'Netflix', icon: 'play-box', desc: 'Hero + content rows' },
     { id: 'plex', name: 'Plex', icon: 'view-dashboard', desc: 'Dashboard layout' },
     { id: 'tv_grid', name: 'TV Grid', icon: 'grid', desc: 'Traditional grid' },
-    { id: 'minimal', name: 'Minimal', icon: 'circle-outline', desc: 'Content-first' },
+    { id: 'gradient', name: 'Gradient', icon: 'brush', desc: 'Dynamic gradients' },
     { id: 'cinema', name: 'Cinema', icon: 'theater', desc: 'Immersive backdrops' },
 ];
 
@@ -594,7 +593,7 @@ export default function TVSettingsScreen() {
                             {/* Select Provider */}
                             {renderSection('Provider')}
                             <View style={[styles.gridContainer, { marginBottom: 24 }]}>
-                                {[{id: 'none', label: 'Disabled'}, {id: 'realdebrid', label: 'Real-Debrid'}, {id: 'alldebrid', label: 'AllDebrid'}, {id: 'premiumize', label: 'Premiumize'}, {id: 'torbox', label: 'TorBox'}].map(item => {
+                                {[{ id: 'none', label: 'Disabled' }, { id: 'realdebrid', label: 'Real-Debrid' }, { id: 'alldebrid', label: 'AllDebrid' }, { id: 'premiumize', label: 'Premiumize' }, { id: 'torbox', label: 'TorBox' }].map(item => {
                                     const isActive = debridProvider === item.id;
                                     return (
                                         <TVFocusable
@@ -628,7 +627,7 @@ export default function TVSettingsScreen() {
                                             placeholderTextColor={c.textMuted}
                                             secureTextEntry
                                         />
-                                        <TVFocusable 
+                                        <TVFocusable
                                             style={{ paddingHorizontal: 24, paddingVertical: 12, backgroundColor: c.primary, borderRadius: 8 }}
                                             onPress={() => setSetting('debridApiKey', tvApiKeyInput)}
                                             focusedScale={1.05}
@@ -671,114 +670,159 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
     const hoursLifetime = data.totalWatchTimeMs / 3600000;
 
     return (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-            <View style={[localStyles.insightHero, { backgroundColor: hexAlpha(c.primary, 0.15), borderColor: hexAlpha(c.primary, 0.3) }]}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 24, paddingBottom: 40, paddingHorizontal: 10 }}>
+            <TVFocusable 
+                style={[localStyles.insightHero, { backgroundColor: hexAlpha(c.primary, 0.15), borderColor: hexAlpha(c.primary, 0.3), overflow: 'hidden' }]}
+                focusedScale={1.02}
+                focusedBorderColor={c.primary}
+            >
+                <LinearGradient colors={[hexAlpha(c.primary, 0.1), hexAlpha(c.primary, 0.0)]} style={StyleSheet.absoluteFill} />
                 <View style={localStyles.insightHeroContent}>
-                    <Text style={{ fontSize: 14, color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Welcome back</Text>
-                    <Text style={{ fontSize: 28, color: c.text, fontFamily: 'Outfit_700Bold', marginVertical: 4 }}>{data.userName}</Text>
-                    <Text style={{ fontSize: 16, color: c.primary, fontFamily: 'Outfit_600SemiBold' }}>
-                        {hoursLifetime.toFixed(0)} hours streamed
-                    </Text>
-                </View>
-                <View style={[localStyles.insightEmojiWrap, { backgroundColor: hexAlpha(c.primary, 0.1) }]}>
-                    <Text style={{ fontSize: 48 }}>{p.emoji}</Text>
-                </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={[localStyles.insightStatCard, { backgroundColor: hexAlpha(c.primary, 0.1), borderColor: hexAlpha(c.primary, 0.2) }]}>
-                    <Text style={{ fontSize: 11, color: c.textMuted, fontFamily: 'Inter_400Regular' }}>TODAY</Text>
-                    <Text style={{ fontSize: 22, color: c.primary, fontFamily: 'Outfit_700Bold' }}>{data.hoursToday.toFixed(1)}h</Text>
-                </View>
-                <View style={[localStyles.insightStatCard, { backgroundColor: hexAlpha(c.success, 0.1), borderColor: hexAlpha(c.success, 0.2) }]}>
-                    <Text style={{ fontSize: 11, color: c.textMuted, fontFamily: 'Inter_400Regular' }}>MONTH</Text>
-                    <Text style={{ fontSize: 22, color: c.success, fontFamily: 'Outfit_700Bold' }}>{data.hoursMonth.toFixed(0)}h</Text>
-                </View>
-                <View style={[localStyles.insightStatCard, { backgroundColor: hexAlpha(c.warning, 0.1), borderColor: hexAlpha(c.warning, 0.2) }]}>
-                    <Text style={{ fontSize: 11, color: c.textMuted, fontFamily: 'Inter_400Regular' }}>LIFETIME</Text>
-                    <Text style={{ fontSize: 22, color: c.warning, fontFamily: 'Outfit_700Bold' }}>{hoursLifetime.toFixed(0)}h</Text>
-                </View>
-            </View>
-
-            <View style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}>
-                <Text style={{ fontSize: 16, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 16 }}>Top Genres</Text>
-                <View style={{ gap: 10 }}>
-                    {genreStats.slice(0, 5).map((g, i) => (
-                        <View key={g.genre} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <Text style={{ width: 20, fontSize: 14, color: c.textSecondary, fontFamily: 'Outfit_700Bold' }}>#{i + 1}</Text>
-                            <View style={[localStyles.genreBarBg, { backgroundColor: hexAlpha(c.primary, 0.1) }]}>
-                                <View style={[localStyles.genreBarFill, { width: `${Math.min((g.hoursWatched / genreStats[0].hoursWatched) * 100, 100)}%`, backgroundColor: i === 0 ? c.primary : hexAlpha(c.primary, 0.4 + 0.6 * (1 - i / 5)) }]} />
-                            </View>
-                            <Text style={{ width: 80, fontSize: 13, color: c.text, fontFamily: 'Outfit_600SemiBold' }}>{g.genre}</Text>
-                            <Text style={{ fontSize: 12, color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>{g.hoursWatched.toFixed(0)}h</Text>
-                        </View>
-                    ))}
-                </View>
-            </View>
-
-            <View style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}>
-                <Text style={{ fontSize: 16, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 12 }}>Personality</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                    <Text style={{ fontSize: 40 }}>{p.emoji}</Text>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 18, color: c.text, fontFamily: 'Outfit_700Bold' }}>{p.title}</Text>
-                        <Text style={{ fontSize: 13, color: c.textSecondary, fontFamily: 'Inter_400Regular', marginTop: 4 }}>{p.description}</Text>
+                    <Text style={{ fontSize: 16, color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Welcome back to your insights,</Text>
+                    <Text style={{ fontSize: 36, color: c.text, fontFamily: 'Outfit_700Bold', marginVertical: 8 }}>{data.userName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <MaterialCommunityIcons name="timer-sand" size={20} color={c.primary} />
+                        <Text style={{ fontSize: 18, color: c.primary, fontFamily: 'Outfit_600SemiBold' }}>
+                            {hoursLifetime.toFixed(0)} total hours streamed
+                        </Text>
                     </View>
                 </View>
-            </View>
-
-            <View style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}>
-                <Text style={{ fontSize: 16, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 12 }}>Achievements</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {data.achievements.filter(a => a.unlockedAt).slice(0, 8).map(a => (
-                        <View key={a.id} style={[localStyles.achBadge, { backgroundColor: hexAlpha(getRarityColor(a.rarity), 0.15), borderColor: hexAlpha(getRarityColor(a.rarity), 0.3) }]}>
-                            <Text style={{ fontSize: 16 }}>{a.icon}</Text>
-                            <Text style={{ fontSize: 11, color: c.text, fontFamily: 'Outfit_600SemiBold' }}>{a.title}</Text>
-                        </View>
-                    ))}
+                <View style={[localStyles.insightEmojiWrap, { backgroundColor: hexAlpha(c.primary, 0.1), width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 60 }}>{p.emoji}</Text>
                 </View>
+            </TVFocusable>
+
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+                {[
+                    { label: 'TODAY', value: data.hoursToday.toFixed(1) + 'h', color: c.primary },
+                    { label: 'THIS MONTH', value: data.hoursMonth.toFixed(0) + 'h', color: c.success },
+                    { label: 'LIFETIME', value: hoursLifetime.toFixed(0) + 'h', color: c.warning }
+                ].map((stat, i) => (
+                    <TVFocusable 
+                        key={i} 
+                        style={[localStyles.insightStatCard, { flex: 1, backgroundColor: hexAlpha(stat.color, 0.1), borderColor: hexAlpha(stat.color, 0.2), paddingVertical: 24 }]}
+                        focusedScale={1.05}
+                        focusedBorderColor={stat.color}
+                    >
+                        <Text style={{ fontSize: 14, color: c.textMuted, fontFamily: 'Inter_400Regular', letterSpacing: 1 }}>{stat.label}</Text>
+                        <Text style={{ fontSize: 32, color: stat.color, fontFamily: 'Outfit_700Bold', marginTop: 4 }}>{stat.value}</Text>
+                    </TVFocusable>
+                ))}
             </View>
 
-            <View style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}>
-                <Text style={{ fontSize: 16, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 12 }}>Devices</Text>
-                <View style={{ gap: 10 }}>
-                    {Object.entries(data.deviceSessions || {}).map(([device, pct], i) => (
-                        <View key={device} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <MaterialCommunityIcons
-                                name={({ 'Android TV': 'television', 'Mobile': 'cellphone', 'Windows': 'laptop', 'Web': 'web' } as Record<string, string>)[device] as any || 'devices'}
-                                size={20} color={[c.primary, c.success, c.info, c.warning][i]} />
-                            <View style={[localStyles.genreBarBg, { backgroundColor: hexAlpha(c.primary, 0.1), flex: 1 }]}>
-                                <View style={[localStyles.genreBarFill, {
-                                    width: `${pct}%`, backgroundColor: [c.primary, c.success, c.info, c.warning][i],
-                                }]} />
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+                <TVFocusable 
+                    style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
+                    focusedScale={1.02}
+                    focusedBorderColor={c.primary}
+                >
+                    <Text style={{ fontSize: 20, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 20 }}>Top Genres</Text>
+                    <View style={{ gap: 12 }}>
+                        {genreStats.length > 0 ? genreStats.slice(0, 5).map((g, i) => (
+                            <View key={g.genre} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                                <Text style={{ width: 24, fontSize: 16, color: c.textSecondary, fontFamily: 'Outfit_700Bold' }}>#{i + 1}</Text>
+                                <View style={[localStyles.genreBarBg, { backgroundColor: hexAlpha(c.primary, 0.1), height: 12, borderRadius: 6 }]}>
+                                    <View style={[localStyles.genreBarFill, { width: `${Math.min((g.hoursWatched / genreStats[0].hoursWatched) * 100, 100)}%`, backgroundColor: i === 0 ? c.primary : hexAlpha(c.primary, 0.4 + 0.6 * (1 - i / 5)), height: '100%', borderRadius: 6 }]} />
+                                </View>
+                                <Text style={{ width: 100, fontSize: 15, color: c.text, fontFamily: 'Outfit_600SemiBold' }}>{g.genre}</Text>
+                                <Text style={{ width: 40, fontSize: 14, color: c.textSecondary, fontFamily: 'Inter_400Regular', textAlign: 'right' }}>{g.hoursWatched.toFixed(0)}h</Text>
                             </View>
-                            <Text style={{ fontSize: 13, color: c.text, fontFamily: 'Outfit_600SemiBold', width: 40, textAlign: 'right' }}>{pct}%</Text>
-                        </View>
-                    ))}
-                </View>
+                        )) : (
+                            <Text style={{ color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Start watching to see genre insights.</Text>
+                        )}
+                    </View>
+                </TVFocusable>
+
+                <TVFocusable 
+                    style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
+                    focusedScale={1.02}
+                    focusedBorderColor={c.primary}
+                >
+                    <Text style={{ fontSize: 20, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 20 }}>Devices</Text>
+                    <View style={{ gap: 16 }}>
+                        {Object.entries(data.deviceSessions || {}).length > 0 ? Object.entries(data.deviceSessions || {}).map(([device, pct], i) => (
+                            <View key={device} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: hexAlpha([c.primary, c.success, c.info, c.warning][i % 4], 0.15), justifyContent: 'center', alignItems: 'center' }}>
+                                    <MaterialCommunityIcons
+                                        name={({ 'Android TV': 'television', 'Mobile': 'cellphone', 'Windows': 'laptop', 'Web': 'web' } as Record<string, string>)[device] as any || 'devices'}
+                                        size={22} color={[c.primary, c.success, c.info, c.warning][i % 4]} />
+                                </View>
+                                <View style={[localStyles.genreBarBg, { backgroundColor: hexAlpha(c.primary, 0.1), flex: 1, height: 10, borderRadius: 5 }]}>
+                                    <View style={[localStyles.genreBarFill, {
+                                        width: `${pct}%`, backgroundColor: [c.primary, c.success, c.info, c.warning][i % 4], height: '100%', borderRadius: 5
+                                    }]} />
+                                </View>
+                                <Text style={{ fontSize: 16, color: c.text, fontFamily: 'Outfit_600SemiBold', width: 50, textAlign: 'right' }}>{pct}%</Text>
+                            </View>
+                        )) : (
+                            <Text style={{ color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Start watching to see device insights.</Text>
+                        )}
+                    </View>
+                </TVFocusable>
             </View>
 
-            <View style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}>
-                <Text style={{ fontSize: 16, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 8 }}>Discovery Insights</Text>
-                <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+                <TVFocusable 
+                    style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
+                    focusedScale={1.02}
+                    focusedBorderColor={p.color || c.primary}
+                >
+                    <Text style={{ fontSize: 20, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 16 }}>Your Personality</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 24 }}>
+                        <View style={{ backgroundColor: hexAlpha(p.color || c.primary, 0.15), width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: hexAlpha(p.color || c.primary, 0.3) }}>
+                            <Text style={{ fontSize: 44 }}>{p.emoji}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 24, color: p.color || c.primary, fontFamily: 'Outfit_700Bold' }}>{p.title}</Text>
+                            <Text style={{ fontSize: 15, color: c.textSecondary, fontFamily: 'Inter_400Regular', marginTop: 8, lineHeight: 22 }}>{p.description}</Text>
+                        </View>
+                    </View>
+                </TVFocusable>
+
+                <TVFocusable 
+                    style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
+                    focusedScale={1.02}
+                    focusedBorderColor={c.primary}
+                >
+                    <Text style={{ fontSize: 20, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 16 }}>Recent Achievements</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                        {data.achievements.filter(a => a.unlockedAt).length > 0 ? data.achievements.filter(a => a.unlockedAt).slice(0, 6).map(a => (
+                            <View key={a.id} style={[localStyles.achBadge, { backgroundColor: hexAlpha(getRarityColor(a.rarity), 0.15), borderColor: hexAlpha(getRarityColor(a.rarity), 0.4), paddingVertical: 10, paddingHorizontal: 16, borderRadius: 16 }]}>
+                                <Text style={{ fontSize: 20 }}>{a.icon}</Text>
+                                <Text style={{ fontSize: 13, color: c.text, fontFamily: 'Outfit_600SemiBold', marginLeft: 8 }}>{a.title}</Text>
+                            </View>
+                        )) : (
+                            <Text style={{ color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Unlock achievements by exploring content!</Text>
+                        )}
+                    </View>
+                </TVFocusable>
+            </View>
+            
+            <TVFocusable 
+                style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
+                focusedScale={1.02}
+                focusedBorderColor={c.primary}
+            >
+                <Text style={{ fontSize: 20, color: c.text, fontFamily: 'Outfit_700Bold', marginBottom: 16 }}>Discovery Highlights</Text>
+                <View style={{ flexDirection: 'row', gap: 24 }}>
                     {(function () {
                         const facts = [];
                         if (data.totalSessions > 0) {
-                            facts.push(`Explored ${data.discoveredGenres?.length || 0} genres`);
-                            if (data.habits?.activeDay !== 'N/A') facts.push(`Most active on ${data.habits.activeDay}`);
-                            if (data.habits?.activeTime !== 'N/A') facts.push(`Prefers ${data.habits.activeTime}`);
+                            facts.push({ icon: 'compass-outline', text: `Explored ${data.discoveredGenres?.length || 0} unique genres` });
+                            if (data.habits?.activeDay !== 'N/A') facts.push({ icon: 'calendar-star', text: `Most active on ${data.habits.activeDay}` });
+                            if (data.habits?.activeTime !== 'N/A') facts.push({ icon: 'clock-outline', text: `Prefers ${data.habits.activeTime} streaming` });
                         }
                         return facts.length > 0 ? facts.slice(0, 3).map((fact, i) => (
-                            <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.primary, marginTop: 6 }} />
-                                <Text style={{ fontSize: 13, color: c.textSecondary, fontFamily: 'Inter_400Regular', flex: 1 }}>{fact}</Text>
+                            <View key={i} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: hexAlpha(c.card, 0.5), padding: 16, borderRadius: 16 }}>
+                                <MaterialCommunityIcons name={fact.icon as any} size={28} color={c.primary} />
+                                <Text style={{ fontSize: 15, color: c.text, fontFamily: 'Outfit_600SemiBold', flex: 1 }}>{fact.text}</Text>
                             </View>
                         )) : (
-                            <Text style={{ fontSize: 13, color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Start watching to see insights.</Text>
+                            <Text style={{ fontSize: 15, color: c.textSecondary, fontFamily: 'Inter_400Regular' }}>Start watching to see your viewing habits.</Text>
                         );
                     })()}
                 </View>
-            </View>
+            </TVFocusable>
         </ScrollView>
     );
 }

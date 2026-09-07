@@ -125,8 +125,7 @@ export const Colors: Record<string, any> = {
     // ─── NEW: Dynamic theme system aliases ──────────────
     amoled: computeThemeColors('amoled', 'blue', '#6366f1', 12, 5, 'normal'),
     glassmorphism: computeThemeColors('glassmorphism', 'blue', '#6366f1', 16, 8, 'normal'),
-    material3: computeThemeColors('material3', 'blue', '#6366f1', 20, 6, 'normal'),
-    minimal: computeThemeColors('minimal', 'blue', '#6366f1', 4, 2, 'normal'),
+    gradient: computeThemeColors('gradient', 'blue', '#6366f1', 16, 6, 'normal'),
     cinema: computeThemeColors('cinema', 'blue', '#6366f1', 8, 10, 'enhanced'),
 };
 

@@ -13,8 +13,11 @@ const tmdbApi = axios.create({
 
 const rawGet = (url: string, options?: any) => tmdbApi.get(url, options);
 
-const CACHE_TTL = 1000 * 60 * 2; // 2 minutes
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 const cache = new Map<string, { expires: number; data: any }>();
+// Coalesce concurrent identical requests so N sections mounting at once only
+// trigger a single network call.
+const inflight = new Map<string, Promise<any>>();
 
 const makeCacheKey = (url: string, params?: any) => `${url}|${JSON.stringify(params || {})}`;
 
@@ -29,9 +32,25 @@ const cachedGet = async (url: string, options?: { params?: any; cacheTTL?: numbe
         return { data: cached.data };
     }
 
-    const response = await rawGet(url, { params });
-    cache.set(key, { data: response.data, expires: now + ttl });
-    return response;
+    const pending = inflight.get(key);
+    if (pending) {
+        const data = await pending;
+        return { data };
+    }
+
+    const promise = (async () => {
+        try {
+            const response = await rawGet(url, { params });
+            cache.set(key, { data: response.data, expires: Date.now() + ttl });
+            return response.data;
+        } finally {
+            inflight.delete(key);
+        }
+    })();
+
+    inflight.set(key, promise);
+    const data = await promise;
+    return { data };
 };
 
 // Add response interceptor for retry logic
@@ -112,7 +131,7 @@ export const getDetails = async (type: 'movie' | 'tv', id: number | string) => {
 
     const response = await cachedGet(`/${type}/${tmdbId}`, {
         params: {
-            append_to_response: 'credits,videos,similar',
+            append_to_response: 'credits,videos,similar,watch/providers',
         },
     });
     return response.data;
@@ -120,6 +139,15 @@ export const getDetails = async (type: 'movie' | 'tv', id: number | string) => {
 
 export const getExternalIds = async (type: 'movie' | 'tv', id: number | string) => {
     const response = await cachedGet(`/${type}/${id}/external_ids`);
+    return response.data;
+};
+
+export const getPersonDetails = async (id: number | string) => {
+    const response = await cachedGet(`/person/${id}`, {
+        params: {
+            append_to_response: 'combined_credits',
+        },
+    });
     return response.data;
 };
 

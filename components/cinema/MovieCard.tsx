@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
@@ -23,15 +22,17 @@ interface MovieCardProps {
 
 function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, showType = false, style, onPress }: MovieCardProps) {
     const { colors: currentColors } = useTheme();
-    const themeStore = useThemeStore();
+    const posterStyleKey = useThemeStore((s) => s.posterStyle);
+    const themeBorderRadius = useThemeStore((s) => s.borderRadius);
+    const cardElevation = useThemeStore((s) => s.cardElevation);
     const router = useRouter();
 
-    const posterStyle = POSTER_STYLES[themeStore.posterStyle] || POSTER_STYLES.netflix;
+    const posterStyle = POSTER_STYLES[posterStyleKey] || POSTER_STYLES.netflix;
     const mediaType = (type || item.media_type || 'movie') as 'movie' | 'tv';
 
     const width = propWidth || (Platform.isTV ? posterStyle.tvWidth : 130);
     const aspectRatio = Platform.isTV ? posterStyle.tvAspectRatio : posterStyle.mobileAspectRatio;
-    const borderRadius = themeStore.borderRadius || posterStyle.borderRadius;
+    const borderRadius = themeBorderRadius || posterStyle.borderRadius;
 
     const posterUrl = useMemo(() => {
         const makeImageUrl = (path?: string) => {
@@ -136,7 +137,7 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
     };
 
     const focusedScale = posterStyle.scaleOnFocus;
-    const shadowElevation = themeStore.cardElevation || posterStyle.shadowElevation;
+    const shadowElevation = cardElevation || posterStyle.shadowElevation;
 
     if (Platform.isTV) {
         return (
@@ -157,7 +158,7 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
                             focused && { shadowColor: currentColors.primary }
                         ]}
                     >
-                        {currentColors.isAmoled ? <View style={StyleSheet.absoluteFill} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
+                        <View style={[StyleSheet.absoluteFill, styles.posterBackdrop]} />
                         {posterUrl ? (
                             <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} />
                         ) : (
@@ -201,27 +202,28 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
         );
     }
 
+    const year = (item.release_date || item.first_air_date || '').split('-')[0];
+
     return (
-        <TouchableOpacity style={[styles.container, { width }, style]} onPress={handlePress} activeOpacity={0.8}>
-            <View style={[styles.posterContainer, { aspectRatio, borderRadius, borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1, elevation: shadowElevation }]}>
-                {currentColors.isAmoled ? <View style={StyleSheet.absoluteFill} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
+        <TouchableOpacity style={[styles.container, { width }, style]} onPress={handlePress} activeOpacity={0.85}>
+            <View style={[styles.posterContainer, { aspectRatio, borderRadius, borderColor: currentColors.border, borderWidth: 1, elevation: shadowElevation }]}>
+                <View style={[StyleSheet.absoluteFill, styles.posterBackdrop]} />
                 {posterUrl ? <OptimizedImage source={{ uri: posterUrl }} style={styles.poster} /> : (
                     <View style={styles.placeholder}>
                         <MaterialIcons name="movie" size={width * 0.3} color={currentColors.textSecondary} />
                     </View>
                 )}
 
-                {posterStyle.showMetadata && (
-                    currentColors.isAmoled ? (
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.4)', '#000000']} style={[styles.gradient, { borderRadius }]} />
-                    ) : (
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']} style={[styles.gradient, { borderRadius }]} />
-                    )
-                )}
+                {/* Soft bottom gradient for legibility */}
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.55)']}
+                    locations={[0.45, 0.7, 1]}
+                    style={[styles.gradient, { borderRadius }]}
+                />
 
                 {item.vote_average > 0 && (
-                    <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-                        <MaterialIcons name="star" size={12} color="#FFD700" />
+                    <View style={styles.ratingBadge}>
+                        <MaterialIcons name="star" size={11} color="#f5c518" />
                         <Text style={styles.ratingText}>{item.vote_average.toFixed(1)}</Text>
                     </View>
                 )}
@@ -231,12 +233,21 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
                         <Text style={styles.typeText}>{mediaType.toUpperCase()}</Text>
                     </View>
                 )}
+
+                {/* Play affordance on poster */}
+                <View style={[styles.playChip, { backgroundColor: currentColors.primary }]}>
+                    <MaterialIcons name="play-arrow" size={16} color="#fff" />
+                </View>
             </View>
             {posterStyle.showMetadata && (
                 <View style={styles.info}>
                     <Text style={[styles.title, { color: currentColors.text }]} numberOfLines={1}>{item.title || item.name}</Text>
-                    {item.release_date || item.first_air_date ? (
-                        <Text style={[styles.year, { color: currentColors.textSecondary }]}>{(item.release_date || item.first_air_date).split('-')[0]}</Text>
+                    {year ? (
+                        <View style={styles.metaLine}>
+                            <Text style={[styles.year, { color: currentColors.textSecondary }]}>{year}</Text>
+                            <View style={[styles.metaDot, { backgroundColor: currentColors.textSecondary }]} />
+                            <Text style={[styles.year, { color: currentColors.textSecondary }]}>{mediaType === 'tv' ? 'Series' : 'Movie'}</Text>
+                        </View>
                     ) : null}
                 </View>
             )}
@@ -245,25 +256,54 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
 }
 
 const styles = StyleSheet.create({
-    container: { marginBottom: 12 },
+    container: { marginBottom: 14 },
     posterContainer: {
         overflow: 'hidden',
         position: 'relative',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
     },
-    poster: { width: '100%', height: '100%', resizeMode: 'cover' },
+    poster: { width: '100%', height: '100%' },
+    posterBackdrop: { backgroundColor: '#1a1a1a' },
     placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-    ratingBadge: { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 2 },
-    ratingText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
-    typeBadge: { position: 'absolute', bottom: 8, right: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-    typeText: { color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' },
+    gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%' },
+    ratingBadge: {
+        position: 'absolute',
+        top: 7,
+        left: 7,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 8,
+        gap: 2,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    ratingText: { color: '#fff', fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+    typeBadge: { position: 'absolute', top: 7, right: 7, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    typeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+    playChip: {
+        position: 'absolute',
+        bottom: 7,
+        right: 7,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+        elevation: 4,
+    },
     info: { marginTop: 8, paddingHorizontal: 2 },
     title: { fontSize: 13, fontFamily: 'Outfit_600SemiBold' },
-    year: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+    metaLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+    metaDot: { width: 3, height: 3, borderRadius: 1.5, opacity: 0.6 },
+    year: { fontSize: 11, fontFamily: 'Inter_400Regular' },
     tvOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingTop: 30 },
     tvTitle: { 
         color: '#fff', 

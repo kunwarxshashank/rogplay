@@ -1,17 +1,102 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Animated, Platform } from 'react-native';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { getTrending } from '@/services/tmdb';
 import { Colors } from '@/constants/Colors';
-import { Ionicons, } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFavoritesStore } from '@/store/favoritesStore';
+import { useToastStore } from '@/store/toastStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import { TrendingSliderSkeleton } from '@/components/Skeleton';
 import { useTheme } from '@/hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 const isTV = Platform.isTV;
+
+const NUM_PARTICLES = 15;
+
+const BurningAshes = ({ color }: { color: string }) => {
+    const particles = useRef([...Array(NUM_PARTICLES)].map(() => ({
+        animY: new Animated.Value(0),
+        animX: new Animated.Value(0),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(Math.random() * 0.6 + 0.4),
+        startX: Math.random() * 100,
+        delay: Math.random() * 2000,
+        duration: Math.random() * 1500 + 2000,
+    }))).current;
+
+    useEffect(() => {
+        const startAnim = (p: any) => {
+            p.animY.setValue(0);
+            p.animX.setValue(0);
+            p.opacity.setValue(0);
+
+            Animated.sequence([
+                Animated.delay(p.delay),
+                Animated.parallel([
+                    Animated.timing(p.animY, {
+                        toValue: -(Math.random() * 100 + 100),
+                        duration: p.duration,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(p.animX, {
+                        toValue: (Math.random() - 0.5) * 60,
+                        duration: p.duration,
+                        useNativeDriver: true,
+                    }),
+                    Animated.sequence([
+                        Animated.timing(p.opacity, {
+                            toValue: Math.random() * 0.6 + 0.4,
+                            duration: p.duration * 0.2,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(p.opacity, {
+                            toValue: 0,
+                            duration: p.duration * 0.8,
+                            useNativeDriver: true,
+                        })
+                    ])
+                ])
+            ]).start(() => startAnim({ ...p, delay: Math.random() * 500 }));
+        };
+
+        particles.forEach(startAnim);
+    }, []);
+
+    return (
+        <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
+            {particles.map((p, i) => (
+                <Animated.View
+                    key={i}
+                    style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: `${p.startX}%`,
+                        width: 5,
+                        height: 5,
+                        borderRadius: 2.5,
+                        backgroundColor: color,
+                        shadowColor: color,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 1,
+                        shadowRadius: 5,
+                        elevation: 5,
+                        opacity: p.opacity,
+                        transform: [
+                            { translateY: p.animY },
+                            { translateX: p.animX },
+                            { scale: p.scale }
+                        ]
+                    }}
+                />
+            ))}
+        </View>
+    );
+};
 
 interface TrendingSliderProps {
     fullScreen?: boolean;
@@ -73,10 +158,11 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur }: any) => {
                 <OptimizedImage
                     source={{ uri: imageUrl }}
                     style={styles.poster}
+                    transition={0}
                 />
                 <View style={styles.gradientImageLook}>
                     <LinearGradient
-                        colors={currentColors.isAmoled 
+                        colors={currentColors.isAmoled
                             ? ['transparent', 'rgba(0, 0, 0, 0.6)', 'rgba(0, 0, 0, 0.95)']
                             : ['transparent', 'rgba(6, 9, 18, 0.6)', 'rgba(6, 9, 18, 0.95)']}
                         locations={[0.2, 0.7, 1]}
@@ -101,33 +187,83 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur }: any) => {
     );
 };
 
+const FavoriteButton = ({ item, toggleFavorite, showToast }: any) => {
+    const favId = `${item.media_type || 'movie'}:${item.id}`;
+    const exists = useFavoritesStore((state) => state.isFavorite(favId));
+    
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    
+    // Track previous exists to only animate on change, not on mount
+    const prevExists = useRef(exists);
+
+    useEffect(() => {
+        if (prevExists.current !== exists) {
+            Animated.sequence([
+                Animated.timing(scaleAnim, { toValue: 0.5, duration: 100, useNativeDriver: true }),
+                Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true })
+            ]).start();
+            prevExists.current = exists;
+        }
+    }, [exists]);
+
+    return (
+        <TouchableOpacity onPress={() => {
+            toggleFavorite({
+                id: favId,
+                kind: item.media_type === 'tv' ? 'tv' : 'movie',
+                title: item.title || item.name,
+                subtitle: item.release_date || item.first_air_date,
+                imageUrl: item.poster_path ? `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${item.poster_path}` : undefined,
+                tmdbType: item.media_type as 'movie' | 'tv',
+                tmdbId: String(item.id),
+            });
+            showToast(!exists ? 'Added to favourites' : 'Removed from favourites', 'success');
+        }}>
+            <BlurView intensity={40} tint="dark" style={styles.infoBtn}>
+                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                    <Ionicons name={exists ? "heart" : "heart-outline"} size={22} color={exists ? "#ff6b8a" : "#fff"} />
+                </Animated.View>
+            </BlurView>
+        </TouchableOpacity>
+    );
+};
+
+let cachedTrendingData: any[] | null = null;
+
 function TrendingSlider({ fullScreen = false, variant = 'traditional' }: TrendingSliderProps) {
     const { colors: currentColors } = useTheme();
-    const [data, setData] = useState<any[]>([]);
+    const [data, setData] = useState<any[]>(cachedTrendingData || []);
+    const [loading, setLoading] = useState(!cachedTrendingData);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
     const router = useRouter();
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+    
+    const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+    const showToast = useToastStore((state) => state.showToast);
 
     const ITEM_WIDTH = useMemo(() => {
         if (fullScreen && isTV) return width * 0.82;
-        return isTV ? width * 0.6 : width * 0.85;
+        return isTV ? width * 0.6 : width;
     }, [fullScreen]);
 
     const ITEM_HEIGHT = useMemo(() => {
         if (fullScreen && isTV) return height * 0.45;
-        return 220;
+        return 550;
     }, [fullScreen]);
 
-    const ITEM_MARGIN = isTV ? (fullScreen ? 20 : 10) : 10;
+    const ITEM_MARGIN = isTV ? (fullScreen ? 20 : 10) : 0;
     const SNAP_INTERVAL = ITEM_WIDTH + ITEM_MARGIN * 2;
     const SPACER_WIDTH = (width - SNAP_INTERVAL) / 2;
 
     useEffect(() => {
-        loadTrending();
+        if (!cachedTrendingData) {
+            loadTrending();
+        }
     }, []);
 
     const loadTrending = async () => {
+        setLoading(true);
         try {
             const response = await getTrending('week');
             const results = response.results || [];
@@ -143,14 +279,17 @@ function TrendingSlider({ fullScreen = false, variant = 'traditional' }: Trendin
                     seen.add(id);
                     return true;
                 });
-                setData([{ key: 'left-spacer' }, ...filtered, { key: 'right-spacer' }]);
+                cachedTrendingData = [{ key: 'left-spacer' }, ...filtered, { key: 'right-spacer' }];
+                setData(cachedTrendingData);
             }
         } catch (error) {
             console.error(error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    const renderItem = ({ item, index }: { item: any, index: number }) => {
+    const renderItem = useCallback(({ item, index }: { item: any, index: number }) => {
         if (!item.id && !item.backdrop_path) {
             return <View style={{ width: SPACER_WIDTH }} />;
         }
@@ -177,27 +316,15 @@ function TrendingSlider({ fullScreen = false, variant = 'traditional' }: Trendin
         }
 
         // Standard / Mobile Layout
-        const inputRange = [
-            (index - 2) * SNAP_INTERVAL,
-            (index - 1) * SNAP_INTERVAL,
-            index * SNAP_INTERVAL,
-        ];
-
-        const scale = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.92, 1, 0.92],
-        });
-
-        const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.6, 1, 0.6],
-        });
-
         const Container = Platform.isTV ? TVFocusable : TouchableOpacity;
+
+        const rank = index; // account for left-spacer at index 0
+        const year = (item.release_date || item.first_air_date || '').split('-')[0];
+        const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
 
         return (
             <Container
-                activeOpacity={1}
+                activeOpacity={0.92}
                 style={{ marginHorizontal: ITEM_MARGIN }}
                 onPress={onPress}
                 onFocus={onFocus}
@@ -208,62 +335,87 @@ function TrendingSlider({ fullScreen = false, variant = 'traditional' }: Trendin
                     {
                         width: ITEM_WIDTH,
                         height: ITEM_HEIGHT,
-                        transform: [{ scale: isFocused ? 1.02 : scale }],
-                        opacity,
-                        backgroundColor: currentColors.card
+                        transform: [{ scale: isFocused ? 1.02 : 1 }],
+                        backgroundColor: currentColors.card,
+                        shadowColor: currentColors.primary,
                     },
                 ]}>
                     <OptimizedImage
-                        source={{ uri: `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${item.backdrop_path}` }}
+                        source={{ uri: `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${item.poster_path || item.backdrop_path}` }}
                         style={styles.poster}
+                        transition={0}
                     />
+
+
 
                     <View style={styles.gradient}>
                         <LinearGradient
-                            colors={variant === 'fullscreen'
-                                ? ['transparent', currentColors.background + '99', currentColors.background]
-                                : currentColors.isAmoled
-                                    ? ['transparent', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.9)', '#000000']
-                                    : ['transparent', 'rgba(6, 9, 18, 0.4)', 'rgba(6, 9, 18, 0.9)', '#060912']}
-                            locations={variant === 'fullscreen' ? [0, 0.7, 1] : [0, 0.5, 0.8, 1]}
+                            colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.95)', '#000000']}
+                            locations={[0, 0.45, 0.8, 1]}
                             style={StyleSheet.absoluteFill}
                         />
+                        <BurningAshes color={currentColors.primary} />
                         <View style={styles.contentWrap}>
-                            <View style={[styles.badge, variant === 'fullscreen' && { backgroundColor: currentColors.primary + '30' }]}>
-                                <Text style={[styles.badgeText, variant === 'fullscreen' && { color: currentColors.primary }]}>TRENDING</Text>
+                            <View style={{ alignSelf: 'flex-start', marginBottom: 10 }}>
+                                <BlurView intensity={40} tint="dark" style={[styles.rankPill, { borderColor: currentColors.primary + '55' }]}>
+                                    <Ionicons name="flame" size={12} color={currentColors.primary} />
+                                    <Text style={[styles.rankPillText, { color: '#fff' }]}>#{rank} Trending</Text>
+                                </BlurView>
                             </View>
-                            <Text style={styles.title} numberOfLines={1}>
-                                {item.title || item.name}
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                                {rating && (
+                                    <BlurView intensity={40} tint="dark" style={[styles.imdbPill, { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 }]}>
+                                        <Text style={[styles.imdbStar, { fontSize: 14 }]}>★</Text>
+                                        <Text style={[styles.imdbText, { fontSize: 15, fontFamily: 'Outfit_700Bold' }]}>{rating}</Text>
+                                    </BlurView>
+                                )}
+                                <Text style={[styles.title, { flex: 1, marginBottom: 0 }]} numberOfLines={2}>
+                                    {item.title || item.name}
+                                </Text>
+                            </View>
                             <View style={styles.metaRow}>
-                                <View style={styles.metaItem}>
-                                    <Ionicons name="calendar-outline" size={12} color={currentColors.primary} />
-                                    <Text style={[styles.metaText, { color: currentColors.textSecondary }]}>
-                                        {new Date(item.release_date || item.first_air_date).getFullYear()}
-                                    </Text>
-                                </View>
-                                <View style={styles.dot} />
-                                <View style={styles.metaItem}>
-                                    <Ionicons name="star" size={12} color="#f59e0b" />
-                                    <Text style={[styles.metaText, { color: currentColors.textSecondary }]}>
-                                        {item.vote_average?.toFixed(1)}
-                                    </Text>
-                                </View>
-                                <View style={styles.dot} />
-                                <View style={styles.metaItem}>
-                                    <Text style={[styles.typeText, { color: currentColors.primary }]}>
+                                <View style={[styles.typeChip, { backgroundColor: currentColors.primary }]}>
+                                    <Text style={styles.typeChipText}>
                                         {(item.media_type || 'Movie').toUpperCase()}
                                     </Text>
                                 </View>
+                                {!!year && (
+                                    <>
+                                        <View style={styles.dot} />
+                                        <View style={styles.metaItem}>
+                                            <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.7)" />
+                                            <Text style={[styles.metaText, { color: "rgba(255,255,255,0.7)" }]}>
+                                                {year}
+                                            </Text>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+
+                            <View style={styles.actionRow}>
+                                <View style={[styles.playBtnWrap, { shadowColor: currentColors.primary }]}>
+                                    <LinearGradient
+                                        colors={[currentColors.primary, currentColors.primary + 'AA']}
+                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                        style={StyleSheet.absoluteFill}
+                                    />
+                                    <View style={styles.playBtnInner}>
+                                        <Ionicons name="play" size={18} color="#fff" style={{ marginLeft: 2 }} />
+                                        <Text style={styles.playBtnText}>Play</Text>
+                                    </View>
+                                </View>
+                                <FavoriteButton item={item} toggleFavorite={toggleFavorite} showToast={showToast} />
                             </View>
                         </View>
                     </View>
                 </Animated.View>
             </Container>
         );
-    };
+    }, [focusedIndex, fullScreen, ITEM_WIDTH, ITEM_HEIGHT, ITEM_MARGIN, SNAP_INTERVAL, SPACER_WIDTH, scrollX, variant, currentColors, router]);
 
-    if (data.length === 0) {
+    const realCount = Math.max(0, data.length - 2); // exclude two spacers
+
+    if (loading) {
         return <TrendingSliderSkeleton fullScreen={fullScreen} />;
     }
 
@@ -277,54 +429,195 @@ function TrendingSlider({ fullScreen = false, variant = 'traditional' }: Trendin
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={[styles.flatListContent, fullScreen && isTV && { paddingHorizontal: 40 }]}
-                snapToInterval={(!fullScreen || !isTV) ? SNAP_INTERVAL : undefined}
+                snapToInterval={SNAP_INTERVAL}
                 decelerationRate="fast"
+                pagingEnabled={!isTV && ITEM_WIDTH === width}
                 bounces={false}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: true }
+                    { useNativeDriver: false }
                 )}
                 scrollEventThrottle={16}
                 initialNumToRender={Math.min(6, data.length)}
                 maxToRenderPerBatch={6}
                 windowSize={5}
-                removeClippedSubviews={true}
+                removeClippedSubviews={false}
             />
+
+            {/* Pagination dots (mobile only) */}
+            {!isTV && realCount > 0 && (
+                <View style={styles.pagination}>
+                    {Array.from({ length: realCount }).map((_, i) => {
+                        const inputRange = [
+                            (i - 1) * SNAP_INTERVAL,
+                            i * SNAP_INTERVAL,
+                            (i + 1) * SNAP_INTERVAL,
+                        ];
+                        const dotWidth = scrollX.interpolate({
+                            inputRange,
+                            outputRange: [6, 20, 6],
+                            extrapolate: 'clamp',
+                        });
+                        const dotOpacity = scrollX.interpolate({
+                            inputRange,
+                            outputRange: [0.3, 1, 0.3],
+                            extrapolate: 'clamp',
+                        });
+                        return (
+                            <Animated.View
+                                key={i}
+                                style={[
+                                    styles.paginationDot,
+                                    { width: dotWidth, opacity: dotOpacity, backgroundColor: currentColors.primary },
+                                ]}
+                            />
+                        );
+                    })}
+                </View>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 32,
-        marginTop: 10
+        // No margin to allow edge-to-edge full-bleed
     },
     flatListContent: {
         alignItems: 'center',
     },
     itemContainer: {
-        borderRadius: 10,
+        borderRadius: isTV ? 28 : 0,
         overflow: 'hidden',
-        elevation: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.4,
-        shadowRadius: 15,
+        elevation: 16,
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.5,
+        shadowRadius: 24,
     },
     poster: {
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
     },
+    topScrim: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 90,
+    },
+    topRow: {
+        position: 'absolute',
+        top: 14,
+        left: 14,
+        right: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    rankPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    rankPillText: {
+        fontSize: 12,
+        fontFamily: 'Outfit_700Bold',
+        letterSpacing: 0.3,
+    },
+    imdbPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        overflow: 'hidden',
+    },
+    imdbStar: {
+        color: '#f5c518',
+        fontSize: 12,
+    },
+    imdbText: {
+        color: '#fff',
+        fontSize: 12,
+        fontFamily: 'Outfit_700Bold',
+    },
     gradient: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        height: '100%',
+        height: '60%',
         justifyContent: 'flex-end',
-        padding: 40,
-        paddingBottom: 40,
+        padding: 24,
+        paddingBottom: 24,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 16,
+    },
+    playBtnWrap: {
+        flex: 1,
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
+        elevation: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    playBtnInner: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    playBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontFamily: 'Outfit_700Bold',
+        letterSpacing: 0.5,
+    },
+    infoBtn: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    typeChip: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    typeChipText: {
+        color: '#fff',
+        fontSize: 10,
+        fontFamily: 'Inter_700Bold',
+        letterSpacing: 0.5,
+    },
+    pagination: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 16,
+    },
+    paginationDot: {
+        height: 6,
+        borderRadius: 3,
     },
     gradientImageLook: {
         position: 'absolute',
@@ -370,12 +663,13 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5,
     },
     title: {
-        fontSize: 22,
+        fontSize: 26,
         fontFamily: 'Outfit_800ExtraBold',
         color: '#fff',
-        textShadowColor: 'rgba(0, 0, 0, 0.7)',
-        textShadowOffset: { width: 0, height: 3 },
-        textShadowRadius: 6,
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 4 },
+        textShadowRadius: 8,
+        marginBottom: 4,
     },
     metaRow: {
         flexDirection: 'row',

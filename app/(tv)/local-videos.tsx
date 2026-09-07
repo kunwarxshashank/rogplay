@@ -15,7 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { TVFocusable } from '@/components/TVFocusable';
 import { TVSearchBar } from '@/components/tv/TVSearchBar';
-import { useHomeLogic, VideoWithThumbnail } from '@/hooks/useHomeLogic';
+import { useHomeLogic, VideoWithThumbnail, FolderType } from '@/hooks/useHomeLogic';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -43,9 +43,9 @@ const TVFolderItem = React.memo(({
     CARD_W,
     c
 }: {
-    item: { name: string, count: number, uri: string },
+    item: FolderType,
     index: number,
-    onPress: (uri: string) => void,
+    onPress: (folder: FolderType) => void,
     CARD_W: number,
     c: any
 }) => {
@@ -53,7 +53,7 @@ const TVFolderItem = React.memo(({
     return (
         <TVFocusable
             style={{ width: CARD_W, borderRadius: 18 }}
-            onPress={() => onPress(item.uri)}
+            onPress={() => onPress(item)}
             nativeID={`tv-folder-${index}`}
             focusedBorderColor={grad[0]}
             focusedScale={1.04}
@@ -123,8 +123,8 @@ const TVVideoItem = React.memo(({
                 borderColor: focused ? c.primary : 'rgba(255,255,255,0.06)',
             }]}>
                 <View style={[styles.thumbWrapper, { height: THUMB_H }]}>
-                    {item.thumbnailUri ? (
-                        <Image source={{ uri: item.thumbnailUri }} style={styles.thumbImage} />
+                    {item.uri ? (
+                        <Image source={{ uri: item.uri }} style={styles.thumbImage} />
                     ) : (
                         <View style={styles.thumbPlaceholder}>
                             <LinearGradient
@@ -171,11 +171,12 @@ const TVVideoItem = React.memo(({
 export default function TVLocalVideosScreen() {
     const logic = useHomeLogic();
     const {
-        currentColors, videos, filteredVideos, loading, storage, searchQuery, setSearchQuery,
+        currentColors, videos, filteredVideos, loading, deviceStorage, searchQuery, setSearchQuery,
         showOptionsModal, setShowOptionsModal, viewMode, setViewMode, folders, selectedFolder, setSelectedFolder,
         sortBy, setSortBy, sortOrder, setSortOrder, showSortModal, setShowSortModal, selectedVideo,
         showInfoModal, setShowInfoModal,
-        handlePlay, showOptions, handleDelete, showInfo, formatDuration
+        handlePlay, showOptions, handleDelete, showInfo, formatDuration,
+        hasNextPage, isFetchingNextPage, loadMoreVideos, foldersLoading
     } = logic;
 
     const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
@@ -203,12 +204,12 @@ export default function TVLocalVideosScreen() {
     };
 
     const storageUsage = useMemo(() => {
-        const used = storage.total - storage.free;
+        const used = deviceStorage.total - deviceStorage.free;
         const usedGB = (used / (1024 * 1024 * 1024)).toFixed(1);
-        const totalGB = (storage.total / (1024 * 1024 * 1024)).toFixed(1);
-        const percent = Math.min(100, (used / storage.total) * 100);
+        const totalGB = (deviceStorage.total / (1024 * 1024 * 1024)).toFixed(1);
+        const percent = Math.min(100, (used / deviceStorage.total) * 100);
         return { usedGB, totalGB, percent };
-    }, [storage]);
+    }, [deviceStorage]);
 
     const totalVideoCount = videos.length;
     const displayCount = filteredVideos.length;
@@ -222,11 +223,11 @@ export default function TVLocalVideosScreen() {
         showOptions(item);
     }, [showOptions]);
 
-    const memoizedSetSelectedFolder = useCallback((uri: string) => {
-        setSelectedFolder(uri);
+    const memoizedSetSelectedFolder = useCallback((folder: FolderType) => {
+        setSelectedFolder(folder);
     }, [setSelectedFolder]);
 
-    const renderFolderItem = useCallback(({ item, index }: { item: { name: string, count: number, uri: string }, index: number }) => (
+    const renderFolderItem = useCallback(({ item, index }: { item: FolderType, index: number }) => (
         <TVFolderItem
             item={item}
             index={index}
@@ -275,7 +276,7 @@ export default function TVLocalVideosScreen() {
                     </View>
                     <View>
                         <Text style={[styles.headerTitle, { color: c.text }]}>
-                            {selectedFolder ? selectedFolder.split('/').pop() : 'Local Videos'}
+                            {selectedFolder ? selectedFolder.name : 'Local Videos'}
                         </Text>
                         <Text style={[styles.headerSubtitle, { color: c.textSecondary }]}>
                             Browse and play your local media files
@@ -416,7 +417,7 @@ export default function TVLocalVideosScreen() {
 
             {/* ── Content Grid ────────────────────────── */}
             <View style={styles.gridArea}>
-                {loading ? (
+                {(loading || (isShowingFolders && foldersLoading)) ? (
                     <View style={styles.loadingContainer}>
                         <View style={[styles.loadingCard, { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
                             <ActivityIndicator size="large" color={c.primary} />
@@ -440,6 +441,17 @@ export default function TVLocalVideosScreen() {
                         maxToRenderPerBatch={8}
                         windowSize={3}
                         removeClippedSubviews={Platform.OS === 'android'}
+                        onEndReached={() => {
+                            loadMoreVideos();
+                        }}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={
+                            isFetchingNextPage ? (
+                                <View style={{ padding: 20, alignItems: 'center', width: '100%' }}>
+                                    <ActivityIndicator size="large" color={c.primary} />
+                                </View>
+                            ) : null
+                        }
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
                                 <View style={[styles.emptyIconCircle, { backgroundColor: hexAlpha(c.primary, 0.08) }]}>
@@ -554,8 +566,8 @@ export default function TVLocalVideosScreen() {
                         {/* Video info header */}
                         <View style={styles.optionsHeader}>
                             <View style={[styles.optionsThumb, { backgroundColor: '#0f1520' }]}>
-                                {selectedVideo?.thumbnailUri ? (
-                                    <Image source={{ uri: selectedVideo.thumbnailUri }} style={styles.optionsThumbImg} />
+                                {selectedVideo?.uri ? (
+                                    <Image source={{ uri: selectedVideo.uri }} style={styles.optionsThumbImg} />
                                 ) : (
                                     <MaterialIcons name="videocam" size={28} color="rgba(255,255,255,0.2)" />
                                 )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Platform, Dimensions, FlatList } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -48,6 +48,74 @@ interface FilterProps {
     type: 'movie' | 'tv';
 }
 
+interface DropdownProps {
+    title: string;
+    value: string;
+    options: { label: string, value: string }[];
+    pickerKey: keyof FilterState;
+    colors: any;
+    onOpen: (title: string, key: keyof FilterState, options: { label: string, value: string }[]) => void;
+}
+
+// Extracted to module scope (was previously defined inside render, which
+// remounted all six dropdowns on every parent render).
+const Dropdown = React.memo(({ title, value, options, pickerKey, colors, onOpen }: DropdownProps) => {
+    const selectedOption = options.find(o => String(o.value) === String(value));
+    const isDefault = value === '' || (pickerKey === 'sort_by' && value === 'popularity.desc');
+    const hasSelection = !isDefault;
+
+    let displayLabel = '';
+    if (selectedOption) {
+        displayLabel = selectedOption.label;
+    } else if (value === '') {
+        if (title === 'GENRE') displayLabel = 'All Genres';
+        else if (title === 'YEAR') displayLabel = 'All Years';
+        else if (title === 'RATING') displayLabel = 'Any Rating';
+        else if (title === 'LANGUAGE') displayLabel = 'All Languages';
+        else if (title === 'COUNTRY') displayLabel = 'All Countries';
+        else if (title === 'SORT BY') displayLabel = 'Most Popular';
+        else displayLabel = 'All';
+    } else {
+        displayLabel = value;
+    }
+
+    return (
+        <View style={styles.dropdownWrapper}>
+            <Text style={[styles.label, { color: colors.textSecondary, opacity: hasSelection ? 1 : 0.6 }]}>
+                {title}
+            </Text>
+            <TVFocusable
+                style={[
+                    styles.dropdown,
+                    {
+                        backgroundColor: colors.card,
+                        borderColor: hasSelection ? colors.primary : colors.border,
+                        borderWidth: hasSelection ? 1.5 : 1
+                    }
+                ]}
+                onPress={() => onOpen(title, pickerKey, options)}
+            >
+                <View style={styles.dropdownInner}>
+                    <Text
+                        style={[
+                            styles.dropdownText,
+                            { color: hasSelection ? colors.primary : colors.text }
+                        ]}
+                        numberOfLines={1}
+                    >
+                        {displayLabel}
+                    </Text>
+                    <MaterialIcons
+                        name={hasSelection ? "check-circle" : "keyboard-arrow-down"}
+                        size={16}
+                        color={hasSelection ? colors.primary : colors.textSecondary}
+                    />
+                </View>
+            </TVFocusable>
+        </View>
+    );
+});
+
 function CinemaFilter({ visible, onClose, onApply, onReset, selectedFilters, setSelectedFilters, type }: FilterProps) {
     const { colors: currentColors, theme } = useTheme();
 
@@ -77,10 +145,10 @@ function CinemaFilter({ visible, onClose, onApply, onReset, selectedFilters, set
         fetchData();
     }, [type]);
 
-    const openPicker = (title: string, key: keyof FilterState, options: { label: string, value: string }[]) => {
+    const openPicker = useCallback((title: string, key: keyof FilterState, options: { label: string, value: string }[]) => {
         setActivePicker({ title, key, options });
         setPickerVisible(true);
-    };
+    }, []);
 
     const handleSelectOption = (value: string) => {
         if (activePicker) {
@@ -94,79 +162,17 @@ function CinemaFilter({ visible, onClose, onApply, onReset, selectedFilters, set
         onClose();
     };
 
-    const Dropdown = ({ title, value, options, pickerKey }: { title: string, value: string, options: { label: string, value: string }[], pickerKey: keyof FilterState }) => {
-        // Find the selected option by comparing string values
-        const selectedOption = options.find(o => String(o.value) === String(value));
-
-        // Check if this filter is currently active (not default)
-        const isDefault = value === '' || (pickerKey === 'sort_by' && value === 'popularity.desc');
-        const hasSelection = !isDefault;
-
-        // Determine the label to display
-        let displayLabel = '';
-
-        if (selectedOption) {
-            displayLabel = selectedOption.label;
-        } else if (value === '') {
-            if (title === 'GENRE') displayLabel = 'All Genres';
-            else if (title === 'YEAR') displayLabel = 'All Years';
-            else if (title === 'RATING') displayLabel = 'Any Rating';
-            else if (title === 'LANGUAGE') displayLabel = 'All Languages';
-            else if (title === 'COUNTRY') displayLabel = 'All Countries';
-            else if (title === 'SORT BY') displayLabel = 'Most Popular';
-            else displayLabel = 'All';
-        } else {
-            displayLabel = value;
-        }
-
-        return (
-            <View style={styles.dropdownWrapper}>
-                <Text style={[styles.label, { color: currentColors.textSecondary, opacity: hasSelection ? 1 : 0.6 }]}>
-                    {title}
-                </Text>
-                <TVFocusable
-                    style={[
-                        styles.dropdown,
-                        {
-                            backgroundColor: currentColors.card,
-                            borderColor: hasSelection ? currentColors.primary : currentColors.border,
-                            borderWidth: hasSelection ? 1.5 : 1
-                        }
-                    ]}
-                    onPress={() => openPicker(title, pickerKey, options)}
-                >
-                    <View style={styles.dropdownInner}>
-                        <Text
-                            style={[
-                                styles.dropdownText,
-                                { color: hasSelection ? currentColors.primary : currentColors.text }
-                            ]}
-                            numberOfLines={1}
-                        >
-                            {displayLabel}
-                        </Text>
-                        <MaterialIcons
-                            name={hasSelection ? "check-circle" : "keyboard-arrow-down"}
-                            size={16}
-                            color={hasSelection ? currentColors.primary : currentColors.textSecondary}
-                        />
-                    </View>
-                </TVFocusable>
-            </View>
-        );
-    };
-
     if (!visible) return null;
 
     return (
         <View style={[styles.container, { backgroundColor: currentColors.background, borderColor: currentColors.border }]}>
             <View style={styles.grid}>
-                <Dropdown title="GENRE" value={selectedFilters.genre} options={genres} pickerKey="genre" />
-                <Dropdown title="YEAR" value={selectedFilters.year} options={YEARS} pickerKey="year" />
-                <Dropdown title="RATING" value={selectedFilters.rating} options={RATINGS} pickerKey="rating" />
-                <Dropdown title="LANGUAGE" value={selectedFilters.language} options={languages} pickerKey="language" />
-                <Dropdown title="SORT BY" value={selectedFilters.sort_by} options={SORT_OPTIONS} pickerKey="sort_by" />
-                <Dropdown title="COUNTRY" value={selectedFilters.country} options={countries} pickerKey="country" />
+                <Dropdown title="GENRE" value={selectedFilters.genre} options={genres} pickerKey="genre" colors={currentColors} onOpen={openPicker} />
+                <Dropdown title="YEAR" value={selectedFilters.year} options={YEARS} pickerKey="year" colors={currentColors} onOpen={openPicker} />
+                <Dropdown title="RATING" value={selectedFilters.rating} options={RATINGS} pickerKey="rating" colors={currentColors} onOpen={openPicker} />
+                <Dropdown title="LANGUAGE" value={selectedFilters.language} options={languages} pickerKey="language" colors={currentColors} onOpen={openPicker} />
+                <Dropdown title="SORT BY" value={selectedFilters.sort_by} options={SORT_OPTIONS} pickerKey="sort_by" colors={currentColors} onOpen={openPicker} />
+                <Dropdown title="COUNTRY" value={selectedFilters.country} options={countries} pickerKey="country" colors={currentColors} onOpen={openPicker} />
             </View>
 
             <View style={styles.footer}>

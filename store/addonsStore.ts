@@ -159,7 +159,10 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
         const { user, token } = useAuthStore.getState();
         if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123') {
             try {
-                const response = await axios.get(`${DB_BASEURL}/get-addons/${user.email}`, { timeout: 5000 });
+                const response = await axios.get(`${DB_BASEURL}/get-addons/${user.email}`, { 
+                    timeout: 5000,
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 if (response.data && Array.isArray(response.data.addons)) {
                     return response.data.addons;
                 }
@@ -179,7 +182,9 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             set({ activeCinemaAddon: storedActiveCinema });
         }
 
-        set({ isLoading: true });
+        if (!get().isHydrated) {
+            set({ isLoading: true });
+        }
         try {
             let urlList: string[] = [];
 
@@ -188,7 +193,10 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             } else if (isPremium) {
                 // Try to fetch from backend for premium users to ensure cross-device sync
                 try {
-                    const response = await axios.get(`${DB_BASEURL}/get-addons/${user.email}`, { timeout: 5000 });
+                    const response = await axios.get(`${DB_BASEURL}/get-addons/${user.email}`, { 
+                        timeout: 5000,
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
                     if (response.data && Array.isArray(response.data.addons)) {
                         urlList = response.data.addons;
                     }
@@ -210,7 +218,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
             // De-duplicate URLs
             urlList = [...new Set(urlList)].filter(url => !!url);
 
-            set({ addonUrls: urlList, isLoading: true }); // Keep loading while fetching manifests
+            set({ addonUrls: urlList, isLoading: !get().isHydrated }); // Keep loading while fetching manifests if not hydrated
             storage.set(LOCAL_ADDONKEY, JSON.stringify(urlList));
 
             // ─── Load cached addon data first (instant display) ─────
@@ -344,6 +352,8 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                 await axios.post(`${DB_BASEURL}/sync-addons`, {
                     email: user.email,
                     addons: addonUrls
+                }, {
+                    headers: { Authorization: `Bearer ${token}` }
                 });
             } catch (error) {
                 console.error('Failed to sync addons with backend', error);

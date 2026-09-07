@@ -527,6 +527,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
         lastProgressSaveSecondRef.current = 0;
     }, [activeUrl]);
 
+
     // ─── Fetch subtitles from OpenSubtitle addon ──────────────────────────
     useEffect(() => {
         if (!tmdbId || sourceType !== 'cinema') return;
@@ -642,7 +643,7 @@ export function usePlayerLogic(props: UsePlayerLogicProps) {
                     tmdbId,
                     contentType,
                 });
-            } catch {}
+            } catch { }
         };
     }, []);
 

@@ -40,8 +40,7 @@ const FocusablePressable = ({ onPress, style, children, focusedScale = 1.02, foc
 const THEMES: { id: ThemeId; name: string; color: string; gradient: readonly [string, string]; icon: any }[] = [
     { id: 'amoled', name: 'AMOLED', color: '#000000', gradient: ['#000000', '#1a1a2e'], icon: 'brightness-1' },
     { id: 'glassmorphism', name: 'Glassmorphism', color: '#6366f1', gradient: ['rgba(99,102,241,0.3)', 'rgba(99,102,241,0.1)'], icon: 'blur' },
-    { id: 'material3', name: 'Material 3', color: '#8b5cf6', gradient: ['#8b5cf6', '#6d28d9'], icon: 'material-design' },
-    { id: 'minimal', name: 'Minimal', color: '#ffffff', gradient: ['#1a1a1a', '#0c0c0c'], icon: 'circle-outline' },
+    { id: 'gradient', name: 'Gradient', color: '#10b981', gradient: ['#1a1a2e', '#0a0a0f'], icon: 'gradient-horizontal' },
     { id: 'cinema', name: 'Cinema', color: '#ef4444', gradient: ['#ef4444', '#050508'], icon: 'theater' },
 ];
 
@@ -51,15 +50,15 @@ const LAYOUT_ITEMS: { id: HomeLayoutId; label: string; icon: string }[] = [
     { id: 'netflix', label: 'Netflix', icon: 'play-box' },
     { id: 'plex', label: 'Plex', icon: 'view-dashboard' },
     { id: 'tv_grid', label: 'TV Grid', icon: 'grid' },
-    { id: 'minimal', label: 'Minimal', icon: 'circle-outline' },
+    { id: 'gradient', label: 'Gradient', icon: 'gradient-horizontal' },
     { id: 'cinema', label: 'Cinema', icon: 'theater' },
 ];
 
 const ANIMATION_INTENSITIES: { id: AnimationIntensity; label: string; }[] = [
-    { id: 'none', label: 'None'},
+    { id: 'none', label: 'None' },
     { id: 'reduced', label: 'Reduced' },
     { id: 'normal', label: 'Normal' },
-    { id: 'enhanced', label: 'Enhanced'},
+    { id: 'enhanced', label: 'Enhanced' },
 ];
 
 const FONT_SCALES: { id: FontScale; label: string }[] = [

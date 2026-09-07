@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as MediaLibrary from 'expo-media-library';
 import { Downloader, ActiveDownloadState } from '@/services/downloader';
 import { DownloadItemSkeleton } from '@/components/Skeleton';
@@ -21,7 +20,6 @@ interface DownloadedFile {
     uri: string;
     size: number;
     modificationTime: number;
-    thumbnail?: string;
 }
 
 function useDownloadsLogic() {
@@ -75,24 +73,13 @@ function useDownloadsLogic() {
                     const fileUri = dir + fileName;
                     const fileInfo = await FileSystem.getInfoAsync(fileUri);
 
-                    let thumbnail: string | undefined;
-                    if (fileName.match(/\.(mp4|mkv|mov|avi|ts|webm)$/i)) {
-                        try {
-                            const { uri } = await VideoThumbnails.getThumbnailAsync(fileUri, {
-                                time: 2000,
-                            });
-                            thumbnail = uri;
-                        } catch (e) {
-                            // Suppress thumbnail errors
-                        }
-                    }
+
 
                     return {
                         name: fileName,
                         uri: fileUri,
                         size: fileInfo.exists ? (fileInfo as any).size : 0,
-                        modificationTime: fileInfo.exists ? (fileInfo as any).modificationTime : (Date.now() / 1000),
-                        thumbnail
+                        modificationTime: fileInfo.exists ? (fileInfo as any).modificationTime : (Date.now() / 1000)
                     };
                 })
             );
@@ -169,8 +156,8 @@ export function DownloadsMobile() {
             activeOpacity={0.7}
         >
             <View style={styles.thumbnailContainer}>
-                {item.thumbnail ? (
-                    <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
+                {item.name.match(/\.(mp4|mkv|mov|avi|ts|webm)$/i) ? (
+                    <Image source={{ uri: item.uri }} style={styles.thumbnail} />
                 ) : (
                     <View style={[styles.placeholderThumbnail, { backgroundColor: activeColors.background }]}>
                         <MaterialIcons name="play-circle-outline" size={32} color={activeColors.primary} />
@@ -325,8 +312,8 @@ export function DownloadsTV() {
             onLongPress={() => handleDelete(item)}
         >
             <View style={[styles.thumbnailContainer, { width: '100%', height: 160, borderRadius: 0, marginRight: 0 }]}>
-                {item.thumbnail ? (
-                    <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
+                {item.name.match(/\.(mp4|mkv|mov|avi|ts|webm)$/i) ? (
+                    <Image source={{ uri: item.uri }} style={styles.thumbnail} />
                 ) : (
                     <View style={[styles.placeholderThumbnail, { backgroundColor: activeColors.background }]}>
                         <MaterialIcons name="play-circle-outline" size={48} color={activeColors.primary} />

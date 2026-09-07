@@ -5,10 +5,10 @@ import { Platform } from 'react-native';
 
 // ─── Type Definitions ──────────────────────────────────────────────
 
-export type ThemeId = 'amoled' | 'glassmorphism' | 'material3' | 'minimal' | 'cinema';
+export type ThemeId = 'amoled' | 'glassmorphism' | 'gradient' | 'cinema';
 export type AccentColorId = 'blue' | 'purple' | 'green' | 'red' | 'orange' | 'teal' | 'custom';
 export type PosterStyleId = 'netflix' | 'plex' | 'cinematic' | 'modern_grid' | 'minimal_cards';
-export type HomeLayoutId = 'netflix' | 'plex' | 'tv_grid' | 'minimal' | 'cinema';
+export type HomeLayoutId = 'netflix' | 'plex' | 'tv_grid' | 'gradient' | 'cinema';
 export type BackgroundType = 'solid' | 'dynamic' | 'blur_poster' | 'daily_rotate' | 'uploaded';
 export type AnimationIntensity = 'none' | 'reduced' | 'normal' | 'enhanced';
 export type FontScale = 'small' | 'normal' | 'large' | 'xlarge';
@@ -133,41 +133,23 @@ export const THEME_PALETTES: Record<ThemeId, ThemePalette> = {
     tvBackground: '#0a0a14',
     glassIntensity: 30,
   },
-  material3: {
-    background: '#0f0f1a',
-    surface: '#1a1a2e',
-    card: '#222240',
-    cardOverlay: 'rgba(34, 34, 64, 0.7)',
+  gradient: {
+    background: '#0a0a0f',
+    surface: 'rgba(255, 255, 255, 0.05)',
+    card: 'rgba(255, 255, 255, 0.07)',
+    cardOverlay: 'rgba(0, 0, 0, 0.6)',
     text: '#ffffff',
-    textSecondary: '#b0b0c8',
-    textMuted: '#707090',
+    textSecondary: 'rgba(255, 255, 255, 0.65)',
+    textMuted: 'rgba(255, 255, 255, 0.4)',
     border: 'rgba(255, 255, 255, 0.08)',
     notification: '#ef4444',
-    tabIconDefault: '#707090',
+    tabIconDefault: 'rgba(255, 255, 255, 0.4)',
     success: '#10b981',
     error: '#ef4444',
     warning: '#f59e0b',
     info: '#3b82f6',
-    blurBackground: 'rgba(15, 15, 26, 0.5)',
-    tvBackground: '#0f0f1a',
-  },
-  minimal: {
-    background: '#0c0c0c',
-    surface: '#141414',
-    card: '#1a1a1a',
-    cardOverlay: 'rgba(26, 26, 26, 0.7)',
-    text: '#f0f0f0',
-    textSecondary: '#909090',
-    textMuted: '#505050',
-    border: 'rgba(255, 255, 255, 0.04)',
-    notification: '#ef4444',
-    tabIconDefault: '#505050',
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    info: '#3b82f6',
-    blurBackground: 'rgba(12, 12, 12, 0.5)',
-    tvBackground: '#0c0c0c',
+    blurBackground: 'rgba(10, 10, 15, 0.5)',
+    tvBackground: '#0a0a0f',
   },
   cinema: {
     background: '#050508',

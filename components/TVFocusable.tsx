@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Pressable, Animated, StyleSheet, Platform, ViewStyle, StyleProp } from 'react-native';
+import { Pressable, StyleSheet, Platform, ViewStyle, StyleProp } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -67,33 +68,37 @@ export function TVFocusable({
 }: TVFocusableProps) {
     const { colors: currentColors } = useTheme();
     const [focused, setFocused] = useState(false);
-    const scaleRef = useRef<Animated.Value | null>(Platform.isTV && !disableFocusEffect ? new Animated.Value(1) : null);
-    const scale = scaleRef.current ?? 1;
-    const borderColor = focusedBorderColor || currentColors.primary;
+    const scale = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ scale: scale.value }]
+        };
+    });
 
     const handleFocus = useCallback(() => {
         setFocused(true);
-        if (!disableFocusEffect && scaleRef.current) {
-            Animated.spring(scaleRef.current, {
-                toValue: focusedScale,
-                useNativeDriver: true,
-                friction: 5,
-            }).start();
+        if (!disableFocusEffect && Platform.isTV) {
+            scale.value = withSpring(focusedScale, {
+                damping: 10,
+                stiffness: 100,
+                mass: 0.5,
+            });
         }
         onFocus?.();
-    }, [disableFocusEffect, focusedScale, onFocus]);
+    }, [disableFocusEffect, focusedScale, onFocus, scale]);
 
     const handleBlur = useCallback(() => {
         setFocused(false);
-        if (!disableFocusEffect && scaleRef.current) {
-            Animated.spring(scaleRef.current, {
-                toValue: 1,
-                useNativeDriver: true,
-                friction: 5,
-            }).start();
+        if (!disableFocusEffect && Platform.isTV) {
+            scale.value = withSpring(1, {
+                damping: 10,
+                stiffness: 100,
+                mass: 0.5,
+            });
         }
         onBlur?.();
-    }, [disableFocusEffect, onBlur]);
+    }, [disableFocusEffect, onBlur, scale]);
 
     // Build TV-specific props
     const tvProps: any = {};
@@ -122,7 +127,7 @@ export function TVFocusable({
         >
             <Animated.View style={[
                 styles.container,
-                { transform: [{ scale }] },
+                animatedStyle,
                 !autoFlex && { flex: 0 },
                 !disableFocusEffect && focused && [
                     styles.focusedContainer,

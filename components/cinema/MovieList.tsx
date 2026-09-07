@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Platform, ScrollView } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TVFocusable } from '@/components/TVFocusable';
 import { MovieCardSkeleton } from '@/components/Skeleton';
@@ -20,26 +21,57 @@ interface MovieListProps {
 
 function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated = false, addonType, catalogRawType }: MovieListProps) {
     const { colors: currentColors } = useTheme();
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
-    const isMounted = React.useRef(true);
-
-    React.useEffect(() => {
-        return () => {
-            isMounted.current = false;
-        };
-    }, []);
 
     // Keep a ref to the latest fetchFunction so reference changes from
-    // parent re-renders (e.g. Zustand store updates) don't trigger a reload.
+    // parent re-renders don't trigger a reload.
     const fetchFunctionRef = React.useRef(fetchFunction);
     useEffect(() => {
         fetchFunctionRef.current = fetchFunction;
     });
+
+    const {
+        data: queryData,
+        error: queryError,
+        fetchNextPage,
+        hasNextPage,
+        isFetching,
+        isFetchingNextPage,
+        status,
+    } = useInfiniteQuery({
+        queryKey: ['movieList', title, type, addonType, catalogRawType],
+        queryFn: async ({ pageParam = 1 }) => {
+            const result = await fetchFunctionRef.current(pageParam);
+            if (Array.isArray(result)) {
+                return { results: result, total_pages: 1, page: pageParam };
+            }
+            return {
+                results: result.results || [],
+                total_pages: result.total_pages || 1,
+                page: pageParam
+            };
+        },
+        getNextPageParam: (lastPage) => {
+            if (!paginated) return undefined;
+            if (lastPage.page < lastPage.total_pages) {
+                return lastPage.page + 1;
+            }
+            return undefined;
+        },
+        initialPageParam: 1,
+        staleTime: 1000 * 60 * 5, // 5 mins
+    });
+
+    const data = useMemo(() => {
+        if (!queryData) return [];
+        const combined = queryData.pages.flatMap((page) => page.results);
+        const seen = new Set();
+        return combined.filter(item => {
+            const id = item.id?.toString();
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+    }, [queryData]);
 
     const isGrid = mode === 'grid';
     const numColumns = Platform.isTV ? 5 : 3;
@@ -65,63 +97,11 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
         [cardWidth, itemSpacing]
     );
 
-    const loadData = useCallback(async (pageNum: number) => {
-        if (pageNum === 1) setLoading(true);
-        else setLoadingMore(true);
-
-        try {
-            const result = await fetchFunctionRef.current(pageNum);
-            let newItems: any[] = [];
-            let totalPages = 1;
-
-            if (Array.isArray(result)) {
-                newItems = result;
-                setHasMore(false); // No pagination info in array return
-            } else {
-                newItems = result.results || [];
-                totalPages = result.total_pages || 1;
-                setHasMore(pageNum < totalPages);
-            }
-
-            if (!isMounted.current) return;
-            setData(prev => {
-                const combined = pageNum === 1 ? newItems : [...prev, ...newItems];
-                // Filter duplicates by id
-                const seen = new Set();
-                return combined.filter(item => {
-                    const id = item.id?.toString();
-                    if (!id || seen.has(id)) return false;
-                    seen.add(id);
-                    return true;
-                });
-            });
-            setError(null);
-        } catch (err: any) {
-            console.error(`Error fetching ${title}:`, err);
-            if (isMounted.current) setError(err.message);
-        } finally {
-            if (isMounted.current) {
-                setLoading(false);
-                setLoadingMore(false);
-            }
-        }
-        // Only re-create loadData when title changes (genuinely different catalog).
-        // fetchFunction is accessed via ref so reference churn doesn't matter.
-    }, [title]);
-
-    useEffect(() => {
-        setPage(1);
-        setData([]);
-        loadData(1);
-    }, [loadData]);
-
     const handleLoadMore = useCallback(() => {
-        if (!loadingMore && hasMore && paginated) {
-            const nextPage = page + 1;
-            setPage(nextPage);
-            loadData(nextPage);
+        if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
         }
-    }, [hasMore, loadingMore, paginated, page, loadData]);
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
@@ -138,16 +118,16 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
     );
 
     const renderFooter = useCallback(() => {
-        if (!paginated || !hasMore) return <View style={{ height: 20 }} />;
+        if (!paginated || !hasNextPage) return <View style={{ height: 20 }} />;
 
         return (
             <View style={styles.footerContainer}>
-                {loadingMore && <MovieCardSkeleton width={cardWidth} />}
+                {isFetchingNextPage && <MovieCardSkeleton width={cardWidth} />}
             </View>
         );
-    }, [paginated, hasMore, loadingMore, cardWidth]);
+    }, [paginated, hasNextPage, isFetchingNextPage, cardWidth]);
 
-    if (loading && page === 1) {
+    if (status === 'pending' && !isFetchingNextPage) {
         return (
             <View style={[styles.container, isGrid && { flex: 1 }]}>
                 <View style={[styles.header, isGrid && { paddingHorizontal: 24 }]}>
@@ -172,13 +152,15 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
         );
     }
 
-    if (error) {
+    if (status === 'error') {
         return (
             <View style={[styles.container, isGrid && { flex: 1 }]}>
                 <View style={[styles.header, isGrid && { paddingHorizontal: 24 }]}>
                     <Text style={[styles.title, { color: currentColors.text }]}>{title}</Text>
                 </View>
-                <Text style={[styles.errorText, { color: currentColors.error }]}>Error: {error}</Text>
+                <View style={styles.centerContent}>
+                    <Text style={[styles.errorText, { color: currentColors.error }]}>Failed to load content.</Text>
+                </View>
             </View>
         );
     }
@@ -189,12 +171,14 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
         <View style={[styles.container, isGrid && { flex: 1 }]}>
             <View style={[styles.header, isGrid && { paddingHorizontal: 24 }]}>
                 <View style={styles.titleSection}>
+                    {!Platform.isTV && <View style={[styles.titleBar, { backgroundColor: currentColors.primary }]} />}
                     <Text style={[styles.title, { color: currentColors.text }]}>{title}</Text>
                     {Platform.isTV && <View style={[styles.indicator, { backgroundColor: currentColors.primary }]} />}
                 </View>
                 {!isGrid && (
-                    <TouchableOpacity style={styles.moreBtn}>
-                        <MaterialIcons name="chevron-right" size={24} color={currentColors.textSecondary} />
+                    <TouchableOpacity style={[styles.moreBtn, { backgroundColor: currentColors.primary + '18' }]} activeOpacity={0.7}>
+                        <Text style={[styles.moreText, { color: currentColors.primary }]}>See all</Text>
+                        <MaterialIcons name="chevron-right" size={16} color={currentColors.primary} />
                     </TouchableOpacity>
                 )}
             </View>
@@ -237,6 +221,13 @@ const styles = StyleSheet.create({
     titleSection: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 10,
+        flex: 1,
+    },
+    titleBar: {
+        width: 4,
+        height: 20,
+        borderRadius: 2,
     },
     title: {
         fontSize: Platform.isTV ? 26 : 20,
@@ -251,7 +242,17 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     moreBtn: {
-        padding: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        paddingLeft: 12,
+        paddingRight: 8,
+        paddingVertical: 5,
+        borderRadius: 999,
+    },
+    moreText: {
+        fontSize: 12.5,
+        fontFamily: 'Outfit_600SemiBold',
     },
     list: {
         paddingHorizontal: Platform.isTV ? 40 : 16,

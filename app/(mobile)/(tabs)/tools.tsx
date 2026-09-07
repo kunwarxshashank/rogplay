@@ -71,20 +71,7 @@ export function ToolsMobile() {
     const { router, activeColors, toolItems } = useToolsLogic();
 
     return (
-        <View style={[styles.container, { backgroundColor: activeColors.background }]}>
-            {/* Dark Luxury Gradient */}
-            {activeColors.isAmoled ? (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-            ) : (
-                <LinearGradient
-                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                    locations={[0, 0.25, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
-            )}
-            {!activeColors.isAmoled && (
-              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
-            )}
+        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <View style={styles.header}>
                     <View style={styles.titleRow}>

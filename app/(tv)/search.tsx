@@ -24,22 +24,25 @@ export default function TVSearchScreen() {
 
     const initialQueryDone = useRef(false);
 
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
         if (query && !initialQueryDone.current) {
             initialQueryDone.current = true;
             const q = query as string;
             setSearchQuery(q);
-            handleSearch(q);
+            executeSearch(q);
         }
     }, []);
 
-    const handleSearch = async (text: string) => {
-        setSearchQuery(text);
+    const executeSearch = async (text: string) => {
         if (text.length > 2) {
             setLoading(true);
             try {
                 let groupedData: any[] = [];
-                if (addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
+                const isTmdbAddon = addonConfig?.addontype === 'tmdbaddon';
+
+                if (!isTmdbAddon && addonConfig && addonConfig.searchcatalog && addonConfig.searchcatalog.length > 0) {
                     const promises = addonConfig.searchcatalog.map(async (cat: any) => {
                         const searchUrl = cat.searchurl.replace('${search}', encodeURIComponent(text));
                         const data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
@@ -49,13 +52,18 @@ export default function TVSearchScreen() {
                     groupedData.push(...catResults.filter(g => g.data && g.data.length > 0));
                 }
 
-                let shouldShowTmdb = true;
-                if (addonConfig && addonConfig.addontype === 'stremio') {
-                    const prefixes = addonConfig.idPrefixes || [];
-                    shouldShowTmdb = prefixes.some((p: string) => ['imdb', 'tmdb', 'tt'].includes(p.toLowerCase()));
+                let shouldShowTmdb = isTmdbAddon;
+                if (!isTmdbAddon) {
+                    if (!addonConfig) {
+                        shouldShowTmdb = true;
+                    } else if (addonConfig.addontype === 'stremio') {
+                        const hasCatalogResults = groupedData.length > 0;
+                        const prefixes = addonConfig.idPrefixes || [];
+                        shouldShowTmdb = !hasCatalogResults && prefixes.some((p: string) => ['imdb', 'tmdb', 'tt'].includes(p.toLowerCase()));
+                    }
                 }
 
-                if (!addonConfig || shouldShowTmdb) {
+                if (shouldShowTmdb) {
                     const tmdbData = await searchMulti(text);
                     const filteredTmdb = tmdbData.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv');
                     if (filteredTmdb.length > 0) {
@@ -71,6 +79,16 @@ export default function TVSearchScreen() {
         } else {
             setResults([]);
         }
+    };
+
+    const handleSearch = (text: string) => {
+        setSearchQuery(text);
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+        searchTimeoutRef.current = setTimeout(() => {
+            executeSearch(text);
+        }, 800);
     };
 
     const fetchCuratedForYou = useCallback(async (page?: number) => {
@@ -109,7 +127,7 @@ export default function TVSearchScreen() {
                                     addonType={item.isTmdb ? undefined : addonConfig?.addontype}
                                 />
                             )}
-                            contentContainerStyle={{ paddingBottom: 50 }}
+                            contentContainerStyle={{ paddingBottom: 250 }}
                             estimatedItemSize={300}
                         />
                     </View>
@@ -124,12 +142,12 @@ export default function TVSearchScreen() {
                         ) : (
                             <>
                                 <ContinueWatchingSection />
-                                    <MovieList
-                                        title="Curated For You"
-                                        fetchFunction={fetchCuratedForYou}
-                                        type="movie"
-                                        addonType={addonConfig?.addontype}
-                                    />
+                                <MovieList
+                                    title="Curated For You"
+                                    fetchFunction={fetchCuratedForYou}
+                                    type="movie"
+                                    addonType={addonConfig?.addontype}
+                                />
                             </>
                         )}
                     </View>

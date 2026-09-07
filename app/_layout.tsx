@@ -21,13 +21,15 @@ import { Stack, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as Linking from 'expo-linking';
 import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useThemeStore } from '@/store/themeStore';
 import { useTheme } from '@/hooks/useTheme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAddonsStore } from '@/store/addonsStore';
 import { usePluginsStore } from '@/store/pluginsStore';
 import { useRouter, useSegments } from 'expo-router';
@@ -37,7 +39,18 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import * as NavigationBar from 'expo-navigation-bar';
 import { initializeFirebase } from '@/services/firebase';
 import notifee, { EventType } from '@notifee/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 1000 * 60 * 5, // 5 minutes
+            gcTime: 1000 * 60 * 30, // 30 minutes
+            retry: 1,
+            refetchOnWindowFocus: false,
+        },
+    },
+});
 notifee.onBackgroundEvent(async ({ type, detail }) => {
     // Handle background events
     if (type === EventType.ACTION_PRESS && detail.pressAction?.id) {
@@ -68,6 +81,7 @@ export default function RootLayout() {
     const [initialIntentProcessed, setInitialIntentProcessed] = useState(false);
     const { isAuthenticated } = useAuthStore();
     const { colors: currentColors } = useTheme();
+    const themeId = useThemeStore((state) => state.themePalette);
 
     useEffect(() => {
         if ((loaded || error) && initialIntentProcessed) {
@@ -238,14 +252,41 @@ export default function RootLayout() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <ErrorBoundary>
+                <QueryClientProvider client={queryClient}>
                 <ThemeProvider value={theme}>
                     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: currentColors.background }}>
+                        {themeId === 'glassmorphism' && !currentColors.isAmoled && (
+                            <>
+                                <LinearGradient
+                                    colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
+                                    locations={[0, 0.25, 1]}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
+                            </>
+                        )}
+                        {themeId === 'gradient' && !currentColors.isAmoled && (
+                            <LinearGradient
+                                colors={[currentColors.primary + '60', currentColors.primary + '20', currentColors.background]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                locations={[0, 0.5, 1]}
+                                style={StyleSheet.absoluteFill}
+                            />
+                        )}
+                        {themeId === 'cinema' && !currentColors.isAmoled && (
+                            <LinearGradient
+                                colors={[currentColors.primary + '15', currentColors.background, '#000000']}
+                                locations={[0, 0.5, 1]}
+                                style={StyleSheet.absoluteFill}
+                            />
+                        )}
                         <View style={{ flex: 1 }}>
                             <Stack
                                 screenOptions={{
                                     headerShown: false,
-                                    contentStyle: { backgroundColor: currentColors.background },
-                                    headerStyle: { backgroundColor: currentColors.background },
+                                    contentStyle: { backgroundColor: 'transparent' },
+                                    headerStyle: { backgroundColor: 'transparent' },
                                     headerTintColor: currentColors.text,
                                 }}
                             >
@@ -263,6 +304,7 @@ export default function RootLayout() {
                     <AppToast />
                     <StatusBar style="light" />
                 </ThemeProvider>
+                </QueryClientProvider>
             </ErrorBoundary>
         </GestureHandlerRootView>
     );

@@ -5,14 +5,15 @@ import { Colors } from '@/constants/Colors';
 
 export function useTheme() {
   const settingsThemeName = useSettingsStore((s) => s.theme);
-  const {
-    themePalette,
-    accentColorId,
-    customHexAccent,
-    borderRadius,
-    cardElevation,
-    animationIntensity,
-  } = useThemeStore();
+  // Subscribe only to the fields that affect computed colors, so unrelated
+  // theme-store mutations (posterStyle, homeBuilder, etc.) don't re-render
+  // every component that reads the theme.
+  const themePalette = useThemeStore((s) => s.themePalette);
+  const accentColorId = useThemeStore((s) => s.accentColorId);
+  const customHexAccent = useThemeStore((s) => s.customHexAccent);
+  const borderRadius = useThemeStore((s) => s.borderRadius);
+  const cardElevation = useThemeStore((s) => s.cardElevation);
+  const animationIntensity = useThemeStore((s) => s.animationIntensity);
 
   const colors = useMemo(() => {
     // Always compute via the new theme engine for dynamic colors
