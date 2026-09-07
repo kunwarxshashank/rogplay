@@ -6,28 +6,38 @@ import {
 import * as MediaLibrary from 'expo-media-library';
 // @ts-ignore
 import * as FileSystem from 'expo-file-system/legacy';
-import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Colors } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
-import { useSettingsStore } from '@/store/settingsStore';
-import { useThemeStore, computeThemeColors } from '@/store/themeStore';
+import { useTheme } from '@/hooks/useTheme';
 import { storage } from '@/store/mmkv';
 export interface VideoWithThumbnail extends MediaLibrary.Asset {
     thumbnailUri?: string;
 }
 
-const THUMB_CACHE_DIR = `${FileSystem.cacheDirectory}rogplay_thumbnails/`;
+export interface FolderType {
+    id: string;
+    name: string;
+    count: number;
+}
+
+export interface FolderType {
+    id: string;
+    name: string;
+    count: number;
+}
 
 export function useHomeLogic() {
-    const { theme } = useSettingsStore();
-    const ts = useThemeStore();
-    const currentColors = computeThemeColors(ts.themePalette, ts.accentColorId, ts.customHexAccent, ts.borderRadius, ts.cardElevation, ts.animationIntensity);
+    const { colors: currentColors, theme } = useTheme();
     const [videos, setVideos] = useState<VideoWithThumbnail[]>([]);
     const [filteredVideos, setFilteredVideos] = useState<VideoWithThumbnail[]>([]);
     const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
     const [loading, setLoading] = useState(true);
+    const [foldersLoading, setFoldersLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [storage, setStorage] = useState({ free: 0, total: 1 });
+    const [hasNextPage, setHasNextPage] = useState(true);
+    const [endCursor, setEndCursor] = useState<string | undefined>(undefined);
+    const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+    const [deviceStorage, setDeviceStorage] = useState({ free: 0, total: 1 });
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [selectedVideo, setSelectedVideo] = useState<VideoWithThumbnail | null>(null);
@@ -37,8 +47,8 @@ export function useHomeLogic() {
     const [showInfoModal, setShowInfoModal] = useState(false);
     const [selectedVideoSize, setSelectedVideoSize] = useState<string>('Unknown');
     const [viewMode, setViewMode] = useState<'video' | 'folder'>('folder');
-    const [folders, setFolders] = useState<{ name: string, count: number, uri: string }[]>([]);
-    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+    const [folders, setFolders] = useState<FolderType[]>([]);
+    const [selectedFolder, setSelectedFolder] = useState<FolderType | null>(null);
     const [sortBy, setSortBy] = useState<'filename' | 'modificationTime' | 'duration' | 'size'>('modificationTime');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [showSortModal, setShowSortModal] = useState(false);
@@ -59,178 +69,134 @@ export function useHomeLogic() {
     }, [permissionResponse]);
 
     useEffect(() => {
-        let list = [...videos];
-        if (selectedFolder) {
-            list = list.filter(v => {
-                const parts = v.uri.split('/');
-                const folderPath = parts.slice(0, -1).join('/');
-                return folderPath === selectedFolder;
+        const timeoutId = setTimeout(() => {
+            let list = [...videos];
+
+            // Apply Sorting
+            list.sort((a, b) => {
+                let valA: any = a[sortBy as keyof VideoWithThumbnail];
+                let valB: any = b[sortBy as keyof VideoWithThumbnail];
+
+                if (sortBy === 'filename') {
+                    valA = a.filename.toLowerCase();
+                    valB = b.filename.toLowerCase();
+                }
+
+                if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+                if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
             });
-        }
 
-        // Apply Sorting
-        list.sort((a, b) => {
-            let valA: any = a[sortBy as keyof VideoWithThumbnail];
-            let valB: any = b[sortBy as keyof VideoWithThumbnail];
-
-            if (sortBy === 'filename') {
-                valA = a.filename.toLowerCase();
-                valB = b.filename.toLowerCase();
+            if (searchQuery.trim() === '') {
+                setFilteredVideos(list);
+            } else {
+                const lowerQuery = searchQuery.toLowerCase();
+                const filtered = list.filter(video =>
+                    video.filename.toLowerCase().includes(lowerQuery)
+                );
+                setFilteredVideos(filtered);
             }
+        }, 50); // Small debounce to keep UI responsive
 
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-        if (searchQuery.trim() === '') {
-            setFilteredVideos(list);
-        } else {
-            const filtered = list.filter(video =>
-                video.filename.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            setFilteredVideos(filtered);
-        }
+        return () => clearTimeout(timeoutId);
     }, [searchQuery, videos, selectedFolder, sortBy, sortOrder]);
 
-    useEffect(() => {
-        const folderMap = new Map<string, { name: string, count: number, uri: string }>();
-        videos.forEach(video => {
-            const parts = video.uri.split('/');
-            const folderPath = parts.slice(0, -1).join('/');
-            const folderName = parts[parts.length - 2] || 'Root';
+    const loadFolders = async () => {
+        try {
+            if (!permissionResponse || permissionResponse.status !== 'granted') return;
 
-            if (folderMap.has(folderPath)) {
-                const current = folderMap.get(folderPath)!;
-                folderMap.set(folderPath, { ...current, count: current.count + 1 });
-            } else {
-                folderMap.set(folderPath, { name: folderName, count: 1, uri: folderPath });
+            // --- INSTANT CACHE LOAD ---
+            let hasCache = false;
+            try {
+                const cachedString = storage?.getString('cached_local_folders');
+                if (cachedString) {
+                    const cachedFolders = JSON.parse(cachedString);
+                    if (Array.isArray(cachedFolders) && cachedFolders.length > 0) {
+                        setFolders(cachedFolders);
+                        setFoldersLoading(false);
+                        hasCache = true;
+                    }
+                }
+            } catch (e) { }
+
+            if (!hasCache) {
+                setFoldersLoading(true);
             }
-        });
-        setFolders(Array.from(folderMap.values()));
-    }, [videos]);
+
+            const allAlbums = await MediaLibrary.getAlbumsAsync();
+            const videoFolders: FolderType[] = [];
+
+            await Promise.all(allAlbums.map(async (album) => {
+                const media = await MediaLibrary.getAssetsAsync({
+                    mediaType: MediaLibrary.MediaType.video,
+                    album: album.id,
+                    first: 0,
+                });
+                if (media.totalCount > 0) {
+                    videoFolders.push({
+                        id: album.id,
+                        name: album.title,
+                        count: media.totalCount,
+                    });
+                }
+            }));
+
+            videoFolders.sort((a, b) => a.name.localeCompare(b.name));
+            setFolders(videoFolders);
+
+            try {
+                if (storage && videoFolders.length > 0) {
+                    storage.set('cached_local_folders', JSON.stringify(videoFolders));
+                }
+            } catch (e) { }
+        } catch (error) {
+            console.error('Error loading folders:', error);
+        } finally {
+            setFoldersLoading(false);
+        }
+    };
 
     const loadData = async () => {
-        await loadVideos();
-        await getStorageInfo();
+        setEndCursor(undefined);
+        setHasNextPage(true);
+        await Promise.all([
+            loadVideos(selectedFolder?.id),
+            loadFolders(),
+            getStorageInfo()
+        ]);
     };
+
+    const firstLoadRef = useRef(true);
+    useEffect(() => {
+        if (!mountedRef.current) return;
+        if (firstLoadRef.current) {
+            firstLoadRef.current = false;
+            return;
+        }
+        setEndCursor(undefined);
+        setHasNextPage(true);
+        setVideos([]);
+        setLoading(true);
+        loadVideos(selectedFolder?.id);
+    }, [selectedFolder]);
 
     const getStorageInfo = async () => {
         try {
             const free = await FileSystem.getFreeDiskStorageAsync();
             const total = await FileSystem.getTotalDiskCapacityAsync();
-            setStorage({ free, total });
+            setDeviceStorage({ free, total });
         } catch (e) {
-            setStorage({ free: 1000000000, total: 32000000000 });
+            setDeviceStorage({ free: 1000000000, total: 32000000000 });
         }
     };
 
-    const ensureCacheDir = async () => {
-        const info = await FileSystem.getInfoAsync(THUMB_CACHE_DIR);
-        if (!info.exists) {
-            await FileSystem.makeDirectoryAsync(THUMB_CACHE_DIR, { intermediates: true });
-        }
-    };
-
-    const getCachedThumbnail = async (assetId: string): Promise<string | undefined> => {
-        const cacheFile = `${THUMB_CACHE_DIR}thumb_${assetId}.jpg`;
-        const info = await FileSystem.getInfoAsync(cacheFile);
-        return info.exists ? cacheFile : undefined;
-    };
-
-    const generateThumbnail = async (uri: string, assetId: string): Promise<string | undefined> => {
-        try {
-            // Check cache first
-            const cached = await getCachedThumbnail(assetId);
-            if (cached) return cached;
-
-            await ensureCacheDir();
-            const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(uri, {
-                time: 1000,
-                quality: 0.3,
-            });
-
-            const cacheFile = `${THUMB_CACHE_DIR}thumb_${assetId}.jpg`;
-            await FileSystem.copyAsync({
-                from: thumbnailUri,
-                to: cacheFile
-            });
-
-            return cacheFile;
-        } catch (e) {
-            console.error('Thumbnail generation failed:', e);
-            return undefined;
-        }
-    };
-
-
-    const loadThumbnails = (videoList: VideoWithThumbnail[]) => {
-        if (thumbTimeoutRef.current) {
-            clearTimeout(thumbTimeoutRef.current);
-        }
-        thumbTimeoutRef.current = setTimeout(async () => {
-            if (!mountedRef.current) return;
-            try {
-                await ensureCacheDir();
-
-                // Phase 1: Load all cached thumbnails rapidly
-                const withCache = await Promise.all(videoList.map(async (video) => {
-                    const cached = await getCachedThumbnail(video.id);
-                    return cached ? { ...video, thumbnailUri: cached } : video;
-                }));
-
-                if (!mountedRef.current) return;
-
-                setVideos(prev => {
-                    return prev.map(v => {
-                        const cachedItem = withCache.find(c => c.id === v.id);
-                        return cachedItem && cachedItem.thumbnailUri ? { ...v, thumbnailUri: cachedItem.thumbnailUri } : v;
-                    });
-                });
-
-                // Phase 2: Generate missing thumbnails in small batches
-                const batchSize = 4;
-                for (let i = 0; i < withCache.length; i += batchSize) {
-                    if (!mountedRef.current) return;
-                    const batch = withCache.slice(i, i + batchSize);
-                    const missingInBatch = batch.filter(v => !v.thumbnailUri);
-
-                    if (missingInBatch.length === 0) continue;
-
-                    const generated = await Promise.all(
-                        missingInBatch.map(async (video) => {
-                            const thumbnailUri = await generateThumbnail(video.uri, video.id);
-                            return { id: video.id, thumbnailUri };
-                        })
-                    );
-
-                    const validGenerated = generated.filter(g => g.thumbnailUri);
-
-                    if (validGenerated.length > 0) {
-                        setVideos(prev => {
-                            const newVideos = [...prev];
-                            validGenerated.forEach(g => {
-                                const index = newVideos.findIndex(v => v.id === g.id);
-                                if (index !== -1) {
-                                    newVideos[index] = { ...newVideos[index], thumbnailUri: g.thumbnailUri };
-                                }
-                            });
-                            return newVideos;
-                        });
-                    }
-                }
-            } catch (err) {
-                console.error('Error in background thumbnail generation:', err);
-            }
-        }, 50);
-    };
-
-    const loadVideos = async () => {
+    const loadVideos = async (albumId?: string) => {
         try {
             if (!permissionResponse || permissionResponse.status !== 'granted') {
                 const perm = await requestPermission();
                 if (perm.status !== 'granted') {
                     setLoading(false);
+                    setFoldersLoading(false);
                     return;
                 }
             }
@@ -242,9 +208,8 @@ export function useHomeLogic() {
                     const cachedVideos = JSON.parse(cachedString);
                     if (Array.isArray(cachedVideos) && cachedVideos.length > 0) {
                         setVideos(cachedVideos);
-                        setFilteredVideos(cachedVideos);
+                        // setFilteredVideos(cachedVideos); // useEffect handles this now
                         setLoading(false);
-                        loadThumbnails(cachedVideos);
                     } else {
                         setLoading(true);
                     }
@@ -255,33 +220,63 @@ export function useHomeLogic() {
                 setLoading(true);
             }
 
-            // --- BACKGROUND FETCH ---
-            const media = await MediaLibrary.getAssetsAsync({
+            // --- PAGINATED BACKGROUND FETCH ---
+            const media: MediaLibrary.PagedInfo<MediaLibrary.Asset> = await MediaLibrary.getAssetsAsync({
                 mediaType: MediaLibrary.MediaType.video,
-                first: 100, // You can increase this if needed
+                first: 30, // Fetch in batches
                 sortBy: MediaLibrary.SortBy.modificationTime,
+                ...(albumId ? { album: albumId } : {})
             });
 
-            // Set videos instantly without thumbnails
-            const instantVideos = media.assets.map(asset => ({ ...asset, thumbnailUri: undefined as string | undefined }));
+            setHasNextPage(media.hasNextPage);
+            setEndCursor(media.endCursor);
 
-            // Save to cache for next time
+            const instantVideos = media.assets;
+
+            // Atomically update state
+            setVideos(instantVideos);
+
+            setLoading(false); // UI ready after first batch
+
+            // Save final full list to cache for next time
             try {
-                if (storage) {
+                if (storage && instantVideos.length > 0) {
                     storage.set('cached_local_videos', JSON.stringify(instantVideos));
                 }
             } catch (e) { }
 
-            setVideos(instantVideos);
-            setFilteredVideos(instantVideos);
-            setLoading(false);
-
-            // Load thumbnails asynchronously
-            loadThumbnails(instantVideos);
-
         } catch (error) {
             console.error('Error loading videos:', error);
             setLoading(false);
+        }
+    };
+
+    const loadMoreVideos = async () => {
+        if (!hasNextPage || isFetchingNextPage || loading) return;
+
+        setIsFetchingNextPage(true);
+        try {
+            const media: MediaLibrary.PagedInfo<MediaLibrary.Asset> = await MediaLibrary.getAssetsAsync({
+                mediaType: MediaLibrary.MediaType.video,
+                first: 50,
+                sortBy: MediaLibrary.SortBy.modificationTime,
+                after: endCursor,
+                ...(selectedFolder?.id ? { album: selectedFolder.id } : {})
+            });
+
+            setHasNextPage(media.hasNextPage);
+            setEndCursor(media.endCursor);
+
+            const newVideos = media.assets;
+
+            setVideos(prev => {
+                return [...prev, ...newVideos];
+            });
+
+        } catch (error) {
+            console.error('Error loading more videos:', error);
+        } finally {
+            setIsFetchingNextPage(false);
         }
     };
 
@@ -420,11 +415,11 @@ export function useHomeLogic() {
     };
 
     return {
-        theme, currentColors, videos, filteredVideos, loading, refreshing, storage, searchQuery, setSearchQuery,
+        theme, currentColors, videos, filteredVideos, loading, refreshing, deviceStorage, searchQuery, setSearchQuery,
         showSearch, setShowSearch, selectedVideo, showOptionsModal, setShowOptionsModal, showRenameModal, setShowRenameModal,
         newFilename, setNewFilename, showInfoModal, setShowInfoModal, viewMode, setViewMode, folders, selectedFolder, setSelectedFolder,
         sortBy, setSortBy, sortOrder, setSortOrder, showSortModal, setShowSortModal, router,
-        selectedVideoSize,
+        selectedVideoSize, hasNextPage, isFetchingNextPage, loadMoreVideos, foldersLoading,
         onRefresh, handlePlay, showOptions, handleDelete, handleRename, confirmRename, showInfo, formatDuration
     };
 }

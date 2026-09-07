@@ -17,6 +17,18 @@ import { useTheme } from '@/hooks/useTheme';
 
 const FILTERS = ['All', 'Plugins', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
 
+const FallbackImage = ({ source, style, fallback }: any) => {
+    const [hasError, setHasError] = useState(false);
+    useEffect(() => { setHasError(false); }, [source]);
+    return (
+        <Image
+            source={hasError ? fallback : source}
+            style={style}
+            onError={() => setHasError(true)}
+        />
+    );
+};
+
 function useAddonsLogic() {
     const { addons, loadAddons, addAddon, removeAddon, isLoading, setActiveCinemaAddon } = useAddonsStore();
     const { repos, addRepo, removeRepo, isLoading: isPluginsLoading, scrapers, toggleScraper } = usePluginsStore();
@@ -171,8 +183,9 @@ export function AddonsMobile() {
             >
                 {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
                 <View style={styles.logoContainer}>
-                    <Image
+                    <FallbackImage
                         source={item.logo ? { uri: item.logo } : require('@/assets/images/icon.png')}
+                        fallback={require('@/assets/images/icon.png')}
                         style={styles.logo}
                     />
                     {item.type === 'nsfw' && (
@@ -222,20 +235,7 @@ export function AddonsMobile() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: activeColors.background }]}>
-            {/* Dark Luxury Gradient */}
-            {activeColors.isAmoled ? (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-            ) : (
-                <LinearGradient
-                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                    locations={[0, 0.25, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
-            )}
-            {!activeColors.isAmoled && (
-                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
-            )}
+        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <View style={styles.header}>
                     <View>
@@ -406,7 +406,7 @@ export function AddonsMobile() {
                                 <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                                     {scrapers.filter(s => s.sourceRepoUrl === selectedPluginRepo).map((scraper) => (
                                         <View key={scraper.id} style={[styles.scraperCard, { borderColor: activeColors.border, backgroundColor: activeColors.background }]}>
-                                            <Image source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} style={styles.scraperLogo} />
+                                            <FallbackImage source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} fallback={require('@/assets/images/icon.png')} style={styles.scraperLogo} />
                                             <View style={styles.scraperInfo}>
                                                 <Text style={[styles.scraperName, { color: activeColors.text }]}>{scraper.name} <Text style={{ fontSize: 10, color: activeColors.textSecondary }}>v{scraper.version}</Text></Text>
                                                 <Text style={[styles.scraperDesc, { color: activeColors.textSecondary }]} numberOfLines={2}>{scraper.description}</Text>
@@ -436,7 +436,7 @@ export function AddonsMobile() {
                                 <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                                     {scrapers.filter(s => s.sourceRepoUrl === selectedPluginRepo).map((scraper) => (
                                         <View key={scraper.id} style={[styles.scraperCard, { borderColor: activeColors.border, backgroundColor: activeColors.background }]}>
-                                            <Image source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} style={styles.scraperLogo} />
+                                            <FallbackImage source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} fallback={require('@/assets/images/icon.png')} style={styles.scraperLogo} />
                                             <View style={styles.scraperInfo}>
                                                 <Text style={[styles.scraperName, { color: activeColors.text }]}>{scraper.name} <Text style={{ fontSize: 10, color: activeColors.textSecondary }}>v{scraper.version}</Text></Text>
                                                 <Text style={[styles.scraperDesc, { color: activeColors.textSecondary }]} numberOfLines={2}>{scraper.description}</Text>

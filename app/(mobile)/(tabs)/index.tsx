@@ -11,15 +11,17 @@ import {
     TextInput,
     Image,
     Pressable,
-    ScrollView
+    ScrollView,
+    ActivityIndicator
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { ListItemSkeleton, FolderSkeleton } from '@/components/Skeleton';
 
-import { useHomeLogic, VideoWithThumbnail } from '@/hooks/useHomeLogic';
+import { useHomeLogic, VideoWithThumbnail, FolderType } from '@/hooks/useHomeLogic';
 
 // Stable hash for mock size
 const getMockSize = (id: string) => {
@@ -52,8 +54,8 @@ const VideoItem = React.memo(({
             activeOpacity={0.7}
         >
             <View style={styles.videoThumbWrapper}>
-                {item.thumbnailUri ? (
-                    <Image source={{ uri: item.thumbnailUri }} style={styles.videoThumb} />
+                {item.uri ? (
+                    <Image source={{ uri: item.uri }} style={styles.videoThumb} />
                 ) : (
                     <View style={[styles.videoThumbPlaceholder, { backgroundColor: '#1e2025' }]}>
                         <MaterialIcons name="videocam" size={32} color="#444" />
@@ -86,14 +88,14 @@ const FolderItem = React.memo(({
     onPress,
     currentColors
 }: {
-    item: { name: string, count: number, uri: string },
-    onPress: (uri: string) => void,
+    item: FolderType,
+    onPress: (folder: FolderType) => void,
     currentColors: any
 }) => {
     return (
         <TouchableOpacity
             style={styles.folderListItem}
-            onPress={() => onPress(item.uri)}
+            onPress={() => onPress(item)}
             activeOpacity={0.7}
         >
             <View style={styles.folderIconWrapper}>
@@ -108,15 +110,31 @@ const FolderItem = React.memo(({
     );
 });
 
+import { InteractionManager } from 'react-native';
+
+let homeHasMounted = false;
+
 // ----------------------- Mobile Component LOCAL VIDEO ----------------------- ---
 export function Home() {
+    const [isReady, setIsReady] = useState(homeHasMounted);
+
+    useEffect(() => {
+        if (homeHasMounted) return;
+        const task = InteractionManager.runAfterInteractions(() => {
+            homeHasMounted = true;
+            setIsReady(true);
+        });
+        return () => task.cancel();
+    }, []);
+
     const logic = useHomeLogic();
     const {
-        theme, currentColors, videos, filteredVideos, loading, refreshing, storage, searchQuery, setSearchQuery, showSearch, setShowSearch,
+        theme, currentColors, videos, filteredVideos, loading, refreshing, deviceStorage, searchQuery, setSearchQuery, showSearch, setShowSearch,
         selectedVideo, showOptionsModal, setShowOptionsModal, showRenameModal, setShowRenameModal, newFilename, setNewFilename,
         showInfoModal, setShowInfoModal, selectedVideoSize, viewMode, setViewMode, folders, selectedFolder, setSelectedFolder,
         sortBy, setSortBy, sortOrder, setSortOrder, showSortModal, setShowSortModal,
-        router, onRefresh, handlePlay, showOptions, handleDelete, handleRename, confirmRename, showInfo, formatDuration
+        router, onRefresh, handlePlay, showOptions, handleDelete, handleRename, confirmRename, showInfo, formatDuration,
+        hasNextPage, isFetchingNextPage, loadMoreVideos, foldersLoading
     } = logic;
 
     const renderHeader = () => {
@@ -177,7 +195,7 @@ export function Home() {
                 {selectedFolder && (
                     <TouchableOpacity onPress={() => setSelectedFolder(null)} style={styles.breadcrumb}>
                         <MaterialIcons name="folder" size={20} color={currentColors.primary} />
-                        <Text style={styles.breadcrumbText}>{selectedFolder.split('/').pop()}</Text>
+                        <Text style={styles.breadcrumbText}>{selectedFolder.name}</Text>
                         <MaterialIcons name="close" size={16} color="#64748b" />
                     </TouchableOpacity>
                 )}
@@ -193,8 +211,8 @@ export function Home() {
         showOptions(item);
     }, [showOptions]);
 
-    const memoizedSetSelectedFolder = useCallback((uri: string) => {
-        setSelectedFolder(uri);
+    const memoizedSetSelectedFolder = useCallback((folder: FolderType) => {
+        setSelectedFolder(folder);
     }, [setSelectedFolder]);
 
     const renderVideoItem = useCallback(({ item }: { item: VideoWithThumbnail }) => (
@@ -206,7 +224,7 @@ export function Home() {
         />
     ), [memoizedHandlePlay, memoizedShowOptions, currentColors]);
 
-    const renderFolderItem = useCallback(({ item }: { item: { name: string, count: number, uri: string } }) => (
+    const renderFolderItem = useCallback(({ item }: { item: FolderType }) => (
         <FolderItem
             item={item}
             onPress={memoizedSetSelectedFolder}
@@ -215,24 +233,11 @@ export function Home() {
     ), [memoizedSetSelectedFolder, currentColors]);
 
     return (
-        <View style={[styles.container, { backgroundColor: '#000' }]}>
-            {/* Dark Luxury Gradient */}
-            {currentColors.isAmoled ? (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-            ) : (
-                <LinearGradient
-                    colors={[currentColors.primary + '30', '#000000FA', '#000000']}
-                    locations={[0, 0.25, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
-            )}
-            {!currentColors.isAmoled && (
-              <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
-            )}
+        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {renderHeader()}
 
-                {loading ? (
+                {(!isReady || loading || (viewMode === 'folder' && !selectedFolder && foldersLoading)) ? (
                     <ScrollView
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={styles.listContainer}>
@@ -245,18 +250,26 @@ export function Home() {
                         ))}
                     </ScrollView>
                 ) : (
-                    <FlatList
+                    <FlashList
                         data={(viewMode === 'folder' && !selectedFolder ? folders : filteredVideos) as any}
                         renderItem={(viewMode === 'folder' && !selectedFolder ? renderFolderItem : renderVideoItem) as any}
                         keyExtractor={(item: any) => item.id || item.uri}
-                        contentContainerStyle={styles.listContainer}
-                        initialNumToRender={10}
-                        maxToRenderPerBatch={10}
+                        contentContainerStyle={styles.listContainer as any}
+                        estimatedItemSize={viewMode === 'folder' && !selectedFolder ? 80 : 100}
                         showsVerticalScrollIndicator={false}
-                        windowSize={5}
-                        removeClippedSubviews={Platform.OS === 'android'}
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={currentColors.primary} />
+                        }
+                        onEndReached={() => {
+                            loadMoreVideos();
+                        }}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={
+                            isFetchingNextPage ? (
+                                <View style={{ padding: 20, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color={currentColors.primary} />
+                                </View>
+                            ) : null
                         }
                         ListEmptyComponent={
                             <View style={styles.empty}>

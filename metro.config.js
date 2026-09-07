@@ -2,6 +2,15 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// Lazily evaluate modules (inlineRequires) to improve startup time (TTI) by
+// deferring execution of the large module graph until modules are actually used.
+config.transformer.getTransformOptions = async () => ({
+    transform: {
+        experimentalImportSupport: false,
+        inlineRequires: true,
+    },
+});
+
 // Ignore "node:" imports from quickjs-emscripten so Metro doesn't crash
 config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (moduleName.startsWith('node:')) {

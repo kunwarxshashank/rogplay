@@ -29,6 +29,18 @@ const hexAlpha = (hex: string, alpha: number) => {
     return hex + a;
 };
 
+const FallbackImage = ({ source, style, fallback }: any) => {
+    const [hasError, setHasError] = useState(false);
+    useEffect(() => { setHasError(false); }, [source]);
+    return (
+        <Image
+            source={hasError ? fallback : source}
+            style={style}
+            onError={() => setHasError(true)}
+        />
+    );
+};
+
 const FILTERS = ['All', 'Plugins', 'Live TV', 'Stremio', 'Cinema', 'Movies', 'NSFW', 'Others'];
 
 // Type color mapping
@@ -225,8 +237,9 @@ export default function TVAddonsScreen() {
                             <View style={styles.cardBody}>
                                 {/* Logo */}
                                 <View style={[styles.logoWrap, { borderColor: hexAlpha(typeConfig.color, 0.2) }]}>
-                                    <Image
+                                    <FallbackImage
                                         source={item.logo ? { uri: item.logo } : require('@/assets/images/icon.png')}
+                                        fallback={require('@/assets/images/icon.png')}
                                         style={styles.logo}
                                     />
                                     {item.type === 'nsfw' && (
@@ -594,7 +607,7 @@ export default function TVAddonsScreen() {
                                             borderWidth: 1, borderColor: focused ? c.textSecondary : 'rgba(255,255,255,0.05)',
                                             backgroundColor: focused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'
                                         }]}>
-                                            <Image source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#1a1a1a' }} />
+                                            <FallbackImage source={scraper.logo ? { uri: scraper.logo } : require('@/assets/images/icon.png')} fallback={require('@/assets/images/icon.png')} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#1a1a1a' }} />
                                             <View style={{ flex: 1, marginLeft: 12 }}>
                                                 <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{scraper.name}</Text>
                                                 <Text style={{ fontSize: 12, color: c.textSecondary }} numberOfLines={1}>{scraper.description}</Text>

@@ -1,3 +1,4 @@
+import { useTheme } from "@/hooks/useTheme";
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, ViewStyle, ScrollView, Dimensions, Platform } from 'react-native';
 
@@ -12,12 +13,247 @@ interface SkeletonProps {
     style?: ViewStyle;
 }
 
+const getSkeletonStyles = (colors: any) => StyleSheet.create({
+    skeleton: {
+        backgroundColor: colors.border,
+    },
+    card: {
+        backgroundColor: colors.card,
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: 16,
+    },
+    cardInfo: {
+        padding: 12,
+    },
+    movieCard: {
+        marginRight: 12,
+    },
+    listItem: {
+        flexDirection: 'row',
+        padding: 16,
+        alignItems: 'center',
+    },
+    listItemContent: {
+        flex: 1,
+        marginLeft: 16,
+        justifyContent: 'center',
+    },
+    folderIconPlaceholder: {
+        width: 60,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        padding: 16,
+    },
+    hero: {
+        position: 'relative',
+        marginBottom: 24,
+    },
+    heroContent: {
+        position: 'absolute',
+        bottom: 40,
+        left: 20,
+        right: 20,
+    },
+    heroButtons: {
+        flexDirection: 'row',
+        marginTop: 20,
+    },
+    addonCard: {
+        backgroundColor: colors.card,
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+    },
+    addonHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    addonHeaderText: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    addonFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    cinemaItem: {
+        flexDirection: 'row',
+        backgroundColor: colors.card,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+    },
+    cinemaContent: {
+        flex: 1,
+        marginLeft: 16,
+        justifyContent: 'center',
+    },
+    cinemaMetadata: {
+        flexDirection: 'row',
+        marginTop: 12,
+    },
+    iptvCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+    },
+    iptvIconContainer: {
+        marginRight: 14,
+    },
+    iptvInfo: {
+        flex: 1,
+    },
+    iptvChannelCard: {
+        backgroundColor: colors.card,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+    },
+    iptvChannelInfo: {
+        padding: 12,
+    },
+    downloadCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        backgroundColor: colors.card,
+        borderRadius: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+    },
+    downloadInfo: {
+        flex: 1,
+        marginLeft: 14,
+    },
+    downloadMeta: {
+        flexDirection: 'row',
+        marginTop: 6,
+    },
+    streamCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        backgroundColor: colors.card,
+        borderRadius: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+    },
+    streamInfo: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    episodeCardSkeleton: {
+        flexDirection: 'row',
+        backgroundColor: colors.card,
+        borderRadius: 12,
+        marginBottom: 16,
+        padding: 0,
+        overflow: 'hidden',
+    },
+    episodeInfoSkeleton: {
+        flex: 1,
+        padding: 12,
+    },
+    episodeMetaSkeleton: {
+        flexDirection: 'row',
+        marginTop: 10,
+    },
+    detailsSkeleton: {
+        flex: 1,
+        backgroundColor: colors.card,
+    },
+    detailsContentSkeleton: {
+        padding: 16,
+    },
+    detailsPosterSkeleton: {
+        marginTop: -60,
+        alignItems: 'center',
+    },
+    detailsMetaSkeleton: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 12,
+    },
+    detailsGenresSkeleton: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 20,
+    },
+    tvServerGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
+    tvServerCardSkeleton: {
+        width: '48%',
+        height: 100,
+        backgroundColor: colors.border,
+        margin: '1%',
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    tvDetailsContainer: {
+        flex: 1,
+        backgroundColor: colors.card,
+    },
+    tvDetailsContent: {
+        flex: 1,
+        paddingTop: 40,
+        paddingLeft: 50,
+        paddingRight: 40,
+    },
+    tvDetailsTop: {
+        flexDirection: 'row',
+        flex: 1,
+    },
+    tvDetailsInfo: {
+        flex: 1,
+        marginLeft: 36,
+        justifyContent: 'center',
+        maxWidth: 650,
+    },
+    tvEpisodeCard: {
+        flexDirection: 'row',
+        backgroundColor: colors.border,
+        marginBottom: 20,
+        borderRadius: 12,
+        overflow: 'hidden',
+    }
+});
+
+
 export const Skeleton: React.FC<SkeletonProps> = ({
     width = '100%',
     height = 20,
     borderRadius = 8,
     style
 }) => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     const shimmerAnimation = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -66,6 +302,9 @@ interface VideoCardSkeletonProps {
 }
 
 export const VideoCardSkeleton: React.FC<VideoCardSkeletonProps> = ({ width = '100%' }) => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={[styles.card, { width: width as any }]}>
             <Skeleton width="100%" height={120} borderRadius={20} />
@@ -83,11 +322,16 @@ interface MovieCardSkeletonProps {
 }
 
 export const MovieCardSkeleton: React.FC<MovieCardSkeletonProps> = ({ width = 120 }) => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
-        <View style={[styles.movieCard, { width: width as any }]}>
-            <Skeleton width="100%" height={180} borderRadius={12} />
-            <Skeleton width="90%" height={12} borderRadius={4} style={{ marginTop: 8 }} />
-            <Skeleton width="60%" height={10} borderRadius={4} style={{ marginTop: 4 }} />
+        <View style={[styles.movieCard, { width: width as any, backgroundColor: 'transparent' }]}>
+            <View style={{ borderRadius: 12, overflow: 'hidden', backgroundColor: colors.primary + '15' }}>
+                <Skeleton width="100%" height={180} borderRadius={12} style={{ backgroundColor: colors.primary + '20' }} />
+            </View>
+            <Skeleton width="90%" height={12} borderRadius={4} style={{ marginTop: 8, backgroundColor: colors.primary + '40' }} />
+            <Skeleton width="60%" height={10} borderRadius={4} style={{ marginTop: 4, backgroundColor: colors.primary + '30' }} />
         </View>
     );
 };
@@ -98,6 +342,9 @@ interface ListItemSkeletonProps {
 
 /* Single Video List */
 export const ListItemSkeleton: React.FC<ListItemSkeletonProps> = ({ showThumbnail = true }) => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.listItem}>
             {showThumbnail && (
@@ -112,6 +359,9 @@ export const ListItemSkeleton: React.FC<ListItemSkeletonProps> = ({ showThumbnai
 };
 
 export const FolderSkeleton: React.FC = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.listItem}>
             <View style={styles.folderIconPlaceholder}>
@@ -121,6 +371,22 @@ export const FolderSkeleton: React.FC = () => {
                 <Skeleton width="60%" height={17} borderRadius={4} />
                 <Skeleton width="30%" height={13} borderRadius={4} style={{ marginTop: 6 }} />
             </View>
+        </View>
+    );
+};
+
+export const MusicTrackSkeleton: React.FC = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
+    return (
+        <View style={styles.listItem}>
+            <Skeleton width={56} height={56} borderRadius={8} />
+            <View style={styles.listItemContent}>
+                <Skeleton width="70%" height={16} borderRadius={4} />
+                <Skeleton width="40%" height={12} borderRadius={4} style={{ marginTop: 8 }} />
+            </View>
+            <Skeleton width={24} height={24} borderRadius={12} />
         </View>
     );
 };
@@ -138,6 +404,9 @@ export const GridSkeleton: React.FC<GridSkeletonProps> = ({
     itemWidth = '48%',
     renderItem
 }) => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.grid}>
             {Array.from({ length: count }).map((_, index) => (
@@ -152,6 +421,9 @@ export const GridSkeleton: React.FC<GridSkeletonProps> = ({
 interface HeroSkeletonProps { }
 
 export const HeroSkeleton: React.FC<HeroSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.hero}>
             <Skeleton width="100%" height={400} borderRadius={0} />
@@ -171,6 +443,9 @@ export const HeroSkeleton: React.FC<HeroSkeletonProps> = () => {
 interface BrowserAddonSkeletonProps { }
 
 export const BrowserAddonSkeleton: React.FC<BrowserAddonSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.addonCard}>
             <View style={styles.addonHeader}>
@@ -194,6 +469,9 @@ export const BrowserAddonSkeleton: React.FC<BrowserAddonSkeletonProps> = () => {
 interface CinemaItemSkeletonProps { }
 
 export const CinemaItemSkeleton: React.FC<CinemaItemSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.cinemaItem}>
             <Skeleton width={120} height={160} borderRadius={12} />
@@ -214,6 +492,9 @@ export const CinemaItemSkeleton: React.FC<CinemaItemSkeletonProps> = () => {
 interface IptvPlaylistSkeletonProps { }
 
 export const IptvPlaylistSkeleton: React.FC<IptvPlaylistSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.iptvCard}>
             <View style={styles.iptvIconContainer}>
@@ -233,6 +514,9 @@ interface IptvChannelSkeletonProps {
 }
 
 export const IptvChannelSkeleton: React.FC<IptvChannelSkeletonProps> = ({ width = '100%' }) => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={[styles.iptvChannelCard, { width: width as any }]}>
             <Skeleton width="100%" height={180} borderRadius={12} />
@@ -247,6 +531,9 @@ export const IptvChannelSkeleton: React.FC<IptvChannelSkeletonProps> = ({ width 
 interface DownloadItemSkeletonProps { }
 
 export const DownloadItemSkeleton: React.FC<DownloadItemSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.downloadCard}>
             <Skeleton width={100} height={70} borderRadius={14} />
@@ -265,6 +552,9 @@ export const DownloadItemSkeleton: React.FC<DownloadItemSkeletonProps> = () => {
 interface StreamSourceSkeletonProps { }
 
 export const StreamSourceSkeleton: React.FC<StreamSourceSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.streamCard}>
             <Skeleton width={52} height={52} borderRadius={26} />
@@ -280,6 +570,9 @@ export const StreamSourceSkeleton: React.FC<StreamSourceSkeletonProps> = () => {
 interface EpisodeSkeletonProps { }
 
 export const EpisodeSkeleton: React.FC<EpisodeSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.episodeCardSkeleton}>
             <Skeleton width={140} height={80} borderRadius={12} />
@@ -300,6 +593,9 @@ interface DetailsSkeletonProps { }
 
 
 export const DetailsSkeleton: React.FC<DetailsSkeletonProps> = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <ScrollView style={styles.detailsSkeleton} showsVerticalScrollIndicator={false}>
             <Skeleton width="100%" height={300} borderRadius={0} />
@@ -341,6 +637,9 @@ export const DetailsSkeleton: React.FC<DetailsSkeletonProps> = () => {
 
 
 export const TVDetailsSkeleton: React.FC = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.tvDetailsContainer}>
             <View style={styles.tvDetailsContent}>
@@ -388,23 +687,36 @@ export interface TrendingSliderSkeletonProps {
 }
 
 export const TrendingSliderSkeleton: React.FC<TrendingSliderSkeletonProps> = ({ fullScreen = false }) => {
-    const itemWidth = fullScreen && isTV ? width * 0.5 : (isTV ? width * 0.6 : width * 0.85);
-    const itemHeight = fullScreen && isTV ? height * 0.45 : 220;
-    const itemMargin = isTV ? (fullScreen ? 20 : 10) : 10;
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
+    const itemWidth = fullScreen && isTV ? width * 0.82 : (isTV ? width * 0.6 : width);
+    const itemHeight = fullScreen && isTV ? height * 0.45 : 550;
+    const itemMargin = isTV ? (fullScreen ? 20 : 10) : 0;
+    const itemBorderRadius = isTV ? 28 : 0;
     const snapInterval = itemWidth + itemMargin * 2;
     const spacerWidth = (width - snapInterval) / 2;
 
     const renderSkeletonItem = (w: number, h: number, m: number, op: number = 1, showContent: boolean = true) => (
-        <View style={{ width: w, height: h, marginHorizontal: m, opacity: op, borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' }}>
-            <Skeleton width="100%" height="100%" borderRadius={10} />
+        <View style={{ width: w, height: h, marginHorizontal: m, opacity: op, borderRadius: itemBorderRadius, overflow: 'hidden', backgroundColor: colors.primary + '15' }}>
+            <Skeleton width="100%" height="100%" borderRadius={itemBorderRadius} style={{ backgroundColor: colors.primary + '20' }} />
             {showContent && (
-                <View style={{ position: 'absolute', bottom: isTV ? 30 : 20, left: isTV ? 30 : 20, right: isTV ? 30 : 20, gap: 8 }}>
-                    {!isTV && <Skeleton width={60} height={16} borderRadius={4} />}
-                    <Skeleton width="70%" height={isTV ? 28 : 20} borderRadius={6} />
-                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                        <Skeleton width={40} height={12} borderRadius={4} />
-                        <Skeleton width={40} height={12} borderRadius={4} />
-                        <Skeleton width={60} height={12} borderRadius={4} />
+                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isTV ? 30 : 20, paddingBottom: isTV ? 30 : 20 }}>
+                    <View style={{ alignSelf: 'flex-start', marginBottom: 10 }}>
+                        <Skeleton width={100} height={24} borderRadius={12} style={{ backgroundColor: colors.primary + '80' }} />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <Skeleton width={50} height={28} borderRadius={8} style={{ backgroundColor: colors.primary + '60' }} />
+                        <Skeleton width="60%" height={24} borderRadius={6} style={{ backgroundColor: colors.primary + '60' }} />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                        <Skeleton width={60} height={18} borderRadius={4} style={{ backgroundColor: colors.primary + '50' }} />
+                        <Skeleton width={6} height={6} borderRadius={3} style={{ backgroundColor: colors.primary + '50' }} />
+                        <Skeleton width={40} height={14} borderRadius={4} style={{ backgroundColor: colors.primary + '50' }} />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Skeleton width={120} height={40} borderRadius={20} style={{ backgroundColor: colors.primary }} />
+                        <Skeleton width={40} height={40} borderRadius={20} style={{ backgroundColor: colors.primary }} />
                     </View>
                 </View>
             )}
@@ -414,24 +726,14 @@ export const TrendingSliderSkeleton: React.FC<TrendingSliderSkeletonProps> = ({ 
     return (
         <View style={[{ marginBottom: 32, marginTop: 10 }, fullScreen && isTV && { marginTop: 40, marginBottom: 20 }]}>
             <View style={[{ flexDirection: 'row', alignItems: 'center' }, fullScreen && isTV && { paddingHorizontal: 40 }]}>
-                {fullScreen && isTV ? (
-                    <>
-                        {renderSkeletonItem(width * 0.5, height * 0.45, 10, 1)}
-                        {renderSkeletonItem(width * 0.22, height * 0.45, 10, 0.7)}
-                        {renderSkeletonItem(width * 0.22, height * 0.45, 10, 0.5)}
-                    </>
-                ) : (
-                    <>
-                        {/* Left Spacer for non-fullscreen */}
-                        <View style={{ width: spacerWidth }} />
+                {/* Left Spacer for non-fullscreen */}
+                <View style={{ width: spacerWidth }} />
 
-                        {/* Main Item */}
-                        {renderSkeletonItem(itemWidth, itemHeight, itemMargin, 1)}
+                {/* Main Item */}
+                {renderSkeletonItem(itemWidth, itemHeight, itemMargin, 1)}
 
-                        {/* Right Item for peek effect */}
-                        {renderSkeletonItem(itemWidth, itemHeight, itemMargin, 0.4, false)}
-                    </>
-                )}
+                {/* Right Item for peek effect */}
+                {renderSkeletonItem(itemWidth, itemHeight, itemMargin, 0.4, false)}
             </View>
         </View>
     );
@@ -439,6 +741,9 @@ export const TrendingSliderSkeleton: React.FC<TrendingSliderSkeletonProps> = ({ 
 
 
 export const TVEpisodeSkeleton: React.FC = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.tvEpisodeCard}>
             <Skeleton width={200} height={112} borderRadius={0} />
@@ -452,6 +757,9 @@ export const TVEpisodeSkeleton: React.FC = () => {
 };
 
 export const TVServerSelectionSkeleton: React.FC = () => {
+    const theme = useTheme();
+    const colors = theme.colors;
+    const styles = getSkeletonStyles(colors);
     return (
         <View style={styles.tvServerGrid}>
             {Array.from({ length: 12 }).map((_, index) => (
@@ -467,233 +775,3 @@ export const TVServerSelectionSkeleton: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
-    skeleton: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    card: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 20,
-        overflow: 'hidden',
-        marginBottom: 16,
-    },
-    cardInfo: {
-        padding: 12,
-    },
-    movieCard: {
-        marginRight: 12,
-    },
-    listItem: {
-        flexDirection: 'row',
-        padding: 16,
-        alignItems: 'center',
-    },
-    listItemContent: {
-        flex: 1,
-        marginLeft: 16,
-        justifyContent: 'center',
-    },
-    folderIconPlaceholder: {
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    grid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        padding: 16,
-    },
-    hero: {
-        position: 'relative',
-        marginBottom: 24,
-    },
-    heroContent: {
-        position: 'absolute',
-        bottom: 40,
-        left: 20,
-        right: 20,
-    },
-    heroButtons: {
-        flexDirection: 'row',
-        marginTop: 20,
-    },
-    addonCard: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#2a2a2a',
-    },
-    addonHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    addonHeaderText: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    addonFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    cinemaItem: {
-        flexDirection: 'row',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#2a2a2a',
-    },
-    cinemaContent: {
-        flex: 1,
-        marginLeft: 16,
-        justifyContent: 'center',
-    },
-    cinemaMetadata: {
-        flexDirection: 'row',
-        marginTop: 12,
-    },
-    iptvCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 16,
-        padding: 12,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#2a2a2a',
-    },
-    iptvIconContainer: {
-        marginRight: 14,
-    },
-    iptvInfo: {
-        flex: 1,
-    },
-    iptvChannelCard: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#2a2a2a',
-    },
-    iptvChannelInfo: {
-        padding: 12,
-    },
-    downloadCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 10,
-        backgroundColor: '#1a1a1a',
-        borderRadius: 20,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#2a2a2a',
-    },
-    downloadInfo: {
-        flex: 1,
-        marginLeft: 14,
-    },
-    downloadMeta: {
-        flexDirection: 'row',
-        marginTop: 6,
-    },
-    streamCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 14,
-        backgroundColor: '#1a1a1a',
-        borderRadius: 16,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#2a2a2a',
-    },
-    streamInfo: {
-        flex: 1,
-        marginLeft: 16,
-    },
-    episodeCardSkeleton: {
-        flexDirection: 'row',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 12,
-        marginBottom: 16,
-        padding: 0,
-        overflow: 'hidden',
-    },
-    episodeInfoSkeleton: {
-        flex: 1,
-        padding: 12,
-    },
-    episodeMetaSkeleton: {
-        flexDirection: 'row',
-        marginTop: 10,
-    },
-    detailsSkeleton: {
-        flex: 1,
-        backgroundColor: '#0f172a',
-    },
-    detailsContentSkeleton: {
-        padding: 16,
-    },
-    detailsPosterSkeleton: {
-        marginTop: -60,
-        alignItems: 'center',
-    },
-    detailsMetaSkeleton: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 12,
-    },
-    detailsGenresSkeleton: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 20,
-    },
-    tvServerGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-    },
-    tvServerCardSkeleton: {
-        width: '48%',
-        height: 100,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        margin: '1%',
-        borderRadius: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-    },
-    tvDetailsContainer: {
-        flex: 1,
-        backgroundColor: '#0f172a',
-    },
-    tvDetailsContent: {
-        flex: 1,
-        paddingTop: 40,
-        paddingLeft: 50,
-        paddingRight: 40,
-    },
-    tvDetailsTop: {
-        flexDirection: 'row',
-        flex: 1,
-    },
-    tvDetailsInfo: {
-        flex: 1,
-        marginLeft: 36,
-        justifyContent: 'center',
-        maxWidth: 650,
-    },
-    tvEpisodeCard: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        marginBottom: 20,
-        borderRadius: 12,
-        overflow: 'hidden',
-    }
-});

@@ -33,6 +33,8 @@ interface SettingsState {
     // Debrid settings
     debridProvider: 'none' | 'realdebrid' | 'alldebrid' | 'premiumize' | 'torbox';
     debridApiKey: string;
+    // Notification settings
+    newReleaseNotification: boolean;
     // Theme & Home Builder persistence keys
     posterStyle: PosterStyle;
     homeLayout: HomeLayout;
@@ -73,6 +75,8 @@ export const useSettingsStore = create<SettingsState>()(
             // Debrid defaults
             debridProvider: 'none',
             debridApiKey: '',
+            // Notification defaults
+            newReleaseNotification: false,
             // Theme & Home Builder defaults
             posterStyle: 'netflix',
             homeLayout: 'netflix',
@@ -114,6 +118,7 @@ export const useSettingsStore = create<SettingsState>()(
                 autoSelectHealthiestSource: false,
                 debridProvider: 'none',
                 debridApiKey: '',
+                newReleaseNotification: false,
                 posterStyle: 'netflix',
                 homeLayout: 'netflix',
                 sectionOrder: [],

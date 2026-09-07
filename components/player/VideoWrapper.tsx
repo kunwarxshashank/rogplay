@@ -365,6 +365,7 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                 type: SelectedVideoTrackType.INDEX,
                 value: selectedVideoTrack
             }}
+            textTracks={importedSubtitles && importedSubtitles.length > 0 ? importedSubtitles : undefined}
             selectedTextTrack={selectedTextTrackProps}
             onError={(e: any) => {
                 console.warn('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });

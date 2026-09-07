@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { cachedFetch } from '@/services/asyncCache';
 
 export async function getStremioMeta(id: string, type: 'movie' | 'series', stremioAddons: any[]) {
     const isCustom = isNaN(Number(id)) && !id.startsWith('tt');
@@ -35,10 +36,13 @@ export async function getStremioMeta(id: string, type: 'movie' | 'series', strem
         throw new Error(`No Stremio addon found that supports fetching meta for ID: ${id}`);
     }
 
-    const { data } = await axios.get(metaUrl);
-    const meta = data.meta;
-
-    if (!meta) throw new Error("Stremio meta returned null");
+    // Cache the meta fetch (keyed by URL) so switching seasons / re-opening
+    // details doesn't re-download the full meta payload every time.
+    const meta = await cachedFetch(`stremioMeta|${metaUrl}`, async () => {
+        const { data } = await axios.get(metaUrl);
+        if (!data.meta) throw new Error("Stremio meta returned null");
+        return data.meta;
+    });
 
     // Convert to TMDB format
     return {
@@ -51,7 +55,7 @@ export async function getStremioMeta(id: string, type: 'movie' | 'series', strem
         vote_average: meta.imdbRating ? parseFloat(meta.imdbRating) : 0,
         release_date: meta.released?.split('T')[0],
         first_air_date: meta.released?.split('T')[0],
-        genres: meta.genres ? meta.genres.map((g: string) => ({ id: Math.random(), name: g })) : [],
+        genres: meta.genres ? meta.genres.map((g: string, i: number) => ({ id: i, name: g })) : [],
         credits: {
             cast: meta.cast ? meta.cast.map((c: string) => ({ name: c })) : [],
             crew: meta.director ? meta.director.map((d: string) => ({ name: d, job: 'Director' })) : [],

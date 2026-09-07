@@ -7,7 +7,7 @@ export default function Index() {
 
     let targetPath = Platform.isTV ? "/(tv)" : "/(mobile)";
 
-    if (defaultScreen && defaultScreen !== 'home') {
+    if (defaultScreen) {
         if (Platform.isTV) {
             // Map mobile/common names to TV routes
             if (defaultScreen === 'addons') targetPath = '/(tv)/addons';
@@ -15,12 +15,13 @@ export default function Index() {
             else if (defaultScreen === 'cinema') targetPath = '/(tv)';
             else if (defaultScreen === 'home') targetPath = '/(tv)/local-videos';
         } else {
-            targetPath = `/(mobile)/${defaultScreen}`;
-            // Special case for home which should go to tabs
-            if ((defaultScreen as string) === 'home') targetPath = '/(mobile)';
+            // Default screens (cinema, local-music, addons, tools, settings) are all inside (tabs)
+            if (defaultScreen === 'home') {
+                targetPath = '/(mobile)/(tabs)';
+            } else {
+                targetPath = `/(mobile)/(tabs)/${defaultScreen}`;
+            }
         }
-    } else if (Platform.isTV && defaultScreen === 'home') {
-        targetPath = '/(tv)/local-videos';
     }
 
     return <Redirect href={targetPath as any} />;

@@ -4,6 +4,9 @@ import { zustandStorage } from './mmkv';
 import { useAuthStore } from './authStore';
 import { getDetails } from '@/services/tmdb';
 import { Platform } from 'react-native';
+import axios from 'axios';
+
+const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 
 export interface ViewingSession {
   id: string;
@@ -110,6 +113,9 @@ export interface AnalyticsState {
   logSession: (session: Omit<ViewingSession, 'id'>) => void;
   resetAnalytics: () => void;
   refreshUserName: () => void;
+  syncWithBackend: () => Promise<void>;
+  loadSyncedInsights: () => Promise<void>;
+  refreshData: () => void;
 }
 
 const GENRE_EMOJI_MAP: Record<string, { emoji: string; personality: PersonalityProfile }> = {
@@ -449,6 +455,15 @@ const initialHabits = {
   hourlyPattern: new Array(24).fill(0),
 };
 
+// Debounced sync — waits 5 seconds after the last session log before syncing
+let _insightsSyncTimer: ReturnType<typeof setTimeout> | null = null;
+const debouncedInsightsSync = () => {
+  if (_insightsSyncTimer) clearTimeout(_insightsSyncTimer);
+  _insightsSyncTimer = setTimeout(() => {
+    useAnalyticsStore.getState().syncWithBackend();
+  }, 5000);
+};
+
 export const useAnalyticsStore = create<AnalyticsState>()(
   persist(
     (set, get) => ({
@@ -502,6 +517,9 @@ export const useAnalyticsStore = create<AnalyticsState>()(
         if (fullSession.tmdbId && fullSession.contentType && !fullSession.genre) {
           enrichSessionGenres(fullSession);
         }
+
+        // Debounced sync to backend for premium users
+        debouncedInsightsSync();
       },
 
       resetAnalytics: () => {
@@ -518,6 +536,75 @@ export const useAnalyticsStore = create<AnalyticsState>()(
       refreshUserName: () => {
         const name = useAuthStore.getState()?.user?.name || '';
         if (name) set({ userName: name });
+      },
+
+      syncWithBackend: async () => {
+        const state = get();
+        const { user, token } = useAuthStore.getState();
+
+        if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123' && token !== ('GUEST_TOKEN_' + token.split('_').pop())) {
+          try {
+            await axios.post(`${DB_BASEURL}/sync-insights`, {
+              email: user.email,
+              insights: {
+                sessions: state.sessions,
+                userName: state.userName,
+                joinDate: state.joinDate,
+              },
+            }, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+          } catch (error: any) {
+            console.error('Failed to sync insights with backend:', error.response?.data || error.message);
+          }
+        }
+      },
+
+      loadSyncedInsights: async () => {
+        const { user, token } = useAuthStore.getState();
+        if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123' && !token.startsWith('GUEST_TOKEN_')) {
+          try {
+            const response = await axios.get(`${DB_BASEURL}/get-insights/${user.email}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.data && response.data.insights && response.data.insights.sessions) {
+              const remoteSessions: ViewingSession[] = response.data.insights.sessions;
+              const localSessions = get().sessions;
+
+              // Merge: dedup by session ID, remote takes precedence
+              const sessionsMap = new Map<string, ViewingSession>();
+              localSessions.forEach(s => sessionsMap.set(s.id, s));
+              remoteSessions.forEach(s => sessionsMap.set(s.id, s));
+
+              const merged = Array.from(sessionsMap.values())
+                .sort((a, b) => b.startTime - a.startTime)
+                .slice(0, 500);
+
+              const derived = computeDerivedStats(merged);
+
+              set({
+                sessions: merged,
+                ...derived,
+                userName: response.data.insights.userName || get().userName,
+                joinDate: response.data.insights.joinDate || get().joinDate,
+              });
+
+              // Sync back if merged result differs from remote
+              const remoteIds = new Set(remoteSessions.map(s => s.id));
+              const needsSyncBack = merged.some(s => !remoteIds.has(s.id)) || merged.length !== remoteSessions.length;
+              if (needsSyncBack) {
+                get().syncWithBackend();
+              }
+            }
+          } catch (error: any) {
+            console.error('Failed to fetch insights from backend:', error.response?.data || error.message);
+          }
+        }
+      },
+
+      refreshData: () => {
+        get().refreshUserName();
+        get().loadSyncedInsights();
       },
     }),
     {

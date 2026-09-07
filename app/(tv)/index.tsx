@@ -4,6 +4,7 @@ import { Colors } from '@/constants/Colors';
 import TVHeroSlider from '@/components/tv/TVHeroSlider';
 import OTTSection from '@/components/cinema/OTTSection';
 import MovieList from '@/components/cinema/MovieList';
+import { TrendingSliderSkeleton } from '@/components/Skeleton';
 import { useRouter } from 'expo-router';
 import ContinueWatchingSection from '@/components/cinema/ContinueWatchingSection';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -202,8 +203,8 @@ export default function TVHomeScreen() {
 
     if (!isHydrated || isLoading) {
         return (
-            <View style={[styles.container, { backgroundColor: currentColors.background, justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={currentColors.primary} />
+            <View style={[styles.container, { backgroundColor: currentColors.background }]}>
+                <TrendingSliderSkeleton fullScreen={true} />
             </View>
         );
     }

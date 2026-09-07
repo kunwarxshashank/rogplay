@@ -12,15 +12,10 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
     return (
         <View style={styles.container}>
             <View style={styles.headerRow}>
-
                 <View style={styles.titleSection}>
+                    <View style={[styles.titleBar, { backgroundColor: currentColors.primary }]} />
                     <Text style={[styles.headerTitle, { color: currentColors.text }]}>Platforms</Text>
-                    <View style={[styles.indicator, { backgroundColor: currentColors.primary }]} />
                 </View>
-
-                {/* <TouchableOpacity>
-                    <Text style={[styles.seeAll, { color: currentColors.primary }]}>See all</Text>
-                </TouchableOpacity> */}
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {Object.entries(PROVIDERS).map(([key, id]) => {
@@ -30,31 +25,32 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
                             key={providerId}
                             style={styles.tvItem}
                             onPress={() => onSelect(providerId, PROVIDER_NAMES[providerId])}
-                            focusedScale={1.15}
+                            focusedScale={1.12}
                         >
                             {({ focused }: any) => (
                                 <View style={styles.providerWrapper}>
                                     <View style={[
                                         styles.borderWrap,
                                         {
-                                            borderColor: focused ? currentColors.primary : 'rgba(255,255,255,0.1)',
-                                            borderWidth: 2,
+                                            borderColor: focused ? currentColors.primary : currentColors.border,
                                         },
                                         focused && {
                                             shadowColor: currentColors.primary,
-                                            shadowOffset: { width: 0, height: 12 },
-                                            shadowOpacity: 0.6,
-                                            shadowRadius: 15,
+                                            shadowOffset: { width: 0, height: 10 },
+                                            shadowOpacity: 0.55,
+                                            shadowRadius: 16,
                                             elevation: 15,
                                         }
                                     ]}>
                                         <LinearGradient
-                                            colors={focused ? [currentColors.primary, currentColors.accent || '#a855f7'] : ['transparent', 'transparent']}
+                                            colors={focused
+                                                ? [currentColors.primary, currentColors.accent || '#a855f7']
+                                                : ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)']}
                                             style={styles.gradientBorder}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 1 }}
                                         >
-                                            <View style={styles.logoContainer}>
+                                            <View style={[styles.logoContainer, { backgroundColor: currentColors.isAmoled ? '#0a0a0a' : '#0e0e16' }]}>
                                                 <Image
                                                     source={PROVIDER_LOGOS[providerId]}
                                                     style={styles.logo}
@@ -84,6 +80,7 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
 
 const styles = StyleSheet.create({
     container: {
+        marginTop: 30,
         marginBottom: 32,
     },
     headerRow: {
@@ -91,33 +88,34 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: Platform.isTV ? 40 : 20,
-        marginBottom: 20,
+        marginBottom: 18,
     },
     titleSection: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 10,
+    },
+    titleBar: {
+        width: 4,
+        height: 20,
+        borderRadius: 2,
     },
     headerTitle: {
-        fontSize: 22,
+        fontSize: 21,
         fontFamily: 'Outfit_700Bold',
-        marginRight: 8,
-    },
-    indicator: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        letterSpacing: -0.4,
     },
     seeAll: {
         fontSize: 14,
         fontFamily: 'Outfit_600SemiBold',
     },
     scrollContent: {
-        paddingHorizontal: Platform.isTV ? 40 : 15,
+        paddingHorizontal: Platform.isTV ? 40 : 16,
+        gap: Platform.isTV ? 5 : 4,
     },
     tvItem: {
-        width: 100,
-        marginRight: 5,
-        height: 140,
+        width: Platform.isTV ? 100 : 84,
+        height: Platform.isTV ? 140 : 116,
     },
     providerWrapper: {
         alignItems: 'center',
@@ -125,23 +123,22 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     borderWrap: {
-        width: 70,
-        height: 70,
-        borderRadius: 40,
+        width: Platform.isTV ? 70 : 66,
+        height: Platform.isTV ? 70 : 66,
+        borderRadius: 22,
         overflow: 'hidden',
-        padding: 2,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        padding: 1.5,
+        borderWidth: 1.5,
     },
     gradientBorder: {
         flex: 1,
-        borderRadius: 38,
+        borderRadius: 20,
         padding: 2,
     },
     logoContainer: {
         flex: 1,
-        borderRadius: 36,
+        borderRadius: 18,
         overflow: 'hidden',
-        backgroundColor: '#000',
     },
     logo: {
         width: '100%',
@@ -149,8 +146,8 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     name: {
-        fontSize: 14,
-        marginTop: 12,
+        fontSize: 12.5,
+        marginTop: 10,
         textAlign: 'center',
         width: '100%',
     },

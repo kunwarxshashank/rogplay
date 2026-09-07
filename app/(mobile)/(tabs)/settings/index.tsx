@@ -239,19 +239,7 @@ export default function SettingsScreen() {
     if (Platform.isTV) {
         return (
             <TVLayout>
-                <View style={{ flex: 1, backgroundColor: currentColors.background }}>
-                    {currentColors.isAmoled ? (
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-                    ) : (
-                        <LinearGradient
-                            colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                            locations={[0, 0.25, 1]}
-                            style={StyleSheet.absoluteFill}
-                        />
-                    )}
-                    {!currentColors.isAmoled && (
-                        <View style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
-                    )}
+                <View style={{ flex: 1, backgroundColor: 'transparent' }}>
                     <View style={{ flex: 1, padding: 20 }}>
                         {renderContent()}
                     </View>
@@ -261,20 +249,7 @@ export default function SettingsScreen() {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-            {/* Dark Luxury Gradient */}
-            {currentColors.isAmoled ? (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-            ) : (
-                <LinearGradient
-                    colors={[currentColors.primary + '30', currentColors.background + 'FA', currentColors.background]}
-                    locations={[0, 0.25, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
-            )}
-            {!currentColors.isAmoled && (
-                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: currentColors.primary + '15', transform: [{ scale: 2 }] }} />
-            )}
+        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
             <SafeAreaView style={{ flex: 1 }}>
                 {renderContent()}
             </SafeAreaView>

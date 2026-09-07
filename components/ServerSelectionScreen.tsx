@@ -5,14 +5,41 @@ import { useAddonsStore } from '@/store/addonsStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StreamSourceSkeleton } from '@/components/Skeleton';
+import { Skeleton } from '@/components/Skeleton';
 import { useStreamSources, StreamResult } from '@/hooks/useStreamSources';
+import { StreamResultWithHealth, HealthInfo } from '@/services/streamHealthEngine';
 import { useTheme } from '@/hooks/useTheme';
 import { resolveMagnet } from '@/services/debrid';
 import { Alert } from 'react-native';
 import { TVFocusable } from '@/components/TVFocusable';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 const Touchable = Platform.isTV ? TVFocusable as any : TouchableOpacity;
+
+const ServerSkeletonItem = () => {
+    const { colors: activeColors } = useTheme();
+    return (
+        <Animated.View entering={FadeIn} exiting={FadeOut}>
+            <View style={[styles.card, { borderColor: activeColors.primary + '20', backgroundColor: activeColors.primary + '05', overflow: 'hidden' }]}>
+                <View style={[styles.iconContainer, { backgroundColor: activeColors.primary + '10' }]}>
+                    <Skeleton width={32} height={32} borderRadius={16} style={{ backgroundColor: activeColors.primary + '20' }} />
+                </View>
+                <View style={styles.info}>
+                    <Skeleton width="70%" height={16} borderRadius={4} style={{ marginBottom: 12, backgroundColor: activeColors.primary + '20' }} />
+                    <View style={styles.metricsRow}>
+                        <Skeleton width={50} height={20} borderRadius={6} style={{ backgroundColor: activeColors.primary + '15' }} />
+                        <Skeleton width={80} height={20} borderRadius={6} style={{ backgroundColor: activeColors.primary + '15' }} />
+                        <Skeleton width={60} height={20} borderRadius={6} style={{ backgroundColor: activeColors.primary + '15' }} />
+                    </View>
+                </View>
+                <View style={[styles.action, { flexDirection: 'column', justifyContent: 'center' }]}>
+                    <Skeleton width={32} height={32} borderRadius={8} style={{ backgroundColor: activeColors.primary + '20' }} />
+                </View>
+            </View>
+        </Animated.View>
+    );
+};
 
 const getTagsFromTitle = (title: string) => {
     if (!title) return [];
@@ -45,7 +72,7 @@ export default function ServerSelectionScreen() {
     const type = Array.isArray(rawType) ? rawType[0] : rawType;
     const tmdbId = Array.isArray(tmdb) ? tmdb[0] : tmdb || (Array.isArray(id) ? id[0] : id);
     const { addons, isHydrated } = useAddonsStore();
-    const { results, loading, searchStreams } = useStreamSources();
+    const { results, loading, searchStreams, healthChecking, healthProgress, currentLog } = useStreamSources();
     const [resolvingMagnet, setResolvingMagnet] = useState(false);
     const [filter, setFilter] = useState<'all' | 'direct' | 'debrid'>('all');
     const hasAutoPlayed = React.useRef(false);
@@ -69,12 +96,13 @@ export default function ServerSelectionScreen() {
     const { autoSelectHealthiestSource, debridProvider, debridApiKey } = useSettingsStore();
     const { colors: activeColors } = useTheme();
 
+    // Auto-play: wait until scraping is done, then pick the top-scored result
     useEffect(() => {
-        if (!loading && results.length > 0 && autoSelectHealthiestSource && !hasAutoPlayed.current) {
+        if (!loading && !healthChecking && results.length > 0 && autoSelectHealthiestSource && !hasAutoPlayed.current) {
             hasAutoPlayed.current = true;
             handlePlay(results[0], 0, results);
         }
-    }, [results, loading, autoSelectHealthiestSource]);
+    }, [results, loading, healthChecking, autoSelectHealthiestSource]);
 
     const handlePlay = async (item: StreamResult, index: number, sourceList: StreamResult[] = results) => {
         let finalUrl = item.url;
@@ -160,50 +188,81 @@ export default function ServerSelectionScreen() {
     };
 
     const renderItem = ({ item, index }: { item: StreamResultWithHealth, index: number }) => {
+        const health = item.healthInfo;
+        const isDead = health && !health.isAlive;
+        const latencyText = health && health.isAlive && health.latency < 9999 ? `${health.latency}ms` : null;
+
+        // Colors for health badges
+        const getHealthColor = () => {
+            if (isDead) return '#ef4444';
+            if (!health) return '#94a3b8';
+            if (health.score >= 75) return '#22c55e';
+            if (health.score >= 50) return '#eab308';
+            return '#ef4444';
+        };
+
+        const healthColor = getHealthColor();
+
         return (
             <Touchable
-                style={{ marginBottom: 12, width: '100%' }}
+                style={{ marginBottom: 12, width: '100%', opacity: isDead ? 0.45 : 1 }}
                 onPress={() => handlePlay(item, index)}
                 activeOpacity={0.8}
                 hasTVPreferredFocus={index === 0}
                 autoFlex={false}
             >
-                <View style={[styles.card, { backgroundColor: activeColors.surface, borderColor: activeColors.border, marginBottom: 0, width: '100%' }]}>
-                    <View style={[styles.iconContainer, { backgroundColor: activeColors.primary + '15' }]}>
-                        <MaterialIcons name={item.isTorrent ? "cloud-download" : "play-lesson"} size={28} color={activeColors.primary} />
+                <BlurView intensity={25} tint="dark" style={[styles.card, { borderColor: isDead ? '#ef444440' : 'rgba(255,255,255,0.05)', backgroundColor: isDead ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.3)', marginBottom: 0, width: '100%' }]}>
+                    <View style={[styles.iconContainer, { backgroundColor: isDead ? '#ef444415' : 'rgba(255,255,255,0.05)' }]}>
+                        <MaterialIcons name={item.isTorrent ? "cloud-download" : "play-lesson"} size={26} color={isDead ? '#ef4444' : '#fff'} />
                     </View>
                     <View style={styles.info}>
-                        <Text style={[styles.title, { color: activeColors.text }]} numberOfLines={3}>
-                            {item.isTorrent && debridProvider !== 'none' && <Text style={{ color: activeColors.primary, fontFamily: 'Outfit_600SemiBold' }}>[RD] </Text>}
+                        <Text style={[styles.title, { color: '#fff' }]} numberOfLines={3}>
+                            {item.isTorrent && debridProvider !== 'none' && <Text style={{ color: activeColors.primary, fontFamily: 'Outfit_700Bold' }}>[RD] </Text>}
                             {item.title}
                         </Text>
 
-                        {(item.quality || getTagsFromTitle(item.title).length > 0) && (
-                            <View style={styles.metricsRow}>
-                                {item.quality && (
-                                    <View style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
-                                        <Text style={[styles.metaText, { color: activeColors.primary }]}>{String(item.quality).toUpperCase()}</Text>
-                                    </View>
-                                )}
-                                {getTagsFromTitle(item.title).map(tag => (
-                                    <View key={tag} style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20' }]}>
-                                        <Text style={[styles.metaText, { color: activeColors.primary }]}>{tag}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
+                        <View style={styles.metricsRow}>
+                            {/* Health status badge */}
+                            {health && (
+                                <View style={[styles.metaBadge, { backgroundColor: healthColor + '20', borderColor: healthColor + '40' }]}>
+                                    <Text style={[styles.metaText, { color: healthColor }]}>
+                                        {health.statusBadge.split(' ')[0]} {health.statusBadge.split(' ')[1]?.toUpperCase() || 'UNKNOWN'}
+                                    </Text>
+                                </View>
+                            )}
+                            {/* Latency badge */}
+                            {latencyText && (
+                                <View style={[styles.metaBadge, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                                    <MaterialIcons name="speed" size={10} color="#cbd5e1" style={{ marginRight: 2 }} />
+                                    <Text style={[styles.metaText, { color: '#cbd5e1' }]}>{latencyText}</Text>
+                                </View>
+                            )}
+                            {/* Quality badge */}
+                            {item.quality && (
+                                <View style={[styles.metaBadge, { backgroundColor: activeColors.primary + '20', borderColor: activeColors.primary + '40' }]}>
+                                    <MaterialIcons name="hd" size={10} color={activeColors.primary} style={{ marginRight: 2 }} />
+                                    <Text style={[styles.metaText, { color: activeColors.primary }]}>{String(item.quality).toUpperCase()}</Text>
+                                </View>
+                            )}
+                            {/* Tag badges */}
+                            {getTagsFromTitle(item.title).map(tag => (
+                                <View key={tag} style={[styles.metaBadge, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.05)' }]}>
+                                    <Text style={[styles.metaText, { color: '#94a3b8' }]}>{tag}</Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
                     {!Platform.isTV && (
                         <View style={[styles.action, { flexDirection: 'column', justifyContent: 'center' }]}>
                             <Touchable
-                                style={[styles.qualityBadge, { backgroundColor: activeColors.primary }]}
+                                style={[styles.qualityBadge, { backgroundColor: isDead ? '#ef4444' : 'rgba(255,255,255,0.1)' }]}
                                 onPress={() => handleDownload(item)}
                             >
-                                <MaterialIcons name="file-download" size={18} color="#fff" />
+                                <MaterialIcons name="file-download" size={18} color={isDead ? "#fff" : activeColors.text} />
                             </Touchable>
                         </View>
                     )}
-                </View>
+                </BlurView>
             </Touchable>
         );
     };
@@ -218,16 +277,17 @@ export default function ServerSelectionScreen() {
     }, [results, filter]);
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]} edges={['top']}>
-            {Platform.isTV && backdrop ? (
+        <View style={{ flex: 1, backgroundColor: activeColors.background }}>
+            {(backdrop || poster) ? (
                 <ImageBackground
-                    source={{ uri: `https://image.tmdb.org/t/p/original${backdrop}` }}
+                    source={{ uri: `https://image.tmdb.org/t/p/original${backdrop || poster}` }}
                     style={StyleSheet.absoluteFill}
-                    blurRadius={5}
                 >
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.background + 'D9' }]} />
+                    <BlurView intensity={Platform.isTV ? 100 : 80} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
                 </ImageBackground>
             ) : null}
+            <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
 
             <View style={styles.header}>
                 <Touchable onPress={() => router.back()} style={styles.backBtn} hasTVPreferredFocus={results.length === 0}>
@@ -235,7 +295,13 @@ export default function ServerSelectionScreen() {
                 </Touchable>
                 <View style={styles.headerInfo}>
                     <Text style={[styles.headerTitle, { color: activeColors.text }]} numberOfLines={1}>{title || query || 'Available Sources'}</Text>
-                    <Text style={[styles.headerSubtitle, { color: activeColors.textSecondary }]}>{results.length} servers found</Text>
+                    <Text style={[styles.headerSubtitle, { color: activeColors.textSecondary }]} numberOfLines={1}>
+                        {results.length} servers found
+                        {loading && currentLog && ` • ${currentLog}`}
+                        {loading && !currentLog && ` • Scanning sources…`}
+                        {!loading && healthChecking && ` • Checking ${healthProgress.checked}/${healthProgress.total}`}
+                        {!loading && !healthChecking && healthProgress.total > 0 && ` • Health checked ✓`}
+                    </Text>
                 </View>
             </View>
 
@@ -262,7 +328,7 @@ export default function ServerSelectionScreen() {
                         </View>
                     )}
                     {!resolvingMagnet && Array.from({ length: 8 }).map((_, index) => (
-                        <StreamSourceSkeleton key={index} />
+                        <ServerSkeletonItem key={index} />
                     ))}
                 </View>
             ) : results.length === 0 ? (
@@ -304,6 +370,7 @@ export default function ServerSelectionScreen() {
                 />
             )}
         </SafeAreaView>
+        </View>
     );
 }
 
@@ -401,13 +468,17 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     metaBadge: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
     },
     metaText: {
         fontSize: 10,
-        fontWeight: 'bold',
+        fontFamily: 'Outfit_700Bold',
+        letterSpacing: 0.5,
     },
     latencyText: {
         fontSize: 10,

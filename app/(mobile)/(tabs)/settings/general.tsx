@@ -7,6 +7,11 @@ import { useRouter } from 'expo-router';
 import { useSettingsStore } from '@/store/settingsStore';
 import { TVFocusable } from '@/components/TVFocusable';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuthStore } from '@/store/authStore';
+import { requestNotificationPermission, getFCMToken } from '@/services/firebase';
+import axios from 'axios';
+
+const DB_BASEURL = process.env.EXPO_PUBLIC_DB_BASEURL;
 
 export default function GeneralSettings() {
     const router = useRouter();
@@ -14,6 +19,32 @@ export default function GeneralSettings() {
     const settings = useSettingsStore();
     const { colors: currentColors } = useTheme();
     const { defaultScreen } = settings;
+    const { user, token } = useAuthStore();
+
+    const toggleNotification = async () => {
+        const newValue = !settings.newReleaseNotification;
+        
+        if (newValue) {
+            const hasPermission = await requestNotificationPermission();
+            if (!hasPermission) {
+                Alert.alert('Permission Denied', 'Please enable notifications in your device settings.');
+                return;
+            }
+        }
+        
+        settings.setSetting('newReleaseNotification', newValue);
+        
+        if (user && token && token !== 'SKIP_TOKEN123') {
+            try {
+                await axios.post(`${DB_BASEURL}/update-notification-pref`, {
+                    email: user.email,
+                    newReleaseNotification: newValue
+                });
+            } catch (error) {
+                console.error('Failed to sync notification preference:', error);
+            }
+        }
+    };
 
     const toggleTab = (tabId: string) => {
         const current = settings.hiddenTabs;
@@ -30,9 +61,10 @@ export default function GeneralSettings() {
 
     const sections = [
         {
-            title: "Appearance",
+            title: "Personalization & Appearance",
             items: [
                 { icon: 'palette', label: 'App Theme', type: 'select', value: settings.theme.toUpperCase().replace('_', ' '), action: () => settings.toggleSetting('theme') },
+                { icon: 'notifications-active', label: 'New Release Notification', type: 'toggle', value: !!settings.newReleaseNotification, action: toggleNotification },
             ]
         },
         {

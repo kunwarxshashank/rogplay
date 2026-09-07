@@ -2,7 +2,7 @@
   "expo": {
     "name": "RogPlay",
     "slug": "rogplay",
-    "version": "7.0.0",
+    "version": "7.1.0",
     "orientation": "default",
     "scheme": [
       "rogplay",
@@ -33,7 +33,7 @@
     "android": {
       "package": "com.rogplay.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 20,
+      "versionCode": 21,
       "minSdkVersion": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -145,7 +145,7 @@
           "android": {
             "usesCleartextTraffic": true,
             "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
+            "targetSdkVersion": 36,
             "enableMinifyInReleaseBuilds": true
           }
         }

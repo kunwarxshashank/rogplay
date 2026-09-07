@@ -15,6 +15,7 @@ import { useLocalMusic } from '@/hooks/useLocalMusic';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import type { MusicTrack } from '@/components/player/MusicPlayer';
 import { useTheme } from '@/hooks/useTheme';
+import { MusicTrackSkeleton } from '@/components/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARTWORK_SIZE = 48;
@@ -265,22 +266,8 @@ export default function LocalMusicScreen() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: activeColors.background }]}>
+        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
             <StatusBar barStyle="light-content" />
-
-            {/* Dark Luxury Gradient */}
-            {activeColors.isAmoled ? (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-            ) : (
-                <LinearGradient
-                    colors={[activeColors.primary + '30', activeColors.background + 'FA', activeColors.background]}
-                    locations={[0, 0.25, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
-            )}
-            {!activeColors.isAmoled && (
-                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: activeColors.primary + '15', transform: [{ scale: 2 }] }} />
-            )}
 
             {/* Header always visible, outside FlatList to keep search bar stable */}
             <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
@@ -319,11 +306,16 @@ export default function LocalMusicScreen() {
             </Animated.View>
 
             {loading && tracks.length === 0 ? (
-                <View style={[styles.loadingContainer, { paddingTop: insets.top + 100 }]}>
-                    <ActivityIndicator size="large" color={activeColors.primary} />
-                    <Text style={[styles.loadingText, { color: activeColors.textSecondary }]}>
-                        Scanning Music...
-                    </Text>
+                <View style={{ flex: 1 }}>
+                    {renderHeader()}
+                    <View style={{ paddingTop: 20 }}>
+                        <MusicTrackSkeleton />
+                        <MusicTrackSkeleton />
+                        <MusicTrackSkeleton />
+                        <MusicTrackSkeleton />
+                        <MusicTrackSkeleton />
+                        <MusicTrackSkeleton />
+                    </View>
                 </View>
             ) : (
                 <FlatList
@@ -332,6 +324,9 @@ export default function LocalMusicScreen() {
                     renderItem={renderTrack}
                     ListHeaderComponent={renderHeader}
                     ListEmptyComponent={renderEmpty}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
                     contentContainerStyle={{ paddingBottom: 120 }}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
@@ -665,16 +660,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 14,
-        fontWeight: '500',
-    },
+
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -706,7 +692,6 @@ const styles = StyleSheet.create({
     searchContainer: {
         alignSelf: 'center',
         overflow: 'hidden',
-        marginBottom: 8,
     },
     searchBar: {
         flexDirection: 'row',
@@ -728,6 +713,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         gap: 10,
+        marginBottom: 20,
     },
     actionCard: {
         flex: 1,

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Platform, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
@@ -50,36 +50,48 @@ function ContinueWatchingSection() {
         });
     }, [router]);
 
-    const renderCard = useCallback(
-        ({ item, index }: { item: ContinueWatchingItem; index: number }) => {
-            const ratio = item.durationMs > 0 ? Math.min(1, item.positionMs / item.durationMs) : 0;
-            const cardItem = {
-                id: item.id,
-                title: decodeSafe(item.title) || 'Untitled',
-                name: decodeSafe(item.title) || 'Untitled',
-                poster_path: item.poster,
-                backdrop_path: item.backdrop,
-                media_type: item.contentType || 'movie',
-                vote_average: 0,
-            };
+    // Build stable card objects + per-item handlers once per items change so the
+    // memoized MovieCard isn't invalidated on every parent render.
+    const cards = useMemo(
+        () =>
+            items.map((item) => {
+                const title = decodeSafe(item.title) || 'Untitled';
+                return {
+                    key: item.id,
+                    ratio: item.durationMs > 0 ? Math.min(1, item.positionMs / item.durationMs) : 0,
+                    type: (item.contentType || 'movie') as 'movie' | 'tv',
+                    onPress: () => openItem(item),
+                    cardItem: {
+                        id: item.id,
+                        title,
+                        name: title,
+                        poster_path: item.poster,
+                        backdrop_path: item.backdrop,
+                        media_type: item.contentType || 'movie',
+                        vote_average: 0,
+                    },
+                };
+            }),
+        [items, openItem, decodeSafe]
+    );
 
-            return (
-                <View style={[styles.cardWrap, { width: cardWidth, marginRight: cardGap }]}>
-                    <MovieCard
-                        item={cardItem}
-                        type={(item.contentType || 'movie') as 'movie' | 'tv'}
-                        width={cardWidth}
-                        onPress={() => openItem(item)}
-                    />
-                    <View style={styles.progressWrap}>
-                        <View style={[styles.progressBg, { backgroundColor: currentColors.border }]}>
-                            <View style={[styles.progressFill, { width: `${ratio * 100}%`, backgroundColor: currentColors.primary }]} />
-                        </View>
+    const renderCard = useCallback(
+        ({ item }: { item: (typeof cards)[number] }) => (
+            <View style={[styles.cardWrap, { width: cardWidth, marginRight: cardGap }]}>
+                <MovieCard
+                    item={item.cardItem}
+                    type={item.type}
+                    width={cardWidth}
+                    onPress={item.onPress}
+                />
+                <View style={styles.progressWrap}>
+                    <View style={[styles.progressBg, { backgroundColor: currentColors.border }]}>
+                        <View style={[styles.progressFill, { width: `${item.ratio * 100}%`, backgroundColor: currentColors.primary }]} />
                     </View>
                 </View>
-            );
-        },
-        [cardWidth, cardGap, currentColors.border, currentColors.primary, openItem, decodeSafe]
+            </View>
+        ),
+        [cardWidth, cardGap, currentColors.border, currentColors.primary]
     );
 
     if (!items.length) return null;
@@ -110,9 +122,9 @@ function ContinueWatchingSection() {
             </View>
 
             <FlatList
-                data={items}
+                data={cards}
                 horizontal
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.key}
                 renderItem={renderCard}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}

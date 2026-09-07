@@ -190,15 +190,13 @@ export default function TVLoginScreen() {
                                             />
                                         </View>
                                         {status === 'scanned' && (
-                                            <View style={[styles.qrOverlay, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
-                                                {!currentColors.isAmoled && <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
+                                            <View style={[styles.qrOverlay, { backgroundColor: currentColors.isAmoled ? '#000000' : 'rgba(0, 0, 0, 0.7)' }]}>
                                                 <ActivityIndicator size="large" color={currentColors.primary} />
                                                 <Text style={styles.qrOverlayText}>Code Scanned! Confirming...</Text>
                                             </View>
                                         )}
                                         {status === 'expired' && (
-                                            <View style={[styles.qrOverlay, currentColors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
-                                                {!currentColors.isAmoled && <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
+                                            <View style={[styles.qrOverlay, { backgroundColor: currentColors.isAmoled ? '#000000' : 'rgba(0, 0, 0, 0.7)' }]}>
                                                 <MaterialIcons name="refresh" size={50} color="#fff" />
                                                 <TouchableOpacity onPress={generateQR}>
                                                     <Text style={styles.qrOverlayText}>Code Expired. Refresh?</Text>
@@ -256,11 +254,10 @@ export default function TVLoginScreen() {
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    style={[styles.googleButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}
+                                    style={[styles.googleButton, { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}
                                     onPress={handleGuestLogin}
                                     activeOpacity={0.8}
                                 >
-                                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                     <MaterialCommunityIcons name="account-off" size={24} color={currentColors.text} style={{ marginRight: 16, zIndex: 1 }} />
                                     <Text style={[styles.googleButtonText, { color: currentColors.text, zIndex: 1 }]}>Continue as Guest</Text>
                                 </TouchableOpacity>

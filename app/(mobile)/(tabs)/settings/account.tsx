@@ -46,9 +46,9 @@ export default function AccountScreen() {
                     const data = response.data.data;
                     const updatedUser = {
                         ...user,
-                        isPremium: data.ispremium || false,
-                        subscriptionStart: data.subscriptionStart,
-                        subscriptionEnd: data.subscriptionEnd,
+                        isPremium: data.ispremium || data.isPremium || false,
+                        subscriptionStart: data.subscriptionStart || data.subscriptionstart || user.subscriptionStart,
+                        subscriptionEnd: data.subscriptionEnd || data.subscriptionend || user.subscriptionEnd || data.validity,
                     };
                     if (token) {
                         setAuth(token, updatedUser);
@@ -62,10 +62,11 @@ export default function AccountScreen() {
         refreshUserInfo();
     }, []);
 
-    const formatDate = (dateString?: string) => {
+    const formatDate = (dateString?: string | number) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
+        if (isNaN(date.getTime())) return 'N/A';
+        return `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
     };
 
     const handleLogout = () => {
@@ -172,7 +173,7 @@ export default function AccountScreen() {
                         <View style={styles.statusDivider} />
                         <View style={styles.statusItem}>
                             <Text style={styles.statusLabel}>Valid Until</Text>
-                            <Text style={styles.statusValue}>{isPremium ? formatDate(user?.subscriptionEnd) : 'N/A'}</Text>
+                            <Text style={styles.statusValue}>{isPremium ? formatDate(user?.subscriptionEnd || user?.validity) : 'N/A'}</Text>
                         </View>
                     </View>
                 </LinearGradient>

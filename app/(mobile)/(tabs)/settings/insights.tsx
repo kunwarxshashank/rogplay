@@ -85,7 +85,16 @@ function CircularProgress({ value, max, size = 72, strokeWidth = 6, color, label
     <View style={{ alignItems: 'center', width: size + 20 }}>
       <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
         <Svg width={size} height={size}>
-          <Circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth={strokeWidth} fill="none" />
+          <Circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} fill="none" />
+          <AnimatedCircle
+            cx={size / 2} cy={size / 2} r={radius}
+            stroke={color} strokeWidth={strokeWidth * 3} strokeOpacity={0.25} fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset as any}
+            strokeLinecap="round"
+            rotation="-90"
+            origin={`${size / 2}, ${size / 2}`}
+          />
           <AnimatedCircle
             cx={size / 2} cy={size / 2} r={radius}
             stroke={color} strokeWidth={strokeWidth} fill="none"
@@ -137,19 +146,21 @@ function WelcomeSection({ colors, data }: { colors: any; data: any }) {
   const remainingHours = nextAchievement ? Math.max(0, nextAchievement.target - nextAchievement.progress) : 0;
 
   return (
-    <View style={[styles.welcomeSection, { marginBottom: 24 }, colors.isAmoled ? { backgroundColor: '#000000' } : {}]}>
+    <View style={[styles.welcomeSection, { marginBottom: 28 }, colors.isAmoled ? { backgroundColor: '#000000', borderColor: colors.primary + '30', borderWidth: 1 } : {}]}>
       {!colors.isAmoled && (
         <LinearGradient
-          colors={[colors.primary + '40', colors.surface + 'CC', colors.background + 'F2']}
-          locations={[0, 0.5, 1]}
-          style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          colors={[colors.primary + '40', colors.surface + 'DD', colors.background + 'F8']}
+          locations={[0, 0.6, 1]}
+          style={[StyleSheet.absoluteFill, { borderRadius: 28 }]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         />
       )}
-      <View style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: colors.primary + '20', transform: [{ scale: 2 }] }} />
-      <View style={{ padding: 28 }}>
-        <Text style={[styles.welcomeGreeting, { color: colors.textSecondary }]}>{greeting}</Text>
-        <Text style={[styles.welcomeName, { color: colors.text }]}>{data.userName || 'Viewer'}</Text>
+      <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: colors.primary + '25', transform: [{ scale: 2 }] }} />
+      <View style={{ position: 'absolute', bottom: -20, left: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: (colors.accent || colors.primary) + '15', transform: [{ scale: 1.5 }] }} />
+      
+      <View style={{ padding: 32 }}>
+        <Text style={[styles.welcomeGreeting, { color: colors.textSecondary }]}>{greeting},</Text>
+        <Text style={[styles.welcomeName, { color: colors.text, marginTop: 4, marginBottom: 24, fontSize: 36 }]}>{data.userName || 'Viewer'}</Text>
         {data.totalSessions > 0 ? (
           <>
             <View style={styles.statRow}>
@@ -244,29 +255,26 @@ function GenreGalaxySection({ colors, data }: { colors: any; data: any }) {
           </Text>
         </View>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 16, gap: 14 }}>
-          {sortedGenres.map((genre: GenreStat) => {
-            const scale = 0.5 + (genre.hoursWatched / maxHours) * 0.5;
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 16, paddingHorizontal: 4, gap: 16 }}>
+          {sortedGenres.map((genre: GenreStat, index: number) => {
+            const scale = 0.6 + (genre.hoursWatched / maxHours) * 0.4;
             const isSelected = selectedGenre === genre.genre;
             return (
               <TouchableOpacity key={genre.genre} onPress={() => setSelectedGenre(isSelected ? null : genre.genre)} activeOpacity={0.7}>
-                <View style={{ alignItems: 'center', width: 90 }}>
-                  <View style={[styles.genreNode, {
-                    width: GENRE_NODE_SIZE * scale + 20,
-                    height: GENRE_NODE_SIZE * scale + 20,
-                    borderRadius: (GENRE_NODE_SIZE * scale + 20) / 2,
-                    backgroundColor: isSelected ? colors.primary + '30' : colors.card + 'AA',
-                    borderColor: isSelected ? colors.primary : colors.primary + '30',
-                    borderWidth: isSelected ? 2 : 1,
-                  }]}>
-                    <Text style={{ fontSize: 24 * scale + 4 }}>{getGenreEmoji(genre.genre)}</Text>
-                  </View>
-                  <Text style={{
-                    fontFamily: 'Outfit_600SemiBold', fontSize: 11, color: isSelected ? colors.primary : colors.textSecondary,
-                    marginTop: 6, textAlign: 'center',
-                  }}>{genre.genre}</Text>
-                  <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 9, color: colors.textMuted, marginTop: 1 }}>
-                    {genre.hoursWatched.toFixed(0)}h
+                <View style={[styles.genreNode, {
+                  paddingVertical: 16, paddingHorizontal: 20,
+                  borderRadius: 24,
+                  backgroundColor: isSelected ? colors.primary + '30' : colors.card + '90',
+                  borderColor: isSelected ? colors.primary : colors.border + '60',
+                  borderWidth: 1,
+                  transform: [{ scale: isSelected ? 1.05 : 1 }],
+                  ...Platform.select({ android: { elevation: isSelected ? 8 : 2 } }),
+                  shadowColor: isSelected ? colors.primary : '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: isSelected ? 0.4 : 0.2, shadowRadius: 8,
+                }]}>
+                  <Text style={{ fontSize: 32 * scale }}>{getGenreEmoji(genre.genre)}</Text>
+                  <Text style={{ fontFamily: 'Outfit_600SemiBold', fontSize: 13, color: isSelected ? colors.primary : colors.text, marginTop: 12 }}>{genre.genre}</Text>
+                  <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                    {genre.hoursWatched.toFixed(0)} hours
                   </Text>
                 </View>
               </TouchableOpacity>

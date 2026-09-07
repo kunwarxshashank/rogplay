@@ -12,8 +12,8 @@ import Animated, {
     Extrapolate,
     SharedValue
 } from 'react-native-reanimated';
-import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/hooks/useTheme';
+import * as Linking from 'expo-linking';
 
 interface AddonsFTUEProps {
     onDismiss: () => void;
@@ -84,8 +84,8 @@ export function AddonsFTUE({ onDismiss }: AddonsFTUEProps) {
                     styles.container,
                     containerStyle,
                     {
-                        width: Math.min(width * 0.92, 760),
-                        maxHeight: Math.min(height * 0.9, 820),
+                        width: Math.min(width * 0.90, 420),
+                        maxHeight: Math.min(height * 0.85, 700),
                     }
                 ]}
             >
@@ -95,70 +95,79 @@ export function AddonsFTUE({ onDismiss }: AddonsFTUEProps) {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={[styles.content, { padding: compactScreen ? 20 : 28 }]}> 
-                        <View style={[styles.header, { marginBottom: compactScreen ? 20 : 28 }]}>
+                    <View style={[styles.content, { padding: 20 }]}>
+                        <View style={[styles.header, { marginBottom: 16 }]}>
                             <View
                                 style={[
                                     styles.iconContainer,
                                     {
                                         backgroundColor: activeColors.primary + '20',
-                                        width: compactScreen ? 64 : 80,
-                                        height: compactScreen ? 64 : 80,
-                                        borderRadius: compactScreen ? 32 : 40,
-                                        marginBottom: compactScreen ? 14 : 20,
+                                        width: 56,
+                                        height: 56,
+                                        borderRadius: 28,
+                                        marginBottom: 12,
                                     }
                                 ]}
                             >
-                                <MaterialIcons name="extension" size={compactScreen ? 28 : 32} color={activeColors.primary} />
+                                <MaterialIcons name="extension" size={28} color={activeColors.primary} />
                             </View>
-                            <Text style={[styles.title, { color: activeColors.text, fontSize: compactScreen ? 24 : 28 }]}>Add Extensions</Text>
-                            <Text style={[styles.subtitle, { color: activeColors.textSecondary, fontSize: compactScreen ? 14 : 16, lineHeight: compactScreen ? 21 : 24 }]}>
-                                Enhance your experience by installing community addons. Here's how:
+                            <Text style={[styles.title, { color: activeColors.text, fontSize: 22 }]}>Add Extensions</Text>
+                            <Text style={[styles.subtitle, { color: activeColors.textSecondary, fontSize: 13, lineHeight: 18 }]}>
+                                Enhance your experience by installing addons. Here's how:
                             </Text>
                         </View>
 
-                        <View style={[styles.stepsContainer, { marginBottom: compactScreen ? 20 : 28 }]}> 
-                            <Animated.View style={[styles.stepItem, getStepStyle(step1Opacity), compactScreen && styles.stepItemCompact]}>
+                        <View style={[styles.stepsContainer, { marginBottom: 20 }]}>
+                            <Animated.View style={[styles.stepItem, getStepStyle(step1Opacity)]}>
                                 <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
                                     <Text style={styles.stepNumberText}>1</Text>
                                 </View>
                                 <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Tap the Add Button</Text>
+                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: 15 }]}>Tap the Add Button</Text>
                                     <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Look for the + button at the top right of the screen.</Text>
                                 </View>
-                                <MaterialIcons name="add-circle" size={compactScreen ? 22 : 24} color={activeColors.primary} />
+                                <MaterialIcons name="add-circle" size={20} color={activeColors.primary} />
                             </Animated.View>
 
-                            <Animated.View style={[styles.stepItem, getStepStyle(step2Opacity), compactScreen && styles.stepItemCompact]}>
+                            <Animated.View style={[styles.stepItem, getStepStyle(step2Opacity)]}>
                                 <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
                                     <Text style={styles.stepNumberText}>2</Text>
                                 </View>
                                 <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Enter Addon URL</Text>
+                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: 15 }]}>Enter Addon URL</Text>
                                     <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Paste the provided JSON link or rogplay:// link into the input field.</Text>
                                 </View>
-                                <MaterialIcons name="link" size={compactScreen ? 22 : 24} color={activeColors.primary} />
+                                <MaterialIcons name="link" size={20} color={activeColors.primary} />
                             </Animated.View>
 
-                            <Animated.View style={[styles.stepItem, getStepStyle(step3Opacity), compactScreen && styles.stepItemCompact]}>
+                            <Animated.View style={[styles.stepItem, getStepStyle(step3Opacity)]}>
                                 <View style={[styles.stepNumber, { backgroundColor: activeColors.primary }]}>
                                     <Text style={styles.stepNumberText}>3</Text>
                                 </View>
                                 <View style={styles.stepContent}>
-                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: compactScreen ? 16 : 18 }]}>Install</Text>
+                                    <Text style={[styles.stepTitle, { color: activeColors.text, fontSize: 15 }]}>Install</Text>
                                     <Text style={[styles.stepDesc, { color: activeColors.textSecondary }]}>Tap Install and you're ready to explore new content!</Text>
                                 </View>
-                                <MaterialIcons name="download-done" size={compactScreen ? 22 : 24} color={activeColors.primary} />
+                                <MaterialIcons name="download-done" size={20} color={activeColors.primary} />
                             </Animated.View>
                         </View>
 
                         <Animated.View style={getStepStyle(step3Opacity)}>
                             <TouchableOpacity
-                                style={[styles.button, { backgroundColor: activeColors.primary, paddingVertical: compactScreen ? 14 : 16 }]}
+                                style={[styles.button, { backgroundColor: activeColors.primary, paddingVertical: 12 }]}
                                 onPress={onDismiss}
                                 activeOpacity={0.8}
                             >
-                                <Text style={[styles.buttonText, { fontSize: compactScreen ? 16 : 18 }]}>Got it, Let's Go!</Text>
+                                <Text style={[styles.buttonText, { fontSize: 16 }]}>Got it, Let's Go!</Text>
+                            </TouchableOpacity>
+                        </Animated.View>
+
+                        <Animated.View style={[getStepStyle(step3Opacity), { marginTop: 12, alignItems: 'center', paddingHorizontal: 4 }]}>
+                            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 10, color: activeColors.textSecondary, textAlign: 'center', lineHeight: 14 }}>
+                                By using the app & addons, you acknowledge that you are solely responsible for the content you access. We do not host any addons or media content.
+                            </Text>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://rogplay.github.io/addonspolicy.html')} style={{ marginTop: 4 }} activeOpacity={0.7}>
+                                <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: activeColors.primary, textDecorationLine: 'underline' }}>Privacy Policy</Text>
                             </TouchableOpacity>
                         </Animated.View>
                     </View>
@@ -219,40 +228,40 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        padding: 16,
-        borderRadius: 16,
+        padding: 8,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.05)',
     },
     stepItemCompact: {
-        padding: 12,
+        padding: 10,
     },
     stepNumber: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 16,
+        marginRight: 12,
     },
     stepNumberText: {
         color: '#fff',
         fontFamily: 'Outfit_700Bold',
-        fontSize: 14,
+        fontSize: 12,
     },
     stepContent: {
         flex: 1,
-        marginRight: 16,
+        marginRight: 12,
     },
     stepTitle: {
-        fontSize: 18,
+        fontSize: 15,
         fontFamily: 'Outfit_600SemiBold',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     stepDesc: {
-        fontSize: 13,
+        fontSize: 11,
         fontFamily: 'Inter_400Regular',
-        lineHeight: 18,
+        lineHeight: 16,
     },
     button: {
         paddingVertical: 16,
