@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/animator/fragment_open_exit.xml",
+        "source": "com.rogplay.mediafolders.media-folders-fragment-1.5.4-16:/animator/fragment_open_exit.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/animator/fragment_open_enter.xml",
+        "source": "com.rogplay.mediafolders.media-folders-fragment-1.5.4-16:/animator/fragment_open_enter.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/animator/fragment_fade_exit.xml",
+        "source": "com.rogplay.mediafolders.media-folders-fragment-1.5.4-16:/animator/fragment_fade_exit.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/animator/fragment_close_exit.xml",
+        "source": "com.rogplay.mediafolders.media-folders-fragment-1.5.4-16:/animator/fragment_close_exit.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/animator/fragment_fade_enter.xml",
+        "source": "com.rogplay.mediafolders.media-folders-fragment-1.5.4-16:/animator/fragment_fade_enter.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/animator/fragment_close_enter.xml",
+        "source": "com.rogplay.mediafolders.media-folders-fragment-1.5.4-16:/animator/fragment_close_enter.xml"
+    }
+]

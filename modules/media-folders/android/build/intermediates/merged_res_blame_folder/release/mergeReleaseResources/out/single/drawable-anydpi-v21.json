@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/drawable-anydpi-v21/ic_call_answer.xml",
+        "source": "com.rogplay.mediafolders.media-folders-core-1.13.1-11:/drawable-anydpi-v21/ic_call_answer.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/drawable-anydpi-v21/ic_call_answer_video.xml",
+        "source": "com.rogplay.mediafolders.media-folders-core-1.13.1-11:/drawable-anydpi-v21/ic_call_answer_video.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/drawable-anydpi-v21/ic_call_decline_low.xml",
+        "source": "com.rogplay.mediafolders.media-folders-core-1.13.1-11:/drawable-anydpi-v21/ic_call_decline_low.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/drawable-anydpi-v21/ic_call_answer_low.xml",
+        "source": "com.rogplay.mediafolders.media-folders-core-1.13.1-11:/drawable-anydpi-v21/ic_call_answer_low.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/drawable-anydpi-v21/ic_call_answer_video_low.xml",
+        "source": "com.rogplay.mediafolders.media-folders-core-1.13.1-11:/drawable-anydpi-v21/ic_call_answer_video_low.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/drawable-anydpi-v21/ic_call_decline.xml",
+        "source": "com.rogplay.mediafolders.media-folders-core-1.13.1-11:/drawable-anydpi-v21/ic_call_decline.xml"
+    }
+]

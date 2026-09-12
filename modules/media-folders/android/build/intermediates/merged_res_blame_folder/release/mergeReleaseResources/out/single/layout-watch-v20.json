@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/layout-watch-v20/abc_alert_dialog_button_bar_material.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/layout-watch-v20/abc_alert_dialog_button_bar_material.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/layout-watch-v20/abc_alert_dialog_title_material.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/layout-watch-v20/abc_alert_dialog_title_material.xml"
+    }
+]

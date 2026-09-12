@@ -6,8 +6,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TVFocusable } from '@/components/TVFocusable';
 import { useTheme } from '@/hooks/useTheme';
 
-function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void }) {
+interface OTTSectionProps {
+    onSelect?: (id: number, name: string) => void;
+    customOttList?: { id: string, name: string, url: string, logo: string }[];
+    onCustomSelect?: (ott: any) => void;
+    addonUrl?: string;
+}
+
+function OTTSection({ onSelect, customOttList, onCustomSelect, addonUrl }: OTTSectionProps) {
     const { colors: currentColors } = useTheme();
+
+    const isCustom = customOttList && customOttList.length > 0;
+    const dataList = isCustom ? customOttList : Object.entries(PROVIDERS).map(([k, v]) => ({ id: v, name: PROVIDER_NAMES[v as number] }));
 
     return (
         <View style={styles.container}>
@@ -18,13 +28,32 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
                 </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                {Object.entries(PROVIDERS).map(([key, id]) => {
-                    const providerId = id as number;
+                {dataList.map((item, index) => {
+                    let logoSource;
+                    let itemName;
+                    let itemKey;
+
+                    if (isCustom) {
+                        const customItem = item as any;
+                        itemName = customItem.name;
+                        itemKey = customItem.id || index.toString();
+                        let logoStr = customItem.logo;
+                        if (logoStr && !logoStr.startsWith('http') && addonUrl) {
+                            logoStr = addonUrl.replace(/\/manifest\.json$/i, '') + '/' + logoStr;
+                        }
+                        logoSource = { uri: logoStr };
+                    } else {
+                        const tmdbItem = item as any;
+                        itemName = tmdbItem.name;
+                        itemKey = tmdbItem.id;
+                        logoSource = PROVIDER_LOGOS[tmdbItem.id];
+                    }
+
                     return (
                         <TVFocusable
-                            key={providerId}
+                            key={itemKey}
                             style={styles.tvItem}
-                            onPress={() => onSelect(providerId, PROVIDER_NAMES[providerId])}
+                            onPress={() => isCustom && onCustomSelect ? onCustomSelect(item) : onSelect?.(itemKey, itemName)}
                             focusedScale={1.12}
                         >
                             {({ focused }: any) => (
@@ -52,7 +81,7 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
                                         >
                                             <View style={[styles.logoContainer, { backgroundColor: currentColors.isAmoled ? '#0a0a0a' : '#0e0e16' }]}>
                                                 <Image
-                                                    source={PROVIDER_LOGOS[providerId]}
+                                                    source={logoSource}
                                                     style={styles.logo}
                                                 />
                                             </View>
@@ -65,7 +94,7 @@ function OTTSection({ onSelect }: { onSelect: (id: number, name: string) => void
                                             fontFamily: focused ? 'Outfit_700Bold' : 'Outfit_500Medium',
                                         },
                                     ]} numberOfLines={1}>
-                                        {PROVIDER_NAMES[providerId]}
+                                        {itemName}
                                     </Text>
                                     {focused && <View style={[styles.focusIndicator, { backgroundColor: currentColors.primary }]} />}
                                 </View>
@@ -143,7 +172,7 @@ const styles = StyleSheet.create({
     logo: {
         width: '100%',
         height: '100%',
-        resizeMode: 'contain',
+        resizeMode: 'cover',
     },
     name: {
         fontSize: 12.5,

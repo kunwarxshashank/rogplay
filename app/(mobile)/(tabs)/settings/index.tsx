@@ -91,12 +91,6 @@ export default function SettingsScreen() {
             title: "Community & Support",
             items: [
                 {
-                    title: "Contributors",
-                    icon: 'stars',
-                    description: 'Members supporting Rogplay',
-                    action: () => router.push('/settings/contributors')
-                },
-                {
                     title: "Join Telegram",
                     icon: 'message',
                     description: 'Join our official Telegram Handle',
@@ -106,7 +100,7 @@ export default function SettingsScreen() {
                     title: "Share App",
                     icon: 'share',
                     description: 'Share Rogplay with your friends',
-                    action: () => handleLink('https://rogplay.github.io/share.html')
+                    action: () => Share.share({ message: 'Download Rogplay App From https://rogplay.app' })
                 },
                 {
                     title: "Privacy Policy",

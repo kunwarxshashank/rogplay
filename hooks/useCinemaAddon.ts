@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
 import { cachedFetch } from '@/services/asyncCache';
+import { executeJsAddonCatalog } from '@/services/pluginEngine';
 
 export function useCinemaAddon() {
     const addons = useAddonsStore(s => s.addons);
@@ -45,6 +46,10 @@ export function useCinemaAddon() {
         const addonType = addon.addontype || (addon.manifest?.addontype) || (addon.type === 'music' ? 'music' : null) || (isStremio ? 'stremio' : 'serveraddon');
         const isStremioLike = addonType === 'stremio' || addonType === 'music';
         const rawCatalogs = addon.catalogs || (addon.manifest?.catalogs) || [];
+        const rawCategories = addon.categories || (addon.manifest?.categories) || [];
+        const taggedCategories = rawCategories.map((c: any) => ({ ...c, _isCategory: true }));
+        const allCatalogs = [...rawCatalogs, ...taggedCategories];
+
         const searchcatalog = addon.searchcatalog || (addon.manifest?.searchcatalog) || [];
         const slidercatalog = addon.slidercatalog || (addon.manifest?.slidercatalog) || null;
 
@@ -54,6 +59,16 @@ export function useCinemaAddon() {
         const idPrefixes = addon.manifest?.idPrefixes || addon.idPrefixes || [];
 
         let finalSearchCatalog = [...searchcatalog];
+
+        if ((addonType === 'scrapperaddon' || addonType === 'jsaddon') && addon.manifest?.search) {
+            finalSearchCatalog.push({
+                id: 'search',
+                name: 'Search Results',
+                type: 'addon',
+                searchurl: addon.manifest.search.url.replace('{query}', '${search}')
+            });
+        }
+
         if (isStremioLike && addon.manifest?.catalogs) {
             const stremioSearchCatalogs = addon.manifest.catalogs
                 .filter((c: any) => (c.type === 'movie' || c.type === 'series') && c.extra?.some((e: any) => e.name === 'search'))
@@ -73,7 +88,7 @@ export function useCinemaAddon() {
             });
         }
 
-        const mappedCatalogs = rawCatalogs.map((c: any) => {
+        const mappedCatalogs = allCatalogs.map((c: any) => {
             if (isStremioLike && !c.url) {
                 return {
                     ...c,
@@ -106,54 +121,65 @@ export function useCinemaAddon() {
 
 }
 
-export async function fetchAddonCatalog(catalogUrl: string, page: number = 1, addonType: string = 'serveraddon', addonMeta?: { url: string, manifestStr: string }) {
+export async function fetchAddonCatalog(catalogUrl: string, page: number = 1, addonType: string = 'serveraddon', addonMeta?: { url: string, manifestStr: string }, catalogRawType?: string) {
     if (!catalogUrl) return [];
     let urlWithPage = catalogUrl;
     if (urlWithPage.includes('${stremioSkip}')) {
         const skipValue = (page - 1) * 20;
         urlWithPage = urlWithPage.replace('${stremioSkip}', skipValue.toString());
     }
-    urlWithPage = urlWithPage.replace('${page}', page.toString());
+    urlWithPage = urlWithPage.replace('${page}', page.toString()).replace('{page}', page.toString());
 
-    // Cache + de-dupe: several list sections often request the same catalog on
-    // mount; this avoids redundant network calls and re-fetches on tab return.
-    return cachedFetch(`addonCatalog|${addonType}|${urlWithPage}`, () =>
-        fetchAddonCatalogRaw(urlWithPage, catalogUrl, addonType, addonMeta)
+    let cacheKeyStr = `addonCatalog|${addonType}|${urlWithPage}`;
+    if (addonType === 'jsaddon' && addonMeta?.manifestStr) {
+        try {
+            const manifest = JSON.parse(addonMeta.manifestStr);
+            if (manifest.scriptUrl) cacheKeyStr += `|${manifest.scriptUrl}`;
+        } catch (e) { }
+    }
+
+    // Cache + de-dupe: several list sections often request the same catalog
+    return cachedFetch(cacheKeyStr, () =>
+        fetchAddonCatalogRaw(urlWithPage, catalogUrl, addonType, addonMeta, catalogRawType)
     );
 }
 
-async function fetchAddonCatalogRaw(urlWithPage: string, catalogUrl: string, addonType: string, addonMeta?: { url: string, manifestStr: string }) {
+async function fetchAddonCatalogRaw(urlWithPage: string, catalogUrl: string, addonType: string, addonMeta?: { url: string, manifestStr: string }, catalogRawType?: string) {
     try {
         const response = await fetch(urlWithPage);
+        const rawText = await response.text();
 
         // Try parsing as JSON; fall back to extracting JSON from text when server returns HTML
         let data: any;
         try {
-            data = await response.json();
+            data = JSON.parse(rawText);
         } catch (jsonErr) {
-            const text = await response.text();
-            const firstArray = text.indexOf('[');
-            const firstObj = text.indexOf('{');
-            const start = (firstArray !== -1 && (firstArray < firstObj || firstObj === -1)) ? firstArray : firstObj;
-            if (start === -1) {
-                console.warn('fetchAddonCatalog: response not JSON and no JSON found in text');
-                return [];
-            }
-            const substr = text.slice(start);
-            try {
-                data = JSON.parse(substr);
-            } catch (e) {
-                // Try to trim to last closing bracket/brace
-                const lastArray = substr.lastIndexOf(']');
-                const lastObj = substr.lastIndexOf('}');
-                const end = Math.max(lastArray, lastObj);
-                if (end === -1) return [];
-                const maybe = substr.slice(0, end + 1);
-                try {
-                    data = JSON.parse(maybe);
-                } catch (e2) {
-                    console.warn('fetchAddonCatalog: failed to parse JSON from text response');
+            if (addonType === 'scrapperaddon' || addonType === 'jsaddon') {
+                data = {}; // scrapperaddon and jsaddon don't need data to be valid JSON
+            } else {
+                const firstArray = rawText.indexOf('[');
+                const firstObj = rawText.indexOf('{');
+                const start = (firstArray !== -1 && (firstArray < firstObj || firstObj === -1)) ? firstArray : firstObj;
+                if (start === -1) {
+                    console.warn('fetchAddonCatalog: response not JSON and no JSON found in text');
                     return [];
+                }
+                const substr = rawText.slice(start);
+                try {
+                    data = JSON.parse(substr);
+                } catch (e) {
+                    // Try to trim to last closing bracket/brace
+                    const lastArray = substr.lastIndexOf(']');
+                    const lastObj = substr.lastIndexOf('}');
+                    const end = Math.max(lastArray, lastObj);
+                    if (end === -1) return [];
+                    const maybe = substr.slice(0, end + 1);
+                    try {
+                        data = JSON.parse(maybe);
+                    } catch (e2) {
+                        console.warn('fetchAddonCatalog: failed to parse JSON from text response');
+                        return [];
+                    }
                 }
             }
         }
@@ -163,6 +189,76 @@ async function fetchAddonCatalogRaw(urlWithPage: string, catalogUrl: string, add
             results = data?.metas || data?.results || data?.items || [];
         } else if (addonType === 'tmdbaddon') {
             results = data?.results || (Array.isArray(data) ? data : []);
+        } else if (addonType === 'jsaddon') {
+            if (addonMeta && addonMeta.manifestStr) {
+                try {
+                    let manifest: any = null;
+                    try {
+                        manifest = JSON.parse(addonMeta.manifestStr);
+                    } catch (e) {
+                        console.error("Failed to parse addon manifest string", e);
+                    }
+                    
+                    if (!manifest) {
+                        const { useAddonsStore } = require('@/store/addonsStore');
+                        const addons = useAddonsStore.getState().addons;
+                        const fallbackAddon = addons.find((a: any) => 
+                            (a.manifest?.url && urlWithPage.startsWith(a.manifest.url)) || 
+                            (a.manifest?.baseUrl && urlWithPage.startsWith(a.manifest.baseUrl))
+                        );
+                        if (fallbackAddon) {
+                            manifest = fallbackAddon.manifest;
+                            console.log("Recovered manifest from store using url matching");
+                        }
+                    }
+
+                    if (manifest && manifest.scriptUrl) {
+                        const noCacheUrl = manifest.scriptUrl.includes('?') ? `${manifest.scriptUrl}&t=${Date.now()}` : `${manifest.scriptUrl}?t=${Date.now()}`;
+                        const scriptRes = await fetch(noCacheUrl, { headers: { 'Cache-Control': 'no-cache' } });
+                        if (!scriptRes.ok) {
+                            console.error(`Failed to fetch script from ${noCacheUrl}. Status: ${scriptRes.status}`);
+                            return [];
+                        }
+                        const pluginCode = await scriptRes.text();
+                        if (pluginCode && !pluginCode.trim().startsWith('<')) {
+                            results = await executeJsAddonCatalog(pluginCode, urlWithPage);
+                        } else {
+                            console.error('Invalid script content received (looks like HTML/XML). URL:', noCacheUrl);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to execute jsaddon', e);
+                }
+            }
+        } else if (addonType === 'scrapperaddon') {
+            const html = rawText;
+            if (addonMeta && addonMeta.manifestStr) {
+                try {
+                    const manifest = JSON.parse(addonMeta.manifestStr);
+                    // Match the catalog rule based on catalogUrl or urlWithPage
+                    let catalogRule = manifest.catalogs?.find((c: any) => catalogUrl.includes(c.id) || urlWithPage.includes(c.id) || (c.url && urlWithPage.includes(c.url.split('?')[0].replace('{page}', '').replace('${page}', '').replace('//', '/'))));
+
+                    if (!catalogRule && manifest.categories) {
+                        catalogRule = manifest.categories.find((c: any) => catalogUrl.includes(c.id) || urlWithPage.includes(c.id) || (c.url && urlWithPage.includes(c.url.split('?')[0].replace('{page}', '').replace('${page}', '').replace('//', '/'))));
+                        if (catalogRule) catalogRule._isCategory = true;
+                    }
+
+                    // Fallback to first catalog or search catalog if it's a search
+                    if (!catalogRule && urlWithPage.includes('?s=') && manifest.search) {
+                        catalogRule = manifest.search;
+                    } else if (!catalogRule) {
+                        catalogRule = manifest.catalogs?.[0];
+                    }
+
+                    const rulesToUse = catalogRule?.scraperRules || (catalogRule?._isCategory ? manifest.categoryScraperRules : manifest.catalogScraperRules);
+                    if (rulesToUse) {
+                        const { parseCatalogHtml } = require('@/services/scrapperEngine');
+                        results = parseCatalogHtml(html, rulesToUse, manifest.baseUrl || '');
+                    }
+                } catch (e) {
+                    console.error('Failed to parse scrapper rules from manifest', e);
+                }
+            }
         } else {
             // serveraddon or generic
             if (Array.isArray(data)) results = data;
@@ -177,9 +273,9 @@ async function fetchAddonCatalogRaw(urlWithPage: string, catalogUrl: string, add
             return {
                 ...item,
                 id,
-                title: item.title || item.name || item.label || item.heading || item.title,
+                title: item.title || item.name || item.label || item.heading,
                 poster_path: item.poster_path || item.poster || item.logo || item.background || item.image || item.thumbnail || item.thumb,
-                media_type: (item.media_type === 'tv' || item.type === 'series' || item.type === 'tv' || item.kind === 'tv' || item.kind === 'series') ? 'tv' : 'movie',
+                media_type: item.media_type || (addonType === 'scrapperaddon' ? 'movie' : (item.type === 'series' || item.type === 'tv' || item.kind === 'tv' || item.kind === 'series' || catalogRawType === 'series' || catalogRawType === 'tv' || ('first_air_date' in item && !('release_date' in item)) ? 'tv' : 'movie')),
                 // Attach the addon info here so it's available to the item when rendering
                 addonType: addonType,
                 _addonUrl: addonMeta?.url || catalogUrl,

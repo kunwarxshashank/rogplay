@@ -10,6 +10,7 @@ import { Colors } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { storage } from '@/store/mmkv';
+import { getVideoFolders } from '@/modules/media-folders';
 export interface VideoWithThumbnail extends MediaLibrary.Asset {
     thumbnailUri?: string;
 }
@@ -123,27 +124,23 @@ export function useHomeLogic() {
                 setFoldersLoading(true);
             }
 
-            const allAlbums = await MediaLibrary.getAlbumsAsync();
-            const videoFolders: FolderType[] = [];
+            // Use native ContentResolver query - executes in ~5ms regardless of video count
+            // This is the same approach used by VLC, MX Player, etc.
+            console.log('[Folders] Using native ContentResolver query...');
+            const startTime = Date.now();
+            const nativeFolders = await getVideoFolders();
+            console.log(`[Folders] Native query returned ${nativeFolders.length} folders in ${Date.now() - startTime}ms`);
 
-            await Promise.all(allAlbums.map(async (album) => {
-                const media = await MediaLibrary.getAssetsAsync({
-                    mediaType: MediaLibrary.MediaType.video,
-                    album: album.id,
-                    first: 0,
-                });
-                if (media.totalCount > 0) {
-                    videoFolders.push({
-                        id: album.id,
-                        name: album.title,
-                        count: media.totalCount,
-                    });
-                }
+            const videoFolders: FolderType[] = nativeFolders.map((f: any) => ({
+                id: String(f.id),
+                name: String(f.name),
+                count: Number(f.count),
             }));
 
-            videoFolders.sort((a, b) => a.name.localeCompare(b.name));
             setFolders(videoFolders);
+            setFoldersLoading(false);
 
+            // Cache for instant load next time
             try {
                 if (storage && videoFolders.length > 0) {
                     storage.set('cached_local_folders', JSON.stringify(videoFolders));
@@ -151,7 +148,6 @@ export function useHomeLogic() {
             } catch (e) { }
         } catch (error) {
             console.error('Error loading folders:', error);
-        } finally {
             setFoldersLoading(false);
         }
     };
@@ -159,6 +155,7 @@ export function useHomeLogic() {
     const loadData = async () => {
         setEndCursor(undefined);
         setHasNextPage(true);
+        // All three can run in parallel now - loadFolders uses native ContentResolver (instant)
         await Promise.all([
             loadVideos(selectedFolder?.id),
             loadFolders(),
@@ -190,25 +187,25 @@ export function useHomeLogic() {
         }
     };
 
-    const loadVideos = async (albumId?: string) => {
+    const loadVideos = async (albumId?: string): Promise<MediaLibrary.Asset[]> => {
         try {
             if (!permissionResponse || permissionResponse.status !== 'granted') {
                 const perm = await requestPermission();
                 if (perm.status !== 'granted') {
                     setLoading(false);
                     setFoldersLoading(false);
-                    return;
+                    return [];
                 }
             }
 
+            const cacheKey = `cached_local_videos_${albumId || 'all'}`;
             // --- INSTANT CACHE LOAD ---
             try {
-                const cachedString = storage?.getString('cached_local_videos');
+                const cachedString = storage?.getString(cacheKey);
                 if (cachedString) {
                     const cachedVideos = JSON.parse(cachedString);
                     if (Array.isArray(cachedVideos) && cachedVideos.length > 0) {
                         setVideos(cachedVideos);
-                        // setFilteredVideos(cachedVideos); // useEffect handles this now
                         setLoading(false);
                     } else {
                         setLoading(true);
@@ -220,34 +217,35 @@ export function useHomeLogic() {
                 setLoading(true);
             }
 
-            // --- PAGINATED BACKGROUND FETCH ---
+            // --- FETCH FIRST BATCH ---
+            console.log('[Videos] Fetching first batch...');
+            const startTime = Date.now();
             const media: MediaLibrary.PagedInfo<MediaLibrary.Asset> = await MediaLibrary.getAssetsAsync({
                 mediaType: MediaLibrary.MediaType.video,
-                first: 30, // Fetch in batches
+                first: 30,
                 sortBy: MediaLibrary.SortBy.modificationTime,
                 ...(albumId ? { album: albumId } : {})
             });
+            console.log(`[Videos] First batch: ${media.assets.length} videos in ${Date.now() - startTime}ms`);
 
             setHasNextPage(media.hasNextPage);
             setEndCursor(media.endCursor);
 
             const instantVideos = media.assets;
-
-            // Atomically update state
             setVideos(instantVideos);
+            setLoading(false);
 
-            setLoading(false); // UI ready after first batch
-
-            // Save final full list to cache for next time
             try {
                 if (storage && instantVideos.length > 0) {
-                    storage.set('cached_local_videos', JSON.stringify(instantVideos));
+                    storage.set(cacheKey, JSON.stringify(instantVideos));
                 }
             } catch (e) { }
 
+            return instantVideos;
         } catch (error) {
             console.error('Error loading videos:', error);
             setLoading(false);
+            return [];
         }
     };
 

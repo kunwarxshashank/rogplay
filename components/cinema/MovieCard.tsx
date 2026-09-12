@@ -9,30 +9,35 @@ import { TVFocusable } from '@/components/TVFocusable';
 import { useThemeStore, POSTER_STYLES } from '@/store/themeStore';
 import { useTheme } from '@/hooks/useTheme';
 
+import { DimensionValue } from 'react-native';
+
 interface MovieCardProps {
     item: any;
     type?: 'movie' | 'tv';
     addonType?: string;
     catalogTypeRaw?: string | undefined;
-    width?: number;
+    width?: DimensionValue;
     showType?: boolean;
     style?: any;
     onPress?: () => void;
+    posterStyleOverride?: string;
 }
 
-function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, showType = false, style, onPress }: MovieCardProps) {
+function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, showType = false, style, onPress, posterStyleOverride }: MovieCardProps) {
     const { colors: currentColors } = useTheme();
-    const posterStyleKey = useThemeStore((s) => s.posterStyle);
+    const themePosterStyleKey = useThemeStore((s) => s.posterStyle);
     const themeBorderRadius = useThemeStore((s) => s.borderRadius);
     const cardElevation = useThemeStore((s) => s.cardElevation);
     const router = useRouter();
 
-    const posterStyle = POSTER_STYLES[posterStyleKey] || POSTER_STYLES.netflix;
+    const activePosterStyleKey = posterStyleOverride || themePosterStyleKey;
+    const posterStyle = POSTER_STYLES[activePosterStyleKey as keyof typeof POSTER_STYLES] || POSTER_STYLES[themePosterStyleKey as keyof typeof POSTER_STYLES] || POSTER_STYLES.netflix;
     const mediaType = (type || item.media_type || 'movie') as 'movie' | 'tv';
 
     const width = propWidth || (Platform.isTV ? posterStyle.tvWidth : 130);
     const aspectRatio = Platform.isTV ? posterStyle.tvAspectRatio : posterStyle.mobileAspectRatio;
     const borderRadius = themeBorderRadius || posterStyle.borderRadius;
+    const finalAddonType = addonType || item.addonType || item.addontype;
 
     const posterUrl = useMemo(() => {
         const makeImageUrl = (path?: string) => {
@@ -66,7 +71,6 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
         }
 
         const itemId = item.id?.toString() || '';
-        const finalAddonType = addonType || item.addonType;
         const streamUrl = item.url || item.movieUrl || item.link || item.source || '';
 
         if (finalAddonType === 'music') {
@@ -102,14 +106,15 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
             return;
         }
 
-        if (finalAddonType === 'serveraddon') {
+        if (finalAddonType === 'serveraddon' || finalAddonType === 'scrapperaddon' || finalAddonType === 'jsaddon') {
             // exclusive server addon music
-            if(item.addontype === "music"){
+            if (item.addontype === "music") {
                 console.log("ok")
             }
             const params: any = {
                 query: item.title || item.name || '', type: 'addon',
                 movieUrl: streamUrl, title: item.title || item.name, poster: posterUrl,
+                addonManifestStr: item._addonManifestStr || manifestStr // pass for scrapperaddon rules
             };
             router.push({ pathname: Platform.isTV ? '/(tv)/server-selection' : '/server-selection', params });
             return;
@@ -234,10 +239,10 @@ function MovieCard({ item, type, addonType, catalogTypeRaw, width: propWidth, sh
                     </View>
                 )}
 
-                {/* Play affordance on poster */}
-                <View style={[styles.playChip, { backgroundColor: currentColors.primary }]}>
+                {/* <View style={[styles.playChip, { backgroundColor: currentColors.primary }]}>
                     <MaterialIcons name="play-arrow" size={16} color="#fff" />
-                </View>
+                </View> */}
+
             </View>
             {posterStyle.showMetadata && (
                 <View style={styles.info}>
@@ -300,19 +305,19 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     info: { marginTop: 8, paddingHorizontal: 2 },
-    title: { fontSize: 13, fontFamily: 'Outfit_600SemiBold' },
+    title: { fontSize: 14, fontFamily: 'Outfit_600SemiBold' },
     metaLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
     metaDot: { width: 3, height: 3, borderRadius: 1.5, opacity: 0.6 },
     year: { fontSize: 11, fontFamily: 'Inter_400Regular' },
     tvOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingTop: 30 },
-    tvTitle: { 
-        color: '#fff', 
-        fontSize: 18, 
-        fontFamily: 'Outfit_700Bold', 
+    tvTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontFamily: 'Outfit_700Bold',
         letterSpacing: -0.2,
         textShadowColor: 'rgba(0,0,0,0.8)',
         textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 4 
+        textShadowRadius: 4
     },
     tvMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 8 },
     tvYear: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontFamily: 'Inter_500Medium' },

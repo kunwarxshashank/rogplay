@@ -102,7 +102,8 @@ function useAddonsLogic() {
 
     const filteredAddons = useMemo(() => {
         return allAddons.filter(item => {
-            const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase());
+            const searchStr = (item.title || item.name || '').toLowerCase();
+            const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
             const type = item.type?.toLowerCase() || 'others';
             let matchesFilter = true;
 
@@ -175,14 +176,25 @@ export function AddonsMobile() {
 
     const renderItem = ({ item }: { item: any }) => {
         const isBuiltin = item.source === TMDB_BUILTIN_SOURCE || item.isBuiltin;
+        
+        let typeColor = activeColors.textSecondary;
+        if (item.type === 'plugin') typeColor = '#ea580c';
+        else if (item.type === 'livetv') typeColor = '#eab308';
+        else if (item.type === 'movie') typeColor = '#3b82f6';
+        else if (item.type === 'cinema') typeColor = '#8b5cf6';
+        else if (item.type === 'stremio') typeColor = '#ec4899';
+
         return (
             <TouchableOpacity
-                style={[styles.card, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }]}
+                style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }]}
                 onPress={() => handleOpenAddon(item)}
                 activeOpacity={0.8}
             >
                 {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />}
+                
                 <View style={styles.logoContainer}>
+                    {/* Glowing effect behind logo */}
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: typeColor, opacity: 0.15, borderRadius: 16, transform: [{ scale: 1.2 }], filter: 'blur(10px)' }]} />
                     <FallbackImage
                         source={item.logo ? { uri: item.logo } : require('@/assets/images/icon.png')}
                         fallback={require('@/assets/images/icon.png')}
@@ -190,30 +202,17 @@ export function AddonsMobile() {
                     />
                     {item.type === 'nsfw' && (
                         <View style={styles.nsfwOverlay}>
-                            <MaterialIcons name="explicit" size={16} color="#fff" />
+                            <MaterialIcons name="explicit" size={12} color="#fff" />
                         </View>
                     )}
                 </View>
+
                 <View style={styles.info}>
-                    <Text style={[styles.name, { color: activeColors.text }]}>{item.title}</Text>
-                    <Text style={[styles.desc, { color: activeColors.textSecondary }]} numberOfLines={2}>{item.description}</Text>
-                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                        <View style={[styles.badge,
-                        item.type === 'plugin' ? { backgroundColor: 'rgba(234, 88, 12, 0.15)' } :
-                            item.type === 'livetv' ? { backgroundColor: 'rgba(234, 179, 8, 0.15)' } :
-                                item.type === 'movie' ? { backgroundColor: 'rgba(59, 130, 246, 0.15)' } :
-                                    item.type === 'cinema' ? { backgroundColor: 'rgba(139, 92, 246, 0.15)' } :
-                                        item.type === 'stremio' ? { backgroundColor: 'rgba(236, 72, 153, 0.15)' } :
-                                            { backgroundColor: 'rgba(148, 163, 184, 0.15)' }
-                        ]}>
-                            <Text style={[styles.badgeText,
-                            item.type === 'plugin' ? { color: '#ea580c' } :
-                                item.type === 'livetv' ? { color: '#eab308' } :
-                                    item.type === 'movie' ? { color: '#3b82f6' } :
-                                        item.type === 'cinema' ? { color: '#8b5cf6' } :
-                                            item.type === 'stremio' ? { color: '#ec4899' } :
-                                                { color: activeColors.textSecondary }
-                            ]}>{item.type?.toUpperCase() || 'OTHER'}</Text>
+                    <Text style={[styles.name, { color: activeColors.text }]} numberOfLines={1}>{item.title}</Text>
+                    <Text style={[styles.desc, { color: activeColors.textSecondary }]} numberOfLines={1}>{item.description}</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        <View style={[styles.badge, { backgroundColor: typeColor + '20' }]}>
+                            <Text style={[styles.badgeText, { color: typeColor }]}>{item.type?.toUpperCase() || 'OTHER'}</Text>
                         </View>
                         {isBuiltin && (
                             <View style={[styles.badge, { backgroundColor: 'rgba(16,185,129,0.15)', flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
@@ -223,13 +222,18 @@ export function AddonsMobile() {
                         )}
                     </View>
                 </View>
-                {
-                    !isBuiltin && (
-                        <TouchableOpacity onPress={() => handleRemoveAddon(item)} style={styles.deleteBtn}>
-                            <MaterialIcons name="delete-outline" size={24} color={activeColors.error} />
-                        </TouchableOpacity>
-                    )
-                }
+
+                <View style={styles.actionContainer}>
+                    {
+                        !isBuiltin ? (
+                            <TouchableOpacity onPress={() => handleRemoveAddon(item)} style={styles.deleteBtn}>
+                                <MaterialIcons name="delete-outline" size={22} color={activeColors.error} />
+                            </TouchableOpacity>
+                        ) : (
+                            <MaterialIcons name="chevron-right" size={24} color={activeColors.textSecondary} style={{ opacity: 0.5 }} />
+                        )
+                    }
+                </View>
             </TouchableOpacity >
         );
     };
@@ -276,23 +280,22 @@ export function AddonsMobile() {
                 <View style={{ height: 48, marginBottom: 8 }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
                         {FILTERS.map(filter => (
-                            <TouchableOpacity
-                                key={filter}
-                                style={[
-                                    styles.filterChip,
-                                    { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
-                                    selectedFilter === filter && { borderColor: activeColors.primary }
-                                ]}
-                                onPress={() => setSelectedFilter(filter)}
-                            >
-                                {activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={selectedFilter === filter ? 40 : 20} tint="dark" style={StyleSheet.absoluteFill} />}
-                                {selectedFilter === filter && <View style={[StyleSheet.absoluteFill, { backgroundColor: activeColors.primary + '20' }]} />}
-                                <Text style={[
-                                    styles.filterText,
-                                    { color: activeColors.textSecondary },
-                                    selectedFilter === filter && { color: activeColors.primary }
-                                ]}>{filter}</Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity
+                                    key={filter}
+                                    style={[
+                                        styles.filterChip,
+                                        { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+                                        selectedFilter === filter && { backgroundColor: activeColors.primary, borderColor: activeColors.primary }
+                                    ]}
+                                    onPress={() => setSelectedFilter(filter)}
+                                >
+                                    {selectedFilter !== filter && (activeColors.isAmoled ? <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} /> : <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />)}
+                                    <Text style={[
+                                        styles.filterText,
+                                        { color: activeColors.textSecondary, zIndex: 1 },
+                                        selectedFilter === filter && { color: '#ffffff' }
+                                    ]}>{filter}</Text>
+                                </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
@@ -572,24 +575,26 @@ const styles = StyleSheet.create({
         paddingBottom: 120,
     },
     card: {
-        borderRadius: 20,
+        borderRadius: 24,
         padding: 16,
         marginBottom: 16,
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        backgroundColor: '#0f1424',
     },
     logoContainer: {
-        width: 60,
-        height: 60,
+        width: 64,
+        height: 64,
         position: 'relative',
+        marginRight: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     logo: {
-        width: 60,
-        height: 60,
-        borderRadius: 14,
-        backgroundColor: '#1a1a1a',
+        width: 64,
+        height: 64,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
     },
     nsfwOverlay: {
         position: 'absolute',
@@ -598,38 +603,40 @@ const styles = StyleSheet.create({
         backgroundColor: '#ef4444',
         borderRadius: 8,
         padding: 2,
-        borderWidth: 2,
-        borderColor: '#000',
     },
     info: {
         flex: 1,
-        marginLeft: 16,
+        justifyContent: 'center',
     },
     name: {
         fontSize: 18,
         fontFamily: 'Outfit_600SemiBold',
+        marginBottom: 2,
     },
     desc: {
         fontSize: 13,
         lineHeight: 18,
-        marginTop: 4,
         fontFamily: 'Inter_400Regular',
     },
     badge: {
-        alignSelf: 'flex-start',
-        paddingHorizontal: 8,
+        paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 6,
-        marginTop: 10,
+        borderRadius: 12,
     },
     badgeText: {
         fontSize: 10,
         fontFamily: 'Outfit_700Bold',
         letterSpacing: 0.5,
     },
+    actionContainer: {
+        paddingLeft: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     deleteBtn: {
         padding: 8,
-        marginLeft: 4,
+        borderRadius: 12,
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
     },
     loadingContainer: {
         flex: 1,

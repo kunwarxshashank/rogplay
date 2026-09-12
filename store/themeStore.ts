@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { zustandStorage } from './mmkv';
-import { Platform } from 'react-native';
 
 // ─── Type Definitions ──────────────────────────────────────────────
 
@@ -196,18 +195,18 @@ export const POSTER_STYLES: Record<PosterStyleId, PosterStyleConfig> = {
     showMetadata: true,
     shadowElevation: 8,
     scaleOnFocus: 1.1,
-    tvWidth: 260,
+    tvWidth: 320,
   },
   plex: {
     id: 'plex',
     label: 'Plex Style',
     tvAspectRatio: 2 / 3,
     mobileAspectRatio: 2 / 3,
-    borderRadius: 4,
+    borderRadius: 12,
     showMetadata: true,
-    shadowElevation: 4,
+    shadowElevation: 6,
     scaleOnFocus: 1.05,
-    tvWidth: 180,
+    tvWidth: 240,
   },
   cinematic: {
     id: 'cinematic',
@@ -215,10 +214,10 @@ export const POSTER_STYLES: Record<PosterStyleId, PosterStyleConfig> = {
     tvAspectRatio: 16 / 9,
     mobileAspectRatio: 16 / 9,
     borderRadius: 8,
-    showMetadata: false,
+    showMetadata: true,
     shadowElevation: 12,
     scaleOnFocus: 1.15,
-    tvWidth: 320,
+    tvWidth: 400,
   },
   modern_grid: {
     id: 'modern_grid',
@@ -229,7 +228,7 @@ export const POSTER_STYLES: Record<PosterStyleId, PosterStyleConfig> = {
     showMetadata: true,
     shadowElevation: 6,
     scaleOnFocus: 1.08,
-    tvWidth: 220,
+    tvWidth: 280,
   },
   minimal_cards: {
     id: 'minimal_cards',
@@ -240,7 +239,7 @@ export const POSTER_STYLES: Record<PosterStyleId, PosterStyleConfig> = {
     showMetadata: false,
     shadowElevation: 1,
     scaleOnFocus: 1.03,
-    tvWidth: 240,
+    tvWidth: 300,
   },
 };
 

@@ -28,7 +28,7 @@ function CinemaSearchBar({ showFilter, onToggleFilter }: CinemaSearchBarProps) {
 
     return (
         <View style={styles.header}>
-            <View style={[styles.searchBar, { borderColor: 'transparent' }]}>
+            <View style={[styles.searchBar, { borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.08)' }]}>
                 <Ionicons name="search-outline" size={20} color={currentColors.textSecondary} style={{ zIndex: 1 }} />
                 <TextInput
                     style={[styles.searchInput, { color: currentColors.text, zIndex: 1 }]}
@@ -42,7 +42,7 @@ function CinemaSearchBar({ showFilter, onToggleFilter }: CinemaSearchBarProps) {
             </View>
             {showFilter && (
                 <TouchableOpacity
-                    style={[styles.filterBtn, { borderColor: 'transparent' }]}
+                    style={[styles.filterBtn, { borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.08)' }]}
                     onPress={onToggleFilter}
                     activeOpacity={0.7}
                 >

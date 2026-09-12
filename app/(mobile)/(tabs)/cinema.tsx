@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Platform, ActivityIndicator, Alert, InteractionManager } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList, TextInput, TouchableOpacity, Platform, ActivityIndicator, Alert, InteractionManager } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import TrendingSlider from '@/components/cinema/TrendingSlider';
+import ScrapperSlider from '@/components/cinema/ScrapperSlider';
 import OTTSection from '@/components/cinema/OTTSection';
 import MovieList from '@/components/cinema/MovieList';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,13 +22,14 @@ import { discoverContent, discoverAllContent } from '@/services/tmdb';
 import { useThemeStore } from '@/store/themeStore';
 import { TrendingSliderSkeleton, MovieCardSkeleton } from '@/components/Skeleton';
 
+
 // Module-level flag: once the Cinema tab has been mounted once, skip the
 // InteractionManager delay on subsequent visits.
 let cinemaHasMounted = false;
 
 export function Cinema() {
     const [isReady, setIsReady] = useState(cinemaHasMounted);
-    
+
     useEffect(() => {
         if (cinemaHasMounted) return;
         const task = InteractionManager.runAfterInteractions(() => {
@@ -118,10 +120,18 @@ export function Cinema() {
         const list = [];
 
         // Settings from Addon
-        const { settings, catalogs, addontype } = addonConfig;
+        const { settings, catalogs, addontype, addonManifest, addonUrl } = addonConfig;
+
+        let manifestObj = null;
+        if (addonManifest) {
+            try { manifestObj = JSON.parse(addonManifest); } catch { }
+        }
+        const customOttList = manifestObj?.ott;
 
         if (cinemaHomeSlider && settings.showslider) list.push({ id: 'trending', type: 'slider' });
-        if (cinemaPlatforms && settings.showottsection) list.push({ id: 'ott', type: 'ott' });
+        if (cinemaPlatforms && (settings.showottsection || customOttList)) {
+            list.push({ id: 'ott', type: 'ott', customOttList, addonUrl, addonManifestStr: addonManifest, addonType: addontype });
+        }
         if (cinemaContinueWatching) list.push({ id: 'continue', type: 'continue' });
 
         // Add dynamically fetched catalogs
@@ -134,18 +144,35 @@ export function Cinema() {
                 if (matchesTab) {
                     const catalogRawType = c.type;
                     const mappedType = (catalogRawType === 'series' || catalogRawType === 'tv') ? 'tv' : (catalogRawType === 'movie' ? 'movie' : 'addon');
+                    const fetchFn = (page?: number) => {
+                        const p = page || 1;
+                        const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
+                        return fetchAddonCatalog(url, p, addontype, { url: c._addonUrl, manifestStr: c._addonManifestStr }, catalogRawType);
+                    };
+
+                    if (c.isSlider) {
+                        list.unshift({
+                            id: `slider_${index}_${c.name}`,
+                            title: c.name,
+                            type: 'scrapperslider',
+                            fetch: fetchFn,
+                            addonType: addontype,
+                            addonManifestStr: c._addonManifestStr,
+                            addonUrl: c._addonUrl
+                        });
+                        return; // Skip adding as regular catalog
+                    }
 
                     list.push({
                         id: `catalog_${index}_${c.name}`,
                         title: c.name,
                         type: mappedType,
-                        fetch: (page?: number) => {
-                            const p = page || 1;
-                            const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
-                            return fetchAddonCatalog(url, p, addontype, { url: c._addonUrl, manifestStr: c._addonManifestStr });
-                        },
+                        fetch: fetchFn,
                         addonType: addontype,
-                        catalogRawType
+                        catalogRawType,
+                        addonUrl: c._addonUrl || addonConfig.addonUrl,
+                        addonManifestStr: c._addonManifestStr || addonConfig.addonManifest,
+                        url: (c.paginationurl) ? c.paginationurl : c.url
                     });
                 }
             });
@@ -154,10 +181,26 @@ export function Cinema() {
         return list;
     }, [activeFilter, appliedFilters, addonConfig, cinemaContinueWatching, cinemaPlatforms, cinemaHomeSlider]);
 
+    const handleCustomOttSelect = useCallback((ott: any, addonManifestStr: string, addonUrl: string, addonType: string) => {
+        router.push({
+            pathname: '/(mobile)/cinema-catalog',
+            params: {
+                title: ott.name,
+                type: 'addon',
+                catalogRawType: 'movie',
+                addonType: addonType,
+                addonManifestStr: addonManifestStr,
+                addonUrl: addonUrl,
+                url: ott.url
+            }
+        });
+    }, [router]);
+
     const renderSection = useCallback(({ item }: { item: any }) => {
         switch (item.type) {
             case 'slider': return <TrendingSlider variant={heroBannerStyle} />;
-            case 'ott': return <OTTSection onSelect={handleOTTSelect} />;
+            case 'scrapperslider': return <ScrapperSlider fetchFunction={item.fetch} variant={heroBannerStyle} addonType={item.addonType} addonManifestStr={item.addonManifestStr} addonUrl={item.addonUrl} title={item.title} />;
+            case 'ott': return <OTTSection onSelect={handleOTTSelect} customOttList={item.customOttList} addonUrl={item.addonUrl} onCustomSelect={(ott) => handleCustomOttSelect(ott, item.addonManifestStr, item.addonUrl, item.addonType)} />;
             case 'continue': return <ContinueWatchingSection />;
             default: return (
                 <MovieList
@@ -167,60 +210,28 @@ export function Cinema() {
                     paginated={true}
                     addonType={item.addonType}
                     catalogRawType={item.catalogRawType}
+                    addonManifestStr={item.addonManifestStr}
+                    onSeeAll={() => {
+                        router.push({
+                            pathname: '/(mobile)/cinema-catalog',
+                            params: {
+                                title: item.title,
+                                type: item.type,
+                                catalogRawType: item.catalogRawType,
+                                addonType: item.addonType,
+                                addonManifestStr: item.addonManifestStr,
+                                addonUrl: item.addonUrl,
+                                url: item.url
+                            }
+                        })
+                    }}
                 />
             );
         }
-    }, [handleOTTSelect, heroBannerStyle]);
+    }, [handleOTTSelect, heroBannerStyle, router]);
 
-    if (!isReady || !isHydrated || isLoading) {
-        return (
-            <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50, paddingTop: insets.top }}>
-                    <TrendingSliderSkeleton />
-                    
-                    {/* Fake OTT Section Skeleton */}
-                    <View style={{ marginTop: 10, paddingHorizontal: 20 }}>
-                        <View style={{ borderRadius: 6, overflow: 'hidden', width: 120, height: 24, marginBottom: 16, backgroundColor: currentColors.primary + '15' }}>
-                            <View style={{ flex: 1, backgroundColor: currentColors.primary + '30' }} />
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                             {[...Array(5)].map((_, i) => (
-                                 <View key={i} style={{ width: 60, height: 60, borderRadius: 30, overflow: 'hidden', backgroundColor: currentColors.primary + '15' }}>
-                                     <View style={{ flex: 1, backgroundColor: currentColors.primary + '20' }} />
-                                 </View>
-                             ))}
-                        </View>
-                    </View>
-
-                    {/* Fake Movie List Skeletons */}
-                    <View style={{ marginTop: 30, paddingHorizontal: 20 }}>
-                        <View style={{ borderRadius: 6, overflow: 'hidden', width: 150, height: 24, marginBottom: 16, backgroundColor: currentColors.primary + '15' }}>
-                            <View style={{ flex: 1, backgroundColor: currentColors.primary + '30' }} />
-                        </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ overflow: 'visible' }}>
-                            {[...Array(4)].map((_, i) => (
-                                <View key={i} style={{ marginRight: 12 }}>
-                                    <MovieCardSkeleton />
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                    
-                    <View style={{ marginTop: 30, paddingHorizontal: 20 }}>
-                        <View style={{ borderRadius: 6, overflow: 'hidden', width: 180, height: 24, marginBottom: 16, backgroundColor: currentColors.primary + '15' }}>
-                            <View style={{ flex: 1, backgroundColor: currentColors.primary + '30' }} />
-                        </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ overflow: 'visible' }}>
-                            {[...Array(4)].map((_, i) => (
-                                <View key={i} style={{ marginRight: 12 }}>
-                                    <MovieCardSkeleton />
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </ScrollView>
-            </View>
-        );
+    if (!isReady || !isHydrated) {
+        return <View style={[styles.container, { backgroundColor: 'transparent' }]} />;
     }
 
     // Fallback: no addons at all (should not happen since TMDB is built-in)
@@ -229,7 +240,7 @@ export function Cinema() {
             <View style={[styles.container, { backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' }]}>
                 <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
                 <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
-                    Please choose Any Provider to Explore
+                    Please choose Any Addons to Explore
                 </Text>
             </View>
         );
@@ -282,21 +293,29 @@ export function Cinema() {
                         </View>
                     )
                 ) : !activeCinemaAddon || !addonConfig || !addonConfig.catalogs || addonConfig.catalogs.length === 0 ? (
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 }}>
-                        <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
-                        <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
-                            Please choose Any Provider to Explore
-                        </Text>
-                    </View>
+                    isLoading ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={currentColors.primary} />
+                        </View>
+                    ) : (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 }}>
+                            <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
+                            <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
+                                Please choose Any Addons to Explore
+                            </Text>
+                        </View>
+                    )
                 ) : (
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-                        <View style={{ height: 10 }} />
-                        {sections.map((item) => (
-                            <React.Fragment key={item.id}>
-                                {renderSection({ item })}
-                            </React.Fragment>
-                        ))}
-                    </ScrollView>
+                    <FlashList
+                        data={sections}
+                        renderItem={renderSection}
+                        keyExtractor={(item) => item.id}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.content}
+                        ListHeaderComponent={<View style={{ height: 10 }} />}
+                        estimatedItemSize={250}
+                        getItemType={(item) => item.type}
+                    />
                 )}
             </View>
         </View>

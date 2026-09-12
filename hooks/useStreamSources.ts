@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAddonsStore } from '@/store/addonsStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { usePluginsStore } from '@/store/pluginsStore';
-import { executeNuvioPlugin } from '@/services/pluginEngine';
+import { executeNuvioPlugin, executeJsAddonStream } from '@/services/pluginEngine';
+import { cachedFetch } from '@/services/asyncCache';
 import { getExternalIds } from '@/services/tmdb';
 import { analyzeAndSortStreams, StreamResultWithHealth } from '@/services/streamHealthEngine';
 import type { HealthInfo } from '@/services/streamHealthEngine';
@@ -145,7 +147,8 @@ export function useStreamSources() {
         type: 'movie' | 'tv' | 'rogmovie' = 'movie',
         directUrl?: string,
         movieData?: string,
-        serverAddonUrl?: string
+        serverAddonUrl?: string,
+        addonManifestStr?: string
     ) => {
         if (!query && !tmdbId && !directUrl && !movieData && !serverAddonUrl) {
             setLoading(false);
@@ -223,31 +226,102 @@ export function useStreamSources() {
             }], signal);
         }
 
-        // ─── Server Addon: direct stream URL fetch (DesiHub-style) ──────────
+        // ─── Server / Scrapper Addon: direct stream URL fetch ──────────
         if (serverAddonUrl && serverAddonUrl !== 'undefined' && serverAddonUrl.trim()) {
-            try {
-                const cleanUrl = serverAddonUrl.trim();
-                const res = await fetch(cleanUrl, {
-                    signal,
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        const mapped: StreamResult[] = data
-                            .filter((s: any) => s.url)
-                            .map((s: any) => ({
-                                title: s.title || s.name || 'Stream',
-                                url: s.url,
-                                headers: s.headers,
-                                source: 'Server Addon',
-                                quality: s.quality || 'Auto'
-                            }));
-                        await pushResults(mapped, signal);
-                    }
+            const cleanUrl = serverAddonUrl.trim();
+            let manifest: any = null;
+            if (addonManifestStr) {
+                try {
+                    manifest = JSON.parse(addonManifestStr);
+                } catch (e) {
+                    console.error("Failed to parse addon manifest string", e);
                 }
-            } catch (e) {
-                console.error('Failed to fetch serveraddon stream URL:', e);
+            }
+
+            if (!manifest) {
+                try {
+                    const addons = useAddonsStore.getState().addons;
+                    const fallbackAddon = addons.find(a => {
+                        const mUrl = a.manifest?.url;
+                        const mBaseUrl = a.manifest?.baseUrl;
+                        return (mUrl && cleanUrl.startsWith(mUrl)) || 
+                               (mBaseUrl && cleanUrl.startsWith(mBaseUrl));
+                    });
+                    if (fallbackAddon && fallbackAddon.manifest) {
+                        manifest = fallbackAddon.manifest;
+                        console.log("Recovered manifest from store using url matching");
+                    }
+                } catch (e) {
+                    console.error("Failed to fallback manifest from store", e);
+                }
+            }
+
+            if (manifest && manifest.addontype === 'scrapperaddon' && manifest.stream && manifest.stream.steps) {
+                // Handle Scrapper Addon Stream Extraction
+                try {
+                    const res = await fetch(cleanUrl, { signal });
+                    const html = await res.text();
+                    const { parseStreamHtml } = require('@/services/scrapperEngine');
+                    const streamUrl = await parseStreamHtml(html, manifest.stream.steps, cleanUrl);
+
+                    if (streamUrl) {
+                        await pushResults([{
+                            title: 'Direct Scraped Stream',
+                            url: streamUrl,
+                            source: manifest.title || 'Scrapper Addon',
+                            quality: 'Auto'
+                        }], signal);
+                    }
+                } catch (e) {
+                    console.error('Failed to extract scrapperaddon stream:', e);
+                }
+            } else if (manifest && manifest.addontype === 'jsaddon') {
+                try {
+                    if (manifest.scriptUrl) {
+                        const noCacheUrl = manifest.scriptUrl.includes('?') ? `${manifest.scriptUrl}&t=${Date.now()}` : `${manifest.scriptUrl}?t=${Date.now()}`;
+                        const scriptRes = await fetch(noCacheUrl, { headers: { 'Cache-Control': 'no-cache' } });
+                        const pluginCode = await scriptRes.text();
+                        if (pluginCode) {
+                            const streams = await executeJsAddonStream(pluginCode, cleanUrl);
+                            if (streams && streams.length > 0) {
+                                await pushResults(streams.map((s: any) => ({
+                                    title: s.title || 'Stream',
+                                    url: s.url,
+                                    source: manifest.title || 'JS Addon',
+                                    quality: s.quality || 'Auto',
+                                    ...s
+                                })), signal);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to extract jsaddon stream:', e);
+                }
+            } else {
+                // Handle standard Server Addon
+                try {
+                    const res = await fetch(cleanUrl, {
+                        signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) {
+                            const mapped: StreamResult[] = data
+                                .filter((s: any) => s.url)
+                                .map((s: any) => ({
+                                    title: s.title || s.name || 'Stream',
+                                    url: s.url,
+                                    headers: s.headers,
+                                    source: manifest?.title || 'Server Addon',
+                                    quality: s.quality || 'Auto'
+                                }));
+                            await pushResults(mapped, signal);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch serveraddon stream URL:', e);
+                }
             }
         }
 

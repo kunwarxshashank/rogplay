@@ -46,13 +46,7 @@ const THEMES: { id: ThemeId; name: string; color: string; gradient: readonly [st
 
 const POSTER_STYLE_ITEMS = Object.values(POSTER_STYLES);
 
-const LAYOUT_ITEMS: { id: HomeLayoutId; label: string; icon: string }[] = [
-    { id: 'netflix', label: 'Netflix', icon: 'play-box' },
-    { id: 'plex', label: 'Plex', icon: 'view-dashboard' },
-    { id: 'tv_grid', label: 'TV Grid', icon: 'grid' },
-    { id: 'gradient', label: 'Gradient', icon: 'gradient-horizontal' },
-    { id: 'cinema', label: 'Cinema', icon: 'theater' },
-];
+
 
 const ANIMATION_INTENSITIES: { id: AnimationIntensity; label: string; }[] = [
     { id: 'none', label: 'None' },
@@ -66,10 +60,7 @@ const FONT_SCALES: { id: FontScale; label: string }[] = [
     { id: 'large', label: 'Large' }, { id: 'xlarge', label: 'X-Large' },
 ];
 
-const HERO_SLIDER_ITEMS: { id: 'traditional' | 'fullscreen'; label: string; icon: string }[] = [
-    { id: 'traditional', label: 'Traditional', icon: 'monitor' },
-    { id: 'fullscreen', label: 'Fullscreen', icon: 'fullscreen' },
-];
+
 
 export default function ThemeSettings() {
     const router = useRouter();
@@ -83,7 +74,7 @@ export default function ThemeSettings() {
         { id: 'themes', label: 'Themes', icon: 'palette' },
         { id: 'accent', label: 'Accent Color', icon: 'color-lens' },
         { id: 'posters', label: 'Poster Style', icon: 'photo-size-select-large' },
-        { id: 'layout', label: 'Home Layout', icon: 'view-quilt' },
+
         { id: 'animation', label: 'Animations', icon: 'motion-photos-auto' },
         { id: 'fine', label: 'Fine Tuning', icon: 'tune' },
     ];
@@ -321,16 +312,7 @@ export default function ThemeSettings() {
                             </View>
                         )}
 
-                        {activeSection === 'layout' && (
-                            <View>
-                                <Text style={[styles.sectionTitleTV, { color: c.text }]}>Home Layout</Text>
-                                <Text style={[styles.sectionDesc, { color: c.textSecondary, fontSize: 16 }]}>Choose your home screen layout</Text>
-                                {renderPicker(LAYOUT_ITEMS, themeStore.homeBuilder.layout, (id) => themeStore.setHomeLayout(id as HomeLayoutId))}
-                                <Text style={[styles.sectionTitleTV, { color: c.text, marginTop: 32 }]}>Home Slider Style</Text>
-                                <Text style={[styles.sectionDesc, { color: c.textSecondary, fontSize: 16 }]}>Hero banner visual treatment</Text>
-                                {renderPicker(HERO_SLIDER_ITEMS, themeStore.homeBuilder.heroBannerStyle, (id) => themeStore.setHeroBannerStyle(id))}
-                            </View>
-                        )}
+
 
                         {activeSection === 'animation' && (
                             <View>
@@ -483,53 +465,7 @@ export default function ThemeSettings() {
                             </View>
                         )}
 
-                        {activeSection === 'layout' && (
-                            <View style={styles.mobileSectionCard}>
-                                <Text style={[styles.mobileSectionTitle, { color: c.text }]}>Home Layout</Text>
-                                <Text style={[styles.mobileSectionDesc, { color: c.textSecondary }]}>Choose your home screen layout</Text>
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                                    {LAYOUT_ITEMS.map(item => {
-                                        const isActive = themeStore.homeBuilder.layout === item.id;
-                                        return (
-                                            <TouchableOpacity
-                                                key={item.id}
-                                                style={[styles.mobilePickerChip, {
-                                                    backgroundColor: isActive ? hexAlpha(c.primary, 0.15) : c.card + '99',
-                                                    borderColor: isActive ? c.primary : c.border,
-                                                }]}
-                                                onPress={() => themeStore.setHomeLayout(item.id as HomeLayoutId)}
-                                                activeOpacity={0.7}
-                                            >
-                                                <MaterialCommunityIcons name={item.icon as any} size={18} color={isActive ? c.primary : c.textSecondary} />
-                                                <Text style={[styles.mobileChipLabel, { color: isActive ? c.primary : c.text }]}>{item.label}</Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-                                <View style={{ height: 1, backgroundColor: c.border + '50', marginVertical: 20 }} />
-                                <Text style={[styles.mobileSectionTitle, { color: c.text, fontSize: 16 }]}>Hero Slider Style</Text>
-                                <Text style={[styles.mobileSectionDesc, { color: c.textSecondary }]}>Banner visual treatment</Text>
-                                <View style={{ flexDirection: 'row', gap: 8 }}>
-                                    {HERO_SLIDER_ITEMS.map(item => {
-                                        const isActive = themeStore.homeBuilder.heroBannerStyle === item.id;
-                                        return (
-                                            <TouchableOpacity
-                                                key={item.id}
-                                                style={[styles.mobilePickerChip, {
-                                                    backgroundColor: isActive ? hexAlpha(c.primary, 0.15) : c.card + '99',
-                                                    borderColor: isActive ? c.primary : c.border, flex: 1,
-                                                }]}
-                                                onPress={() => themeStore.setHeroBannerStyle(item.id)}
-                                                activeOpacity={0.7}
-                                            >
-                                                <MaterialCommunityIcons name={item.icon as any} size={18} color={isActive ? c.primary : c.textSecondary} />
-                                                <Text style={[styles.mobileChipLabel, { color: isActive ? c.primary : c.text }]}>{item.label}</Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-                            </View>
-                        )}
+
 
                         {activeSection === 'animation' && (
                             <View style={styles.mobileSectionCard}>

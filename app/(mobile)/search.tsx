@@ -24,11 +24,29 @@ function useSearchLogic() {
     const router = useRouter();
     const addonConfig = useCinemaAddon();
 
+    const searchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
-        if (initialQuery) {
+        if (initialQuery && query === initialQuery) {
             handleSearch(initialQuery as string);
         }
     }, [initialQuery]);
+
+    useEffect(() => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+        if (query && query !== initialQuery) {
+            searchTimeoutRef.current = setTimeout(() => {
+                handleSearch(query);
+            }, 800);
+        } else if (!query) {
+            setResults([]);
+        }
+        return () => {
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        };
+    }, [query]);
 
     const handleSearch = async (searchQuery: string) => {
         if (!searchQuery.trim()) return;
@@ -44,7 +62,8 @@ function useSearchLogic() {
                 const promises = addonConfig.searchcatalog.map(async (cat: any) => {
                     const searchUrl = cat.searchurl.replace('${search}', encodeURIComponent(searchQuery));
                     const data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
-                    return { title: cat.name || 'Catalog Search', data: data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv') };
+                    const filteredData = (addonConfig.addontype === 'scrapperaddon' || addonConfig.addontype === 'jsaddon') ? data : data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv');
+                    return { title: cat.name || 'Catalog Search', data: filteredData };
                 });
                 const catResults = await Promise.all(promises);
                 groupedData.push(...catResults.filter(g => g.data.length > 0));

@@ -15,7 +15,7 @@ interface SkeletonProps {
 
 const getSkeletonStyles = (colors: any) => StyleSheet.create({
     skeleton: {
-        backgroundColor: colors.border,
+        backgroundColor: colors.textSecondary,
     },
     card: {
         backgroundColor: colors.card,

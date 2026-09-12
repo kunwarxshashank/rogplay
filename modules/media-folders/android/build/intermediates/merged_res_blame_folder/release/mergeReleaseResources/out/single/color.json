@@ -1,0 +1,54 @@
+[
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_primary_text_disable_only_material_dark.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_primary_text_disable_only_material_dark.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/switch_thumb_material_dark.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/switch_thumb_material_dark.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_background_cache_hint_selector_material_light.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_background_cache_hint_selector_material_light.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_secondary_text_material_light.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_secondary_text_material_light.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_primary_text_material_light.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_primary_text_material_light.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/switch_thumb_material_light.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/switch_thumb_material_light.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_background_cache_hint_selector_material_dark.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_background_cache_hint_selector_material_dark.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_hint_foreground_material_light.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_hint_foreground_material_light.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_primary_text_material_dark.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_primary_text_material_dark.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_secondary_text_material_dark.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_secondary_text_material_dark.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_hint_foreground_material_dark.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_hint_foreground_material_dark.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_primary_text_disable_only_material_light.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_primary_text_disable_only_material_light.xml"
+    },
+    {
+        "merged": "com.rogplay.mediafolders.media-folders-release-28:/color/abc_search_url_text.xml",
+        "source": "com.rogplay.mediafolders.media-folders-appcompat-1.7.0-24:/color/abc_search_url_text.xml"
+    }
+]

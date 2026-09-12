@@ -13,28 +13,45 @@ import { resolveMagnet } from '@/services/debrid';
 import { Alert } from 'react-native';
 import { TVFocusable } from '@/components/TVFocusable';
 import { BlurView } from 'expo-blur';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, withRepeat, withSequence, withTiming, useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 
 const Touchable = Platform.isTV ? TVFocusable as any : TouchableOpacity;
 
 const ServerSkeletonItem = () => {
     const { colors: activeColors } = useTheme();
+    const opacity = useSharedValue(0.3);
+
+    useEffect(() => {
+        opacity.value = withRepeat(
+            withSequence(
+                withTiming(0.8, { duration: 850 }),
+                withTiming(0.3, { duration: 850 })
+            ),
+            -1,
+            true
+        );
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
     return (
-        <Animated.View entering={FadeIn} exiting={FadeOut}>
-            <View style={[styles.card, { borderColor: activeColors.primary + '20', backgroundColor: activeColors.primary + '05', overflow: 'hidden' }]}>
-                <View style={[styles.iconContainer, { backgroundColor: activeColors.primary + '10' }]}>
-                    <Skeleton width={32} height={32} borderRadius={16} style={{ backgroundColor: activeColors.primary + '20' }} />
+        <Animated.View entering={FadeIn} exiting={FadeOut} style={animatedStyle}>
+            <View style={[styles.card, { borderColor: activeColors.border, backgroundColor: activeColors.card, overflow: 'hidden' }]}>
+                <View style={[styles.iconContainer, { backgroundColor: activeColors.background }]}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: activeColors.border }} />
                 </View>
                 <View style={styles.info}>
-                    <Skeleton width="70%" height={16} borderRadius={4} style={{ marginBottom: 12, backgroundColor: activeColors.primary + '20' }} />
+                    <View style={{ width: "70%", height: 16, borderRadius: 4, marginBottom: 12, backgroundColor: activeColors.border }} />
                     <View style={styles.metricsRow}>
-                        <Skeleton width={50} height={20} borderRadius={6} style={{ backgroundColor: activeColors.primary + '15' }} />
-                        <Skeleton width={80} height={20} borderRadius={6} style={{ backgroundColor: activeColors.primary + '15' }} />
-                        <Skeleton width={60} height={20} borderRadius={6} style={{ backgroundColor: activeColors.primary + '15' }} />
+                        <View style={{ width: 50, height: 20, borderRadius: 6, backgroundColor: activeColors.border }} />
+                        <View style={{ width: 80, height: 20, borderRadius: 6, backgroundColor: activeColors.border }} />
+                        <View style={{ width: 60, height: 20, borderRadius: 6, backgroundColor: activeColors.border }} />
                     </View>
                 </View>
                 <View style={[styles.action, { flexDirection: 'column', justifyContent: 'center' }]}>
-                    <Skeleton width={32} height={32} borderRadius={8} style={{ backgroundColor: activeColors.primary + '20' }} />
+                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: activeColors.border }} />
                 </View>
             </View>
         </Animated.View>
@@ -68,7 +85,7 @@ const getTagsFromTitle = (title: string) => {
 };
 
 export default function ServerSelectionScreen() {
-    const { query, type: rawType, movieUrl, tmdb, id, season, episode, movieData, title, poster, backdrop, genre } = useLocalSearchParams();
+    const { query, type: rawType, movieUrl, tmdb, id, season, episode, movieData, title, poster, backdrop, genre, addonManifestStr } = useLocalSearchParams();
     const type = Array.isArray(rawType) ? rawType[0] : rawType;
     const tmdbId = Array.isArray(tmdb) ? tmdb[0] : tmdb || (Array.isArray(id) ? id[0] : id);
     const { addons, isHydrated } = useAddonsStore();
@@ -89,9 +106,10 @@ export default function ServerSelectionScreen() {
             (type as any) || 'movie',
             type === 'addon' ? undefined : movieUrl as string,
             movieData as string,
-            type === 'addon' ? movieUrl as string : undefined  // serverAddonUrl for DesiHub-style
+            type === 'addon' ? movieUrl as string : undefined,  // serverAddonUrl for DesiHub-style
+            addonManifestStr as string
         );
-    }, [query, tmdb, type, movieUrl, movieData]);
+    }, [query, tmdb, type, movieUrl, movieData, addonManifestStr]);
 
     const { autoSelectHealthiestSource, debridProvider, debridApiKey } = useSettingsStore();
     const { colors: activeColors } = useTheme();
@@ -276,11 +294,19 @@ export default function ServerSelectionScreen() {
         });
     }, [results, filter]);
 
+    const getImageUrl = (path: any) => {
+        if (!path) return null;
+        if (typeof path === 'string' && (path.startsWith('http://') || path.startsWith('https://'))) return path;
+        return `https://image.tmdb.org/t/p/original${path}`;
+    };
+
+    const bgImage = getImageUrl(backdrop || poster);
+
     return (
         <View style={{ flex: 1, backgroundColor: activeColors.background }}>
-            {(backdrop || poster) ? (
+            {bgImage ? (
                 <ImageBackground
-                    source={{ uri: `https://image.tmdb.org/t/p/original${backdrop || poster}` }}
+                    source={{ uri: bgImage }}
                     style={StyleSheet.absoluteFill}
                 >
                     <BlurView intensity={Platform.isTV ? 100 : 80} tint="dark" style={StyleSheet.absoluteFill} />

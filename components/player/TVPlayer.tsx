@@ -8,7 +8,6 @@ import {
     Dimensions,
     Platform,
     Image,
-    ActivityIndicator,
 } from 'react-native';
 import { useTVRemote } from '@/hooks/useTVRemote';
 import { MaterialIcons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
@@ -19,6 +18,7 @@ import EpgSidebar from './EpgSidebar';
 import { useWatchParty } from '@/hooks/useWatchParty';
 import WatchPartyModal from './WatchPartyModal';
 import JoinPremiumModal from './JoinPremiumModal';
+import { PremiumLoader } from './PremiumLoader';
 
 import { usePlayerLogic, UsePlayerLogicProps } from './usePlayerLogic';
 import { VideoWrapper } from './VideoWrapper';
@@ -310,7 +310,7 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
     });
 
     const [progressBarFocused, setProgressBarFocused] = useState(false);
-    
+
     const handleSkipBackward = useCallback(() => {
         skip(false);
         watchParty.onLocalSeek(Math.max(0, positionRef.current - 10000) / 1000);
@@ -489,7 +489,10 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
 
             <SubtitleModal
                 visible={subtitleModalVisible}
-                textTracks={[...allTextTracks, ...importedSubtitles]}
+                textTracks={[
+                    ...allTextTracks,
+                    ...importedSubtitles.filter(sub => !allTextTracks.some(t => t.title === sub.title))
+                ]}
                 selectedTextTrack={selectedTextTrack}
                 subtitleDelay={subtitleDelay}
                 isFetchingSubtitles={isFetchingSubtitles}
@@ -636,7 +639,7 @@ export default function TVPlayer(props: UsePlayerLogicProps) {
 
                 {isBuffering && (
                     <View style={styles.loaderContainer}>
-                        <ActivityIndicator size={60} color={currentColors.primary} style={styles.loaderIndicator} />
+                        <PremiumLoader size={40} color={currentColors.primary} style={styles.loaderIndicator} />
                     </View>
                 )}
 

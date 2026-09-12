@@ -279,7 +279,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                             id: data.id,
                             manifest: data
                         }];
-                    } else if (data.addontype === 'tmdbaddon' || data.addontype === 'serveraddon') {
+                    } else if (data.addontype === 'tmdbaddon' || data.addontype === 'serveraddon' || data.addontype === 'scrapperaddon' || data.addontype === 'jsaddon') {
                         items = [{
                             title: data.title || data.name,
                             description: data.description,
@@ -419,7 +419,7 @@ export const useAddonsStore = create<AddonsState>((set, get) => ({
                     id: data.id,
                     manifest: data
                 }];
-            } else if (data.addontype === 'tmdbaddon' || data.addontype === 'serveraddon') {
+            } else if (data.addontype === 'tmdbaddon' || data.addontype === 'serveraddon' || data.addontype === 'scrapperaddon' || data.addontype === 'jsaddon') {
                 items = [{
                     title: data.title || data.name,
                     description: data.description,

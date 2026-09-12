@@ -175,7 +175,7 @@ export default function TabLayout() {
                     options={{
                         title: 'Music',
                         tabBarIcon: localMusicIcon,
-                        href: hiddenTabs.includes('local-music') ? null : '/(mobile)/(tabs)/local-music',
+                        href: null,
                     }}
                 />
                 <Tabs.Screen
