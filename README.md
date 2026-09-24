@@ -13,6 +13,11 @@
     <img src="https://img.shields.io/badge/Available_for-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Available for Android" />
     <img src="https://img.shields.io/badge/Available_for-Android_TV-000000?style=flat-square&logo=android&logoColor=3DDC84" alt="Available for Android TV" />
   </p>
+  <p>
+    <a href="https://rogplay.app">
+      <img src="https://img.shields.io/badge/Download-RogPlay.app-blue?style=for-the-badge" alt="Download RogPlay" />
+    </a>
+  </p>
 </div>
 
 ---
@@ -126,4 +131,4 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 
 ## 📄 License
 
-*(Add your license information here)*
+AH SHIT 
