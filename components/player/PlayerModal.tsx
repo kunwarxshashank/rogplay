@@ -10,6 +10,7 @@ import {
     ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Colors } from '@/constants/Colors';
@@ -385,23 +386,27 @@ export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onS
                     onPress={onClose}
                 />
 
-                <View style={[
-                    styles.speedModalContainer,
-                    {
-                        width: isTV ? '55%' : (isLandscape ? '70%' : '85%'),
-                        maxWidth: isTV ? 600 : 500,
-                        backgroundColor: '#121212',
-                        borderColor: 'rgba(255, 255, 255, 0.1)',
-                    }
-                ]}>
+                <BlurView 
+                    intensity={85} 
+                    tint="dark" 
+                    style={[
+                        styles.speedModalContainer,
+                        {
+                            width: isTV ? '55%' : (isLandscape ? '70%' : '85%'),
+                            maxWidth: isTV ? 600 : 500,
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                        }
+                    ]}
+                >
                     <View style={styles.speedHeaderRow}>
                         <View style={styles.premiumBadge}>
-                            <Text style={styles.premiumText}>P</Text>
+                            <MaterialIcons name="speed" size={24} color="#FFF" style={{marginRight: 6}} />
+                            <Text style={styles.premiumText}>Playback Speed</Text>
                         </View>
-                        <Text style={[styles.currentSpeedText, { fontSize: getResponsiveSize(24, 28, 36) }]}>
-                            {currentSpeed.toFixed(1)}x
-                        </Text>
                     </View>
+                    <Text style={[styles.currentSpeedText, { fontSize: getResponsiveSize(36, 42, 54), textAlign: 'center', marginBottom: 20 }]}>
+                        {Number(currentSpeed).toFixed(2).replace(/\.?0+$/, '')}x
+                    </Text>
 
                     <View style={styles.sliderSection}>
                         <TVFocusable
@@ -421,7 +426,7 @@ export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onS
                             value={currentSpeed}
                             onValueChange={setCurrentSpeed}
                             minimumTrackTintColor="#FFFFFF"
-                            maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
+                            maximumTrackTintColor="rgba(255, 255, 255, 0.15)"
                             thumbTintColor="#FFFFFF"
                         />
 
@@ -452,11 +457,8 @@ export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onS
                                     { fontSize: getResponsiveSize(14, 16, 18) },
                                     currentSpeed === speed && styles.quickSpeedTextActive
                                 ]}>
-                                    {speed === 1.0 ? '1.0' : speed}
+                                    {speed === 1.0 ? '1.0' : speed}x
                                 </Text>
-                                {Math.abs(currentSpeed - speed) < 0.01 && (
-                                    <View style={styles.activeIndicator} />
-                                )}
                             </TVFocusable>
                         ))}
                     </View>
@@ -474,13 +476,13 @@ export const SpeedModal = React.memo(function SpeedModal({ visible, onClose, onS
                             autoFlex={false}
                             style={[styles.modalActionBtn, styles.modalApplyBtn]}
                             onPress={handleApply}
-                            focusedBackgroundColor="rgba(255, 255, 255, 0.3)"
+                            focusedBackgroundColor="rgba(255, 255, 255, 0.4)"
                             hasTVPreferredFocus={true}
                         >
                             <Text style={[styles.modalActionText, styles.modalApplyText]}>Apply</Text>
                         </TVFocusable>
                     </View>
-                </View>
+                </BlurView>
             </View>
         </Modal>
     );
@@ -677,17 +679,17 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     premiumBadge: {
-        backgroundColor: '#FF0000',
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
     },
     premiumText: {
         color: 'white',
-        fontWeight: '900',
-        fontSize: 16,
+        fontWeight: 'bold',
+        fontSize: 18,
     },
     currentSpeedText: {
         color: 'white',

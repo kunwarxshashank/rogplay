@@ -6,6 +6,7 @@ import OTTSection from '@/components/cinema/OTTSection';
 import MovieList from '@/components/cinema/MovieList';
 import { TrendingSliderSkeleton } from '@/components/Skeleton';
 import { useRouter } from 'expo-router';
+import ScrapperSlider from '@/components/cinema/ScrapperSlider';
 import ContinueWatchingSection from '@/components/cinema/ContinueWatchingSection';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCinemaAddon, fetchAddonCatalog } from '@/hooks/useCinemaAddon';
@@ -67,19 +68,24 @@ export default function TVHomeScreen() {
 
         // Map addon catalogs to sections
         if (catalogs && catalogs.length > 0) {
-            const catalogSections = catalogs.map((c: any, index: number) => ({
-                key: `catalog_${index}_${c.name}`,
-                title: c.name,
-                type: c.type === 'series' || c.type === 'tv' ? 'tv' : 'movie',
-                addonType: addontype,
-                catalogRawType: c.type,
-                sectionId: `catalog_${c.name.toLowerCase().replace(/\s+/g, '_')}`,
-                fetchFunction: (page?: number) => {
-                    const p = page || 1;
-                    const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
-                    return fetchAddonCatalog(url, p, addontype, { url: c._addonUrl, manifestStr: c._addonManifestStr });
-                }
-            }));
+            const catalogSections = catalogs
+                .filter((c: any) => !c.isSlider)
+                .map((c: any, index: number) => ({
+                    key: `catalog_${index}_${c.name}`,
+                    title: c.name,
+                    type: c.type === 'series' || c.type === 'tv' ? 'tv' : 'movie',
+                    addonType: addontype,
+                    catalogRawType: c.type,
+                    sectionId: `catalog_${c.name.toLowerCase().replace(/\s+/g, '_')}`,
+                    addonUrl: c._addonUrl || addonConfig.addonUrl,
+                    addonManifestStr: c._addonManifestStr || addonConfig.addonManifest,
+                    url: c.paginationurl || c.url,
+                    fetchFunction: (page?: number) => {
+                        const p = page || 1;
+                        const url = (p > 1 && c.paginationurl) ? c.paginationurl : c.url;
+                        return fetchAddonCatalog(url, p, addontype, { url: c._addonUrl, manifestStr: c._addonManifestStr }, c.type);
+                    }
+                }));
             allSections = [...allSections, ...catalogSections];
         }
 
@@ -107,9 +113,24 @@ export default function TVHomeScreen() {
                 paginated
                 addonType={item.addonType}
                 catalogRawType={item.catalogRawType}
+                addonManifestStr={item.addonManifestStr}
+                onSeeAll={() => {
+                    router.push({
+                        pathname: '/(tv)/cinema-catalog',
+                        params: {
+                            title: item.title,
+                            type: item.type,
+                            catalogRawType: item.catalogRawType,
+                            addonType: item.addonType,
+                            addonManifestStr: item.addonManifestStr,
+                            addonUrl: item.addonUrl,
+                            url: item.url
+                        }
+                    })
+                }}
             />
         ),
-        []
+        [router]
     );
 
     const layoutStyle = useMemo(() => ({
@@ -120,9 +141,21 @@ export default function TVHomeScreen() {
     const ListHeader = useCallback(() => (
         <Animated.View style={{ opacity: fadeAnim }}>
             {/* Hero Banner */}
-            {themeStore.homeBuilder.showHeroBanner && addonConfig?.settings?.showslider && (
-                <TVHeroSlider variant={themeStore.homeBuilder.heroBannerStyle} />
-            )}
+            {(() => {
+                const sliderCatalog = addonConfig?.catalogs?.find((c: any) => c.isSlider);
+                if (sliderCatalog) {
+                    const fetchFn = (page?: number) => {
+                        const p = page || 1;
+                        const url = (p > 1 && sliderCatalog.paginationurl) ? sliderCatalog.paginationurl : sliderCatalog.url;
+                        return fetchAddonCatalog(url, p, addonConfig.addontype, { url: sliderCatalog._addonUrl, manifestStr: sliderCatalog._addonManifestStr }, sliderCatalog.type);
+                    };
+                    return <TVHeroSlider fetchFunction={fetchFn} variant={themeStore.homeBuilder.heroBannerStyle} addonType={addonConfig.addontype} addonManifestStr={sliderCatalog._addonManifestStr} addonUrl={sliderCatalog._addonUrl} />;
+                }
+                if (themeStore.homeBuilder.showHeroBanner && addonConfig?.settings?.showslider) {
+                    return <TVHeroSlider variant={themeStore.homeBuilder.heroBannerStyle} />;
+                }
+                return null;
+            })()}
 
             {/* Addon Picker */}
             {showAddonPicker && (
@@ -193,13 +226,46 @@ export default function TVHomeScreen() {
             <ContinueWatchingSection />
 
             {/* OTT Platforms */}
-            {addonConfig?.settings?.showottsection && (
-                <View style={[styles.section, { marginBottom: layoutConfig.sectionSpacing }]}>
-                    <OTTSection onSelect={handleOTTSelect} />
-                </View>
-            )}
+            {(() => {
+                let customOttList;
+                if (addonConfig?.addonManifest) {
+                    try {
+                        const manifestObj = JSON.parse(addonConfig.addonManifest);
+                        customOttList = manifestObj?.ott;
+                    } catch (e) { }
+                }
+                const showOtt = addonConfig?.settings?.showottsection || customOttList;
+
+                if (!showOtt) return null;
+
+                const handleCustomOttSelect = (ott: any) => {
+                    router.push({
+                        pathname: '/(tv)/cinema-catalog',
+                        params: {
+                            title: ott.name,
+                            type: 'addon',
+                            catalogRawType: 'movie',
+                            addonType: addonConfig?.addontype,
+                            addonManifestStr: addonConfig?.addonManifest,
+                            addonUrl: addonConfig?.addonUrl,
+                            url: ott.url
+                        }
+                    });
+                };
+
+                return (
+                    <View style={[styles.section, { marginBottom: layoutConfig.sectionSpacing }]}>
+                        <OTTSection
+                            onSelect={handleOTTSelect}
+                            customOttList={customOttList}
+                            addonUrl={addonConfig?.addonUrl}
+                            onCustomSelect={handleCustomOttSelect}
+                        />
+                    </View>
+                );
+            })()}
         </Animated.View>
-    ), [handleOTTSelect, addonConfig, showAddonPicker, addons, activeCinemaAddon, currentColors, setActiveCinemaAddon, themeStore.homeBuilder.showHeroBanner, themeStore.homeBuilder.heroBannerStyle, layoutConfig, fadeAnim]);
+    ), [handleOTTSelect, addonConfig, showAddonPicker, addons, activeCinemaAddon, currentColors, setActiveCinemaAddon, themeStore.homeBuilder.showHeroBanner, themeStore.homeBuilder.heroBannerStyle, layoutConfig, fadeAnim, router]);
 
     if (!isHydrated || isLoading) {
         return (
@@ -234,7 +300,7 @@ export default function TVHomeScreen() {
                     <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
                         <Ionicons name="film-outline" size={64} color={currentColors.textSecondary} style={{ marginBottom: 16 }} />
                         <Text style={{ color: currentColors.text, fontSize: 18, fontFamily: 'Outfit_600SemiBold', textAlign: 'center' }}>
-                            Please choose Any Provider to Explore
+                            Please choose Any Addons to Explore
                         </Text>
                     </View>
                 ) : null}

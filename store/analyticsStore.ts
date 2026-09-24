@@ -542,7 +542,7 @@ export const useAnalyticsStore = create<AnalyticsState>()(
         const state = get();
         const { user, token } = useAuthStore.getState();
 
-        if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123' && token !== ('GUEST_TOKEN_' + token.split('_').pop())) {
+        if (user?.email && user.isPremium && token && token !== 'SKIP_TOKEN123' && !token.startsWith('GUEST_TOKEN_')) {
           try {
             await axios.post(`${DB_BASEURL}/sync-insights`, {
               email: user.email,

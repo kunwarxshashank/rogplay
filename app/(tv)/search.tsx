@@ -46,7 +46,8 @@ export default function TVSearchScreen() {
                     const promises = addonConfig.searchcatalog.map(async (cat: any) => {
                         const searchUrl = cat.searchurl.replace('${search}', encodeURIComponent(text));
                         const data = await fetchAddonCatalog(searchUrl, 1, addonConfig.addontype, { url: addonConfig.addonUrl, manifestStr: addonConfig.addonManifest });
-                        return { title: cat.name || 'Catalog Search', data: data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv') };
+                        const filteredData = (addonConfig.addontype === 'scrapperaddon' || addonConfig.addontype === 'jsaddon') ? data : data.filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv');
+                        return { title: cat.name || 'Catalog Search', data: filteredData };
                     });
                     const catResults = await Promise.all(promises);
                     groupedData.push(...catResults.filter(g => g.data && g.data.length > 0));
@@ -140,15 +141,17 @@ export default function TVSearchScreen() {
                                 </Text>
                             </View>
                         ) : (
-                            <>
-                                <ContinueWatchingSection />
-                                <MovieList
-                                    title="Curated For You"
-                                    fetchFunction={fetchCuratedForYou}
-                                    type="movie"
-                                    addonType={addonConfig?.addontype}
-                                />
-                            </>
+                            (!addonConfig || addonConfig.addontype === 'tmdbaddon') ? (
+                                <>
+                                    <ContinueWatchingSection />
+                                    <MovieList
+                                        title="Curated For You"
+                                        fetchFunction={fetchCuratedForYou}
+                                        type="movie"
+                                        addonType={addonConfig?.addontype}
+                                    />
+                                </>
+                            ) : null
                         )}
                     </View>
                 )}

@@ -67,6 +67,73 @@ function useToolsLogic() {
     return { router, activeColors, toolItems };
 }
 
+const HeroCard = ({ item, flex, activeColors, router }: any) => (
+    <TouchableOpacity
+        style={[styles.heroCard, { flex, backgroundColor: item.color + '15', borderColor: item.color + '30' }]}
+        onPress={() => router.push(item.route)}
+        activeOpacity={0.8}
+    >
+        <LinearGradient
+            colors={[item.color + '25', 'transparent']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+        />
+        <View style={styles.heroContent}>
+            <View style={[styles.heroIconContainer, { backgroundColor: item.color }]}>
+                {item.iconType === 'material' ? (
+                    <MaterialIcons name={item.icon} size={32} color="#fff" />
+                ) : (
+                    <Ionicons name={item.icon} size={32} color="#fff" />
+                )}
+            </View>
+            <View style={styles.heroTextContainer}>
+                <Text style={[styles.heroTitle, { color: activeColors.text }]}>{item.title}</Text>
+                <Text style={[styles.heroDescription, { color: activeColors.textSecondary }]}>{item.description}</Text>
+            </View>
+        </View>
+        <MaterialIcons name="arrow-outward" size={24} color={item.color} style={styles.heroArrow} />
+    </TouchableOpacity>
+);
+
+const SquareCard = ({ item, flex, activeColors, router }: any) => (
+    <TouchableOpacity
+        style={[styles.squareCard, { flex, backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: activeColors.border }]}
+        onPress={() => router.push(item.route)}
+        activeOpacity={0.8}
+    >
+        <View style={[styles.squareIconContainer, { backgroundColor: item.color + '15' }]}>
+            {item.iconType === 'material' ? (
+                <MaterialIcons name={item.icon} size={28} color={item.color} />
+            ) : (
+                <Ionicons name={item.icon} size={28} color={item.color} />
+            )}
+        </View>
+        <Text style={[styles.squareTitle, { color: activeColors.text }]}>{item.title}</Text>
+        <Text style={[styles.squareDescription, { color: activeColors.textSecondary }]} numberOfLines={2}>{item.description}</Text>
+    </TouchableOpacity>
+);
+
+const WideCard = ({ item, flex, activeColors, router }: any) => (
+    <TouchableOpacity
+        style={[styles.wideCard, { flex, backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: activeColors.border }]}
+        onPress={() => router.push(item.route)}
+        activeOpacity={0.8}
+    >
+        <View style={[styles.squareIconContainer, { backgroundColor: item.color + '15', marginBottom: 0 }]}>
+            {item.iconType === 'material' ? (
+                <MaterialIcons name={item.icon} size={28} color={item.color} />
+            ) : (
+                <Ionicons name={item.icon} size={28} color={item.color} />
+            )}
+        </View>
+        <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text style={[styles.squareTitle, { color: activeColors.text }]}>{item.title}</Text>
+            <Text style={[styles.squareDescription, { color: activeColors.textSecondary }]}>{item.description}</Text>
+        </View>
+    </TouchableOpacity>
+);
+
 export function ToolsMobile() {
     const { router, activeColors, toolItems } = useToolsLogic();
 
@@ -82,27 +149,29 @@ export function ToolsMobile() {
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {toolItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.title}
-                            style={[styles.toolCard, { backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: activeColors.border }]}
-                            onPress={() => router.push(item.route as any)}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[styles.iconContainer, { backgroundColor: item.color + '15' }]}>
-                                {item.iconType === 'material' ? (
-                                    <MaterialIcons name={item.icon as any} size={28} color={item.color} />
-                                ) : (
-                                    <Ionicons name={item.icon as any} size={28} color={item.color} />
-                                )}
-                            </View>
-                            <View style={styles.toolInfo}>
-                                <Text style={[styles.toolTitle, { color: activeColors.text }]}>{item.title}</Text>
-                                <Text style={[styles.toolDescription, { color: activeColors.textSecondary }]}>{item.description}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color={activeColors.textSecondary} />
-                        </TouchableOpacity>
-                    ))}
+                    
+                    {/* Row 1: Hero */}
+                    <View style={styles.gridRow}>
+                        <HeroCard item={toolItems[0]} flex={1} activeColors={activeColors} router={router} />
+                    </View>
+
+                    {/* Row 2: Squares */}
+                    <View style={styles.gridRow}>
+                        <SquareCard item={toolItems[4]} flex={1} activeColors={activeColors} router={router} />
+                        <SquareCard item={toolItems[1]} flex={1} activeColors={activeColors} router={router} />
+                    </View>
+
+                    {/* Row 3: Squares */}
+                    <View style={styles.gridRow}>
+                        <SquareCard item={toolItems[2]} flex={1} activeColors={activeColors} router={router} />
+                        <SquareCard item={toolItems[3]} flex={1} activeColors={activeColors} router={router} />
+                    </View>
+
+                    {/* Row 4: Wide */}
+                    <View style={styles.gridRow}>
+                        <WideCard item={toolItems[5]} flex={1} activeColors={activeColors} router={router} />
+                    </View>
+
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -203,6 +272,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 120,
     },
+    gridRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
     toolCard: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -220,9 +294,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 16,
     },
-    toolInfo: {
-        flex: 1,
-    },
     toolTitle: {
         fontSize: 18,
         fontFamily: 'Outfit_600SemiBold',
@@ -232,6 +303,80 @@ const styles = StyleSheet.create({
         fontSize: 13,
         lineHeight: 18,
         fontFamily: 'Inter_400Regular',
+    },
+    heroCard: {
+        borderRadius: 24,
+        padding: 24,
+        borderWidth: 1,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    heroContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    heroIconContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    heroTextContainer: {
+        flex: 1,
+    },
+    heroTitle: {
+        fontSize: 22,
+        fontFamily: 'Outfit_700Bold',
+        marginBottom: 4,
+    },
+    heroDescription: {
+        fontSize: 14,
+        lineHeight: 20,
+        fontFamily: 'Inter_400Regular',
+    },
+    heroArrow: {
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        opacity: 0.6,
+    },
+    squareCard: {
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
+        justifyContent: 'space-between',
+    },
+    squareIconContainer: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    squareTitle: {
+        fontSize: 16,
+        fontFamily: 'Outfit_600SemiBold',
+        marginBottom: 4,
+    },
+    squareDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontFamily: 'Inter_400Regular',
+    },
+    wideCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
     }
 });
 

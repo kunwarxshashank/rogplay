@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="/home/highrisk/Kode/Expo/Rogplay/rogplayapp/modules/media-folders/android"
+    name=":media-folders"
+    type="LIBRARY"
+    maven="com.rogplay.mediafolders:media-folders:1.0.0"
+    agpVersion="8.11.0"
+    buildFolder="build"
+    bootClassPath="/home/highrisk/Android/Sdk/platforms/android-35/android.jar:/home/highrisk/Android/Sdk/build-tools/35.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-35"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

@@ -1,27 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TouchableOpacity,
-    RefreshControl,
-    Platform,
-    Modal,
-    TextInput,
-    Image,
-    Pressable,
-    ScrollView,
-    ActivityIndicator
+    View, Text, StyleSheet, TouchableOpacity, RefreshControl, Platform, Modal, TextInput, Image, Pressable, ActivityIndicator, BackHandler
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { ListItemSkeleton, FolderSkeleton } from '@/components/Skeleton';
-
+import { BlurView } from 'expo-blur';
+import { ListItemSkeleton, FolderSkeleton, GridSkeleton } from '@/components/Skeleton';
 import { useHomeLogic, VideoWithThumbnail, FolderType } from '@/hooks/useHomeLogic';
+import BottomMediaPill from '@/components/BottomMediaPill';
+import { useFocusEffect } from 'expo-router';
 
 // Stable hash for mock size
 const getMockSize = (id: string) => {
@@ -33,16 +23,21 @@ const getMockSize = (id: string) => {
     return `${size.toFixed(1)}MB`;
 };
 
+// Dynamic Greetings
+const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+};
+
+// Pastel colors for folder glow
+const FOLDER_COLORS = ['#FF9A9E', '#FECFEF', '#A18CD1', '#FBC2EB', '#84FAB0', '#8FD3F4', '#FFC3A0'];
+
 const VideoItem = React.memo(({
-    item,
-    onPress,
-    onLongPress,
-    currentColors
+    item, onPress, onLongPress, currentColors
 }: {
-    item: VideoWithThumbnail,
-    onPress: (uri: string, filename: string) => void,
-    onLongPress: (item: VideoWithThumbnail) => void,
-    currentColors: any
+    item: VideoWithThumbnail, onPress: (uri: string, filename: string) => void, onLongPress: (item: VideoWithThumbnail) => void, currentColors: any
 }) => {
     const sizeMb = getMockSize(item.id);
 
@@ -57,8 +52,8 @@ const VideoItem = React.memo(({
                 {item.uri ? (
                     <Image source={{ uri: item.uri }} style={styles.videoThumb} />
                 ) : (
-                    <View style={[styles.videoThumbPlaceholder, { backgroundColor: '#1e2025' }]}>
-                        <MaterialIcons name="videocam" size={32} color="#444" />
+                    <View style={[styles.videoThumbPlaceholder, { backgroundColor: currentColors.surface }]}>
+                        <MaterialIcons name="videocam" size={32} color={currentColors.textSecondary} />
                     </View>
                 )}
                 <View style={styles.videoDurationBadge}>
@@ -72,61 +67,43 @@ const VideoItem = React.memo(({
             </View>
             <View style={styles.videoListItemInfo}>
                 <View style={styles.videoListTitleRow}>
-                    <Text style={styles.videoListFilename} numberOfLines={1}>{item.filename}</Text>
+                    <Text style={[styles.videoListFilename, { color: currentColors.text }]} numberOfLines={2}>{item.filename}</Text>
                     <TouchableOpacity onPress={() => onLongPress(item)}>
-                        <MaterialIcons name="more-vert" size={22} color="#64748b" />
+                        <MaterialIcons name="more-vert" size={22} color={currentColors.textSecondary} />
                     </TouchableOpacity>
                 </View>
-                <Text style={styles.videoListMeta}>{sizeMb}</Text>
+                <Text style={[styles.videoListMeta, { color: currentColors.textSecondary }]}>{sizeMb} • {new Date(item.modificationTime * 1000).toLocaleDateString()}</Text>
             </View>
         </TouchableOpacity>
     );
 });
 
 const FolderItem = React.memo(({
-    item,
-    onPress,
-    currentColors
+    item, index, onPress, currentColors
 }: {
-    item: FolderType,
-    onPress: (folder: FolderType) => void,
-    currentColors: any
+    item: FolderType, index: number, onPress: (folder: FolderType) => void, currentColors: any
 }) => {
     return (
         <TouchableOpacity
-            style={styles.folderListItem}
+            style={[styles.premiumFolderCard, { backgroundColor: currentColors.surface, borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]}
             onPress={() => onPress(item)}
             activeOpacity={0.7}
         >
-            <View style={styles.folderIconWrapper}>
-                <MaterialIcons name="folder" size={40} color={currentColors.primary} />
+            <View style={styles.premiumFolderIconHeader}>
+                <View style={[styles.premiumFolderIconWrapper, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                    <Ionicons name="folder-open" size={26} color={currentColors.primary} />
+                </View>
             </View>
-            <View style={styles.folderInfo}>
-                <Text style={styles.folderName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.folderMeta}>{item.count} videos</Text>
+
+            <View style={styles.premiumFolderInfo}>
+                <Text style={[styles.premiumFolderName, { color: currentColors.text }]} numberOfLines={1}>{item.name}</Text>
+                <Text style={[styles.premiumFolderMeta, { color: currentColors.textSecondary }]}>{item.count} files</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={24} color="#64748b" />
         </TouchableOpacity>
     );
 });
 
-import { InteractionManager } from 'react-native';
-
-let homeHasMounted = false;
-
-// ----------------------- Mobile Component LOCAL VIDEO ----------------------- ---
 export function Home() {
-    const [isReady, setIsReady] = useState(homeHasMounted);
-
-    useEffect(() => {
-        if (homeHasMounted) return;
-        const task = InteractionManager.runAfterInteractions(() => {
-            homeHasMounted = true;
-            setIsReady(true);
-        });
-        return () => task.cancel();
-    }, []);
-
     const logic = useHomeLogic();
     const {
         theme, currentColors, videos, filteredVideos, loading, refreshing, deviceStorage, searchQuery, setSearchQuery, showSearch, setShowSearch,
@@ -137,176 +114,182 @@ export function Home() {
         hasNextPage, isFetchingNextPage, loadMoreVideos, foldersLoading
     } = logic;
 
-    const renderHeader = () => {
-        return (
-            <View style={styles.headerArea}>
-                <View style={styles.headerMain}>
-                    <View style={styles.titleContainer}>
-                        <Text style={styles.mainTitle}>VIDEOS</Text>
-                        <View style={styles.playCircle}>
-                            <Image source={require('@/assets/images/icon.png')} style={{ width: 25, height: 25 }} />
-                        </View>
-                    </View>
-                    <View style={styles.headerRightIcons}>
-                        <TouchableOpacity onPress={() => setShowSearch(!showSearch)} style={styles.headerIconButton}>
-                            <MaterialIcons name="search" size={28} color="#fff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.headerIconButton}>
-                            <MaterialIcons name="more-vert" size={28} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                if (selectedFolder) {
+                    setSelectedFolder(null);
+                    return true;
+                }
+                return false;
+            };
+
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+            return () => subscription.remove();
+        }, [selectedFolder])
+    );
+
+    // Greeting
+    const greeting = useMemo(() => getGreeting(), []);
+
+    // Storage formatting
+    const totalGB = (deviceStorage.total / (1024 ** 3)).toFixed(1);
+    const freeGB = (deviceStorage.free / (1024 ** 3)).toFixed(1);
+    const usedGB = (Number(totalGB) - Number(freeGB)).toFixed(1);
+    const usedPercentage = Math.min((Number(usedGB) / Number(totalGB)) * 100, 100);
+
+    const memoizedHandlePlay = useCallback((uri: string, filename: string) => { handlePlay(uri, filename); }, [handlePlay]);
+    const memoizedShowOptions = useCallback((item: VideoWithThumbnail) => { showOptions(item); }, [showOptions]);
+    const memoizedSetSelectedFolder = useCallback((folder: FolderType) => { setSelectedFolder(folder); }, [setSelectedFolder]);
+
+    const renderHeader = () => (
+        <View style={styles.headerContainer}>
+            <View style={styles.headerTopRow}>
+                <View>
+                    <Text style={[styles.headerGreeting, { color: currentColors.textSecondary }]}>{greeting}</Text>
+                    <Text style={[styles.headerTitle, { color: currentColors.text }]}>My Media</Text>
                 </View>
-
-                {showSearch && (
-                    <View style={styles.searchBarContainer}>
-                        <TextInput
-                            style={styles.searchBarInput}
-                            placeholder="Search videos..."
-                            placeholderTextColor="#64748b"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            autoFocus
-                        />
-                    </View>
-                )}
-
-                <View style={styles.subHeader}>
-                    <View style={styles.toggleContainer}>
-                        <TouchableOpacity
-                            onPress={() => { setViewMode('folder'); setSelectedFolder(null); }}
-                            style={[styles.toggleBtn, viewMode === 'folder' && { backgroundColor: currentColors.primary }]}
-                        >
-                            <Text style={[styles.toggleText, viewMode === 'folder' && styles.toggleTextActive]}>Folder</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => { setViewMode('video'); setSelectedFolder(null); }}
-                            style={[styles.toggleBtn, viewMode === 'video' && { backgroundColor: currentColors.primary }]}
-                        >
-                            <Text style={[styles.toggleText, viewMode === 'video' && styles.toggleTextActive]}>Video</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.viewActions}>
-                        <TouchableOpacity style={styles.actionIcon} onPress={() => setShowSortModal(true)}>
-                            <MaterialIcons name="sort" size={24} color={showSortModal ? currentColors.primary : "#fff"} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {selectedFolder && (
-                    <TouchableOpacity onPress={() => setSelectedFolder(null)} style={styles.breadcrumb}>
-                        <MaterialIcons name="folder" size={20} color={currentColors.primary} />
-                        <Text style={styles.breadcrumbText}>{selectedFolder.name}</Text>
-                        <MaterialIcons name="close" size={16} color="#64748b" />
+                <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={() => setShowSearch(!showSearch)} style={[styles.iconButton, { backgroundColor: currentColors.surface }]}>
+                        <Ionicons name="search" size={22} color={currentColors.text} />
                     </TouchableOpacity>
-                )}
+                    <TouchableOpacity onPress={() => router.push('/settings')} style={[styles.iconButton, { backgroundColor: currentColors.surface }]}>
+                        <Ionicons name="settings-outline" size={22} color={currentColors.text} />
+                    </TouchableOpacity>
+                </View>
             </View>
-        );
-    };
 
-    const memoizedHandlePlay = useCallback((uri: string, filename: string) => {
-        handlePlay(uri, filename);
-    }, [handlePlay]);
+            {showSearch && (
+                <View style={[styles.searchBar, { backgroundColor: currentColors.surface }]}>
+                    <Ionicons name="search" size={20} color={currentColors.textSecondary} style={{ marginRight: 8 }} />
+                    <TextInput
+                        style={[styles.searchInput, { color: currentColors.text }]}
+                        placeholder="Search videos..."
+                        placeholderTextColor={currentColors.textSecondary}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        autoFocus
+                    />
+                </View>
+            )}
 
-    const memoizedShowOptions = useCallback((item: VideoWithThumbnail) => {
-        showOptions(item);
-    }, [showOptions]);
+            <View style={[styles.togglePillContainer, { backgroundColor: currentColors.surface }]}>
+                <TouchableOpacity
+                    style={[styles.togglePill, viewMode === 'folder' && { backgroundColor: currentColors.primary }]}
+                    onPress={() => { setViewMode('folder'); setSelectedFolder(null); }}
+                >
+                    <Text style={[styles.togglePillText, viewMode === 'folder' ? { color: '#fff' } : { color: currentColors.textSecondary }]}>Folders</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.togglePill, viewMode === 'video' && { backgroundColor: currentColors.primary }]}
+                    onPress={() => { setViewMode('video'); setSelectedFolder(null); }}
+                >
+                    <Text style={[styles.togglePillText, viewMode === 'video' ? { color: '#fff' } : { color: currentColors.textSecondary }]}>Videos</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
 
-    const memoizedSetSelectedFolder = useCallback((folder: FolderType) => {
-        setSelectedFolder(folder);
-    }, [setSelectedFolder]);
+    const renderStorageCard = () => (
+        <View style={[styles.storageCard, { backgroundColor: currentColors.surface }]}>
+            <LinearGradient colors={['rgba(255,255,255,0.05)', 'transparent']} style={StyleSheet.absoluteFillObject} />
+            <View style={styles.storageHeader}>
+                <View style={styles.storageIconWrapper}>
+                    <Ionicons name="server" size={24} color={currentColors.primary} />
+                </View>
+                <View style={styles.storageTextWrapper}>
+                    <Text style={[styles.storageTitle, { color: currentColors.text }]}>Device Storage</Text>
+                    <Text style={[styles.storageSubtitle, { color: currentColors.textSecondary }]}>{usedGB} GB of {totalGB} GB Used</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowSortModal(true)} style={[styles.iconButton, { backgroundColor: 'transparent' }]}>
+                    <Ionicons name="filter" size={22} color={currentColors.textSecondary} />
+                </TouchableOpacity>
+            </View>
+            <View style={styles.storageProgressBarBg}>
+                <View style={[styles.storageProgressBarFill, { width: `${usedPercentage}%`, backgroundColor: currentColors.primary }]} />
+            </View>
+        </View>
+    );
 
-    const renderVideoItem = useCallback(({ item }: { item: VideoWithThumbnail }) => (
-        <VideoItem
-            item={item}
-            onPress={memoizedHandlePlay}
-            onLongPress={memoizedShowOptions}
-            currentColors={currentColors}
-        />
-    ), [memoizedHandlePlay, memoizedShowOptions, currentColors]);
+    const renderItem = useCallback(({ item, index }: { item: any, index: number }) => {
+        if (viewMode === 'folder' && !selectedFolder) {
+            return <FolderItem item={item} index={index} onPress={memoizedSetSelectedFolder} currentColors={currentColors} />;
+        }
+        return <VideoItem item={item} onPress={memoizedHandlePlay} onLongPress={memoizedShowOptions} currentColors={currentColors} />;
+    }, [viewMode, selectedFolder, memoizedSetSelectedFolder, memoizedHandlePlay, memoizedShowOptions, currentColors]);
 
-    const renderFolderItem = useCallback(({ item }: { item: FolderType }) => (
-        <FolderItem
-            item={item}
-            onPress={memoizedSetSelectedFolder}
-            currentColors={currentColors}
-        />
-    ), [memoizedSetSelectedFolder, currentColors]);
+    const listData = viewMode === 'folder' && !selectedFolder ? folders : filteredVideos;
+    const isFolderView = viewMode === 'folder' && !selectedFolder;
 
     return (
-        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <View style={[styles.container, { backgroundColor: currentColors.background }]}>
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {renderHeader()}
 
-                {(!isReady || loading || (viewMode === 'folder' && !selectedFolder && foldersLoading)) ? (
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.listContainer}>
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            viewMode === 'folder' && !selectedFolder ? (
-                                <FolderSkeleton key={i} />
-                            ) : (
-                                <ListItemSkeleton key={i} />
-                            )
-                        ))}
-                    </ScrollView>
-                ) : (
-                    <FlashList
-                        data={(viewMode === 'folder' && !selectedFolder ? folders : filteredVideos) as any}
-                        renderItem={(viewMode === 'folder' && !selectedFolder ? renderFolderItem : renderVideoItem) as any}
-                        keyExtractor={(item: any) => item.id || item.uri}
-                        contentContainerStyle={styles.listContainer as any}
-                        estimatedItemSize={viewMode === 'folder' && !selectedFolder ? 80 : 100}
-                        showsVerticalScrollIndicator={false}
-                        refreshControl={
-                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={currentColors.primary} />
-                        }
-                        onEndReached={() => {
-                            loadMoreVideos();
-                        }}
-                        onEndReachedThreshold={0.5}
-                        ListFooterComponent={
-                            isFetchingNextPage ? (
-                                <View style={{ padding: 20, alignItems: 'center' }}>
-                                    <ActivityIndicator size="small" color={currentColors.primary} />
-                                </View>
-                            ) : null
-                        }
-                        ListEmptyComponent={
-                            <View style={styles.empty}>
-                                <Ionicons name="videocam-outline" size={80} color="#1e293b" />
-                                <Text style={styles.emptyText}>No content found</Text>
-                            </View>
-                        }
-                    />
+                {selectedFolder && (
+                    <TouchableOpacity onPress={() => setSelectedFolder(null)} style={[styles.breadcrumb, { backgroundColor: currentColors.surface }]}>
+                        <Ionicons name="folder-open" size={18} color={currentColors.primary} />
+                        <Text style={[styles.breadcrumbText, { color: currentColors.text }]}>{selectedFolder.name}</Text>
+                        <Ionicons name="close-circle" size={20} color={currentColors.textSecondary} />
+                    </TouchableOpacity>
                 )}
+
+                <FlashList
+                    key={isFolderView ? `2-col-${foldersLoading}` : `1-col-${loading}`}
+                    data={(isFolderView ? foldersLoading : loading) ? Array.from({ length: 8 }).map((_, i) => ({ isSkeleton: true, id: `skel-${i}` })) as any : listData as any}
+                    renderItem={({ item, index }) => {
+                        if (item.isSkeleton) {
+                            return isFolderView ? <View style={{ padding: 8 }}><FolderSkeleton /></View> : <View style={{ padding: 8, paddingHorizontal: 16 }}><ListItemSkeleton /></View>;
+                        }
+                        if (viewMode === 'folder' && !selectedFolder) {
+                            return <FolderItem item={item} index={index} onPress={memoizedSetSelectedFolder} currentColors={currentColors} />;
+                        }
+                        return <VideoItem item={item} onPress={memoizedHandlePlay} onLongPress={memoizedShowOptions} currentColors={currentColors} />;
+                    }}
+                    keyExtractor={(item: any) => item.id || item.uri}
+                    contentContainerStyle={styles.listContent}
+                    numColumns={isFolderView ? 2 : 1}
+                    estimatedItemSize={isFolderView ? 160 : 100}
+                    showsVerticalScrollIndicator={false}
+                    ListHeaderComponent={(!selectedFolder && viewMode === 'folder') ? renderStorageCard : null}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={currentColors.primary} />}
+                    onEndReached={loadMoreVideos}
+                    onEndReachedThreshold={0.5}
+                    ListFooterComponent={isFetchingNextPage ? <View style={{ padding: 20 }}><ActivityIndicator size="small" color={currentColors.primary} /></View> : null}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Ionicons name="videocam-outline" size={64} color={currentColors.textSecondary} />
+                            <Text style={[styles.emptyStateText, { color: currentColors.text }]}>No Media Found</Text>
+                        </View>
+                    }
+                />
             </SafeAreaView>
 
             {/* Modals are shared but here duplicated for cleaner separation if desired, or can be extracted */}
             <Modal visible={showOptionsModal} transparent animationType="fade" onRequestClose={() => setShowOptionsModal(false)}>
                 <Pressable style={styles.modalOverlay} onPress={() => setShowOptionsModal(false)}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: currentColors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle} numberOfLines={1}>{selectedVideo?.filename}</Text>
+                            <Text style={[styles.modalTitle, { color: currentColors.text }]} numberOfLines={1}>{selectedVideo?.filename}</Text>
                             <TouchableOpacity onPress={() => setShowOptionsModal(false)}>
-                                <MaterialIcons name="close" size={24} color="#fff" />
+                                <MaterialIcons name="close" size={24} color={currentColors.text} />
                             </TouchableOpacity>
                         </View>
                         <TouchableOpacity style={styles.modalOption} onPress={() => { setShowOptionsModal(false); if (selectedVideo) handlePlay(selectedVideo.uri, selectedVideo.filename); }}>
                             <MaterialIcons name="play-arrow" size={24} color={currentColors.primary} />
-                            <Text style={styles.modalOptionText}>Play Video</Text>
+                            <Text style={[styles.modalOptionText, { color: currentColors.text }]}>Play Video</Text>
                         </TouchableOpacity>
-                        {/* More options... */}
                         <TouchableOpacity style={styles.modalOption} onPress={handleRename}>
                             <MaterialIcons name="edit" size={24} color={currentColors.accent} />
-                            <Text style={styles.modalOptionText}>Rename</Text>
+                            <Text style={[styles.modalOptionText, { color: currentColors.text }]}>Rename</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.modalOption} onPress={showInfo}>
                             <MaterialIcons name="info-outline" size={24} color="#4FC3F7" />
-                            <Text style={styles.modalOptionText}>Information</Text>
+                            <Text style={[styles.modalOptionText, { color: currentColors.text }]}>Information</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.modalOption} onPress={() => { setShowOptionsModal(false); if (selectedVideo) Sharing.shareAsync(selectedVideo.uri); }}>
                             <MaterialIcons name="share" size={24} color="#00C851" />
-                            <Text style={styles.modalOptionText}>Share</Text>
+                            <Text style={[styles.modalOptionText, { color: currentColors.text }]}>Share</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.modalOption} onPress={() => selectedVideo && handleDelete(selectedVideo)}>
                             <MaterialIcons name="delete" size={24} color="#FF6B6B" />
@@ -316,21 +299,20 @@ export function Home() {
                 </Pressable>
             </Modal>
 
-            {/* Other modals (Rename, Info) similar to original */}
             {/* Rename Modal */}
             <Modal visible={showRenameModal} transparent animationType="fade" onRequestClose={() => setShowRenameModal(false)}>
                 <Pressable style={styles.modalOverlay} onPress={() => setShowRenameModal(false)}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: currentColors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Rename Video</Text>
+                            <Text style={[styles.modalTitle, { color: currentColors.text }]}>Rename Video</Text>
                             <TouchableOpacity onPress={() => setShowRenameModal(false)}>
-                                <MaterialIcons name="close" size={24} color="#fff" />
+                                <MaterialIcons name="close" size={24} color={currentColors.text} />
                             </TouchableOpacity>
                         </View>
-                        <TextInput style={styles.renameInput} value={newFilename} onChangeText={setNewFilename} placeholder="Enter new filename" placeholderTextColor={currentColors.textSecondary} autoFocus />
+                        <TextInput style={[styles.renameInput, { backgroundColor: currentColors.background, color: currentColors.text }]} value={newFilename} onChangeText={setNewFilename} placeholder="Enter new filename" placeholderTextColor={currentColors.textSecondary} autoFocus />
                         <View style={styles.modalActions}>
-                            <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={() => setShowRenameModal(false)}>
-                                <Text style={styles.modalButtonText}>Cancel</Text>
+                            <TouchableOpacity style={[styles.modalButton, { backgroundColor: currentColors.background }]} onPress={() => setShowRenameModal(false)}>
+                                <Text style={[styles.modalButtonText, { color: currentColors.text }]}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.modalButton, styles.modalButtonConfirm]} onPress={confirmRename}>
                                 <Text style={styles.modalButtonText}>Rename</Text>
@@ -343,11 +325,11 @@ export function Home() {
             {/* Information Modal */}
             <Modal visible={showInfoModal} transparent animationType="fade" onRequestClose={() => setShowInfoModal(false)}>
                 <Pressable style={styles.modalOverlay} onPress={() => setShowInfoModal(false)}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: currentColors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Video Information</Text>
+                            <Text style={[styles.modalTitle, { color: currentColors.text }]}>Video Information</Text>
                             <TouchableOpacity onPress={() => setShowInfoModal(false)}>
-                                <MaterialIcons name="close" size={24} color="#fff" />
+                                <MaterialIcons name="close" size={24} color={currentColors.text} />
                             </TouchableOpacity>
                         </View>
 
@@ -355,29 +337,29 @@ export function Home() {
                             <View style={styles.infoContainer}>
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>Filename</Text>
-                                    <Text style={styles.infoValue}>{selectedVideo.filename}</Text>
+                                    <Text style={[styles.infoValue, { color: currentColors.text }]}>{selectedVideo.filename}</Text>
                                 </View>
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>Duration</Text>
-                                    <Text style={styles.infoValue}>{formatDuration(selectedVideo.duration)}</Text>
+                                    <Text style={[styles.infoValue, { color: currentColors.text }]}>{formatDuration(selectedVideo.duration)}</Text>
                                 </View>
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>File Size</Text>
-                                    <Text style={styles.infoValue}>{selectedVideoSize}</Text>
+                                    <Text style={[styles.infoValue, { color: currentColors.text }]}>{selectedVideoSize}</Text>
                                 </View>
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>Resolution</Text>
-                                    <Text style={styles.infoValue}>{selectedVideo.width} x {selectedVideo.height}</Text>
+                                    <Text style={[styles.infoValue, { color: currentColors.text }]}>{selectedVideo.width} x {selectedVideo.height}</Text>
                                 </View>
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>Modified</Text>
-                                    <Text style={styles.infoValue}>
+                                    <Text style={[styles.infoValue, { color: currentColors.text }]}>
                                         {selectedVideo.modificationTime ? new Date(selectedVideo.modificationTime * 1000).toLocaleString() : 'N/A'}
                                     </Text>
                                 </View>
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>Location</Text>
-                                    <Text style={styles.infoValue} numberOfLines={2}>{selectedVideo.uri}</Text>
+                                    <Text style={[styles.infoValue, { color: currentColors.text }]} numberOfLines={2}>{selectedVideo.uri}</Text>
                                 </View>
                             </View>
                         )}
@@ -395,11 +377,11 @@ export function Home() {
             {/* Sort Modal */}
             <Modal visible={showSortModal} transparent animationType="fade" onRequestClose={() => setShowSortModal(false)}>
                 <Pressable style={styles.modalOverlay} onPress={() => setShowSortModal(false)}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: currentColors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Sort By</Text>
+                            <Text style={[styles.modalTitle, { color: currentColors.text }]}>Sort By</Text>
                             <TouchableOpacity onPress={() => setShowSortModal(false)}>
-                                <MaterialIcons name="close" size={24} color="#fff" />
+                                <MaterialIcons name="close" size={24} color={currentColors.text} />
                             </TouchableOpacity>
                         </View>
                         {[
@@ -416,15 +398,15 @@ export function Home() {
                                 <MaterialIcons
                                     name={item.icon as any}
                                     size={24}
-                                    color={sortBy === item.value ? currentColors.primary : "#64748b"}
+                                    color={sortBy === item.value ? currentColors.primary : currentColors.textSecondary}
                                 />
-                                <Text style={[styles.modalOptionText, sortBy === item.value && { color: currentColors.primary }]}>
+                                <Text style={[styles.modalOptionText, sortBy === item.value ? { color: currentColors.primary } : { color: currentColors.text }]}>
                                     {item.label}
                                 </Text>
                                 {sortBy === item.value && <MaterialIcons name="check" size={20} color={currentColors.primary} />}
                             </TouchableOpacity>
                         ))}
-                        <View style={[styles.divider, { marginVertical: 10 }]} />
+                        <View style={styles.divider} />
                         <TouchableOpacity
                             style={styles.modalOption}
                             onPress={() => { setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); setShowSortModal(false); }}
@@ -434,564 +416,95 @@ export function Home() {
                                 size={24}
                                 color={currentColors.primary}
                             />
-                            <Text style={styles.modalOptionText}>
+                            <Text style={[styles.modalOptionText, { color: currentColors.text }]}>
                                 Order: {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
                             </Text>
                         </TouchableOpacity>
                     </View>
                 </Pressable>
             </Modal>
+
+            <BottomMediaPill activeTab="videos" />
         </View>
     );
 }
-
-
 
 export default function HomeScreen() {
     return <Home />;
 }
 
-
-
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#060912',
-    },
-    safeArea: {
-        flex: 1,
-    },
-    topHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 20,
-    },
-    greeting: {
-        fontSize: 32,
-        fontFamily: 'Outfit_700Bold',
-        color: '#fff',
-    },
-    subGreeting: {
-        fontSize: 14,
-        fontFamily: 'Inter_400Regular',
-        color: '#94a3b8',
-        marginTop: 2,
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#0f1424',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        height: 52,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.06)',
-        gap: 10,
-    },
-    searchInput: {
-        flex: 1,
-        color: '#fff',
-        fontSize: 15,
-        fontFamily: 'Outfit_500Medium',
-        padding: 0,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        width: '100%',
-    },
-    headerActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    iconBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        backgroundColor: '#0f1424',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.06)',
-    },
-    center: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    skeletonContainer: {
-        flex: 1,
-    },
-    headerComponent: {
-        paddingHorizontal: 20,
-        marginBottom: 10,
-    },
-    storageFocusable: {
-        marginBottom: 32,
-        borderRadius: 24,
-    },
-    storageCard: {
-        borderRadius: 24,
-        padding: 24,
-    },
-    storageRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    storageIconCircle: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    storageTitle: {
-        color: '#fff',
-        fontFamily: 'Outfit_700Bold',
-        fontSize: 18,
-    },
-    storageSubtitle: {
-        color: 'rgba(255, 255, 255, 0.8)',
-        fontFamily: 'Inter_400Regular',
-        fontSize: 13,
-        marginTop: 2,
-    },
-    progressBarBg: {
-        height: 6,
-        backgroundColor: 'rgba(0, 0, 0, 0.2)',
-        borderRadius: 3,
-        overflow: 'hidden',
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: '#fff',
-        borderRadius: 3,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    sectionTitle: {
-        fontSize: 22,
-        fontFamily: 'Outfit_700Bold',
-        color: '#fff',
-    },
-    videoCount: {
-        color: '#64748b',
-        fontSize: 14,
-        fontFamily: 'Outfit_600SemiBold',
-    },
-    list: {
-        paddingBottom: 120,
-    },
-    row: {
-        paddingHorizontal: 20,
-        justifyContent: 'space-between',
-    },
-    card: {
-        marginBottom: 20,
-        backgroundColor: '#0f1424',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.06)',
-        overflow: 'hidden',
-    },
-    thumbnailContainer: {
-        height: 120,
-        backgroundColor: '#000',
-        position: 'relative',
-    },
-    thumbnail: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    thumbGradient: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    moreButton: {
-        position: 'absolute',
-        top: 8,
-        left: 8,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        width: 28,
-        height: 28,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10,
-    },
-    cardGradient: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '50%',
-    },
-    durationBadge: {
-        position: 'absolute',
-        bottom: 8,
-        right: 8,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-    },
-    durationText: {
-        color: '#fff',
-        fontSize: 10,
-        fontFamily: 'Inter_600SemiBold',
-    },
-    info: {
-        padding: 12,
-    },
-    filename: {
-        color: '#f8fafc',
-        fontSize: 14,
-        fontFamily: 'Outfit_600SemiBold',
-        marginBottom: 4,
-    },
-    timeAgo: {
-        color: '#64748b',
-        fontSize: 11,
-        fontFamily: 'Inter_400Regular',
-    },
-    empty: {
-        alignItems: 'center',
-        marginTop: 60,
-    },
-    emptyText: {
-        color: '#fff',
-        fontSize: 20,
-        fontFamily: 'Outfit_700Bold',
-        marginTop: 20,
-    },
-    emptySubtext: {
-        color: '#94a3b8',
-        fontSize: 14,
-        fontFamily: 'Inter_400Regular',
-        textAlign: 'center',
-        paddingHorizontal: 40,
-        marginTop: 8,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: '#0f1424',
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        padding: 24,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontFamily: 'Outfit_700Bold',
-        color: '#fff',
-        flex: 1,
-        marginRight: 16,
-    },
-    modalOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 16,
-        gap: 16,
-    },
-    modalOptionText: {
-        fontSize: 16,
-        fontFamily: 'Outfit_500Medium',
-        color: '#f1f5f9',
-    },
-    modalOptionDangerText: {
-        color: '#ff4b4b',
-    },
-    renameInput: {
-        backgroundColor: '#1e293b',
-        borderRadius: 12,
-        padding: 16,
-        color: '#fff',
-        fontSize: 16,
-        fontFamily: 'Outfit_500Medium',
-        marginBottom: 24,
-    },
-    modalActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    modalButton: {
-        flex: 1,
-        height: 52,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalButtonCancel: {
-        backgroundColor: '#1e293b',
-    },
-    modalButtonConfirm: {
-        backgroundColor: '#6366f1',
-    },
-    modalButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontFamily: 'Outfit_600SemiBold',
-    },
-    infoContainer: {
-        marginBottom: 24,
-    },
-    infoRow: {
-        marginBottom: 16,
-    },
-    infoLabel: {
-        color: '#64748b',
-        fontSize: 12,
-        fontFamily: 'Inter_600SemiBold',
-        marginBottom: 4,
-        textTransform: 'uppercase',
-    },
-    infoValue: {
-        color: '#f1f5f9',
-        fontSize: 15,
-        fontFamily: 'Outfit_500Medium',
-    },
-    // New Styles inspired by image
-    headerArea: {
-        paddingTop: 10,
-    },
-    headerMain: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        marginBottom: 16,
-    },
-    titleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    mainTitle: {
-        fontSize: 22,
-        fontFamily: 'Outfit_700Bold',
-        color: '#fff',
-        letterSpacing: 1,
-    },
-    playCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerRightIcons: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    headerIconButton: {
-        padding: 4,
-    },
-    subHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        marginBottom: 16,
-    },
-    toggleContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 25,
-        padding: 4,
-    },
-    toggleBtn: {
-        paddingHorizontal: 24,
-        paddingVertical: 8,
-        borderRadius: 21,
-    },
-    toggleText: {
-        fontSize: 16,
-        fontFamily: 'Outfit_600SemiBold',
-        color: '#94a3b8',
-    },
-    toggleTextActive: {
-        color: '#fff',
-    },
-    viewActions: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    actionIcon: {
-        padding: 4,
-    },
-    listContainer: {
-        paddingBottom: 100,
-    },
-    loadingArea: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoListItem: {
-        flexDirection: 'row',
-        padding: 16,
-        alignItems: 'center',
-        marginHorizontal: 12,
-        marginBottom: 8,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 3,
-    },
-    videoThumbWrapper: {
-        width: 120,
-        height: 70,
-        borderRadius: 12,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    videoThumb: {
-        width: '100%',
-        height: '100%',
-    },
-    videoThumbPlaceholder: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoDurationBadge: {
-        position: 'absolute',
-        bottom: 4,
-        right: 4,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        paddingHorizontal: 4,
-        borderRadius: 4,
-    },
-    videoDurationText: {
-        color: '#fff',
-        fontSize: 10,
-        fontFamily: 'Inter_600SemiBold',
-    },
-    videoProgressBarBg: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 3,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    videoProgressBarFill: {
-        height: '100%',
-    },
-    videoListItemInfo: {
-        flex: 1,
-        marginLeft: 16,
-        justifyContent: 'center',
-    },
-    videoListTitleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    videoListFilename: {
-        flex: 1,
-        fontSize: 16,
-        color: '#fff',
-        fontFamily: 'Outfit_600SemiBold',
-        marginRight: 8,
-    },
-    videoListMeta: {
-        fontSize: 13,
-        color: '#64748b',
-        fontFamily: 'Inter_400Regular',
-        marginTop: 4,
-    },
-    folderListItem: {
-        flexDirection: 'row',
-        padding: 16,
-        alignItems: 'center',
-        marginHorizontal: 12,
-        marginBottom: 8,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 3,
-    },
-    folderIconWrapper: {
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    folderInfo: {
-        flex: 1,
-        marginLeft: 16,
-    },
-    folderName: {
-        fontSize: 17,
-        color: '#fff',
-        fontFamily: 'Outfit_600SemiBold',
-    },
-    folderMeta: {
-        fontSize: 13,
-        color: '#94a3b8',
-        fontFamily: 'Inter_400Regular',
-        marginTop: 2,
-    },
-    breadcrumb: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#1e293b',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        marginHorizontal: 16,
-        marginBottom: 12,
-        borderRadius: 12,
-        gap: 8,
-    },
-    breadcrumbText: {
-        color: '#fff',
-        fontFamily: 'Outfit_600SemiBold',
-        fontSize: 14,
-        flex: 1,
-    },
-    searchBarContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        marginBottom: 16,
-    },
-    searchBarInput: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 48,
-        color: '#fff',
-        fontFamily: 'Outfit_500Medium',
-        flex: 1,
-        fontSize: 16,
-    }
+    container: { flex: 1 },
+    safeArea: { flex: 1 },
+    headerContainer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
+    headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+    headerGreeting: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', letterSpacing: 0.5, marginBottom: 2 },
+    headerTitle: { fontSize: 28, fontFamily: 'Outfit_700Bold' },
+    headerActions: { flexDirection: 'row', gap: 10 },
+    iconButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+    searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, height: 50, marginBottom: 20 },
+    searchInput: { flex: 1, fontFamily: 'Outfit_500Medium', fontSize: 15 },
+    togglePillContainer: { flexDirection: 'row', borderRadius: 20, padding: 4 },
+    togglePill: { flex: 1, paddingVertical: 10, borderRadius: 16, alignItems: 'center' },
+    togglePillText: { fontFamily: 'Outfit_600SemiBold', fontSize: 14 },
+
+    listContent: { paddingHorizontal: 20, paddingBottom: 120, paddingTop: 10 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+    // Storage Card
+    storageCard: { borderRadius: 24, padding: 20, marginBottom: 20, overflow: 'hidden' },
+    storageHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    storageIconWrapper: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    storageTextWrapper: { flex: 1 },
+    storageTitle: { fontSize: 18, fontFamily: 'Outfit_700Bold', marginBottom: 2 },
+    storageSubtitle: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+    storageProgressBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' },
+    storageProgressBarFill: { height: '100%', borderRadius: 4 },
+
+    // Original Video Item Layout
+    videoListItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, backgroundColor: 'transparent' },
+    videoThumbWrapper: { width: 140, height: 80, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000', position: 'relative' },
+    videoThumb: { width: '100%', height: '100%', resizeMode: 'cover' },
+    videoThumbPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    videoDurationBadge: { position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    videoDurationText: { color: '#fff', fontSize: 10, fontFamily: 'Outfit_600SemiBold' },
+    videoProgressBarBg: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)' },
+    videoProgressBarFill: { height: '100%' },
+    videoListItemInfo: { flex: 1, paddingLeft: 14, justifyContent: 'center' },
+    videoListTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    videoListFilename: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', flex: 1, marginRight: 8, marginBottom: 4 },
+    videoListMeta: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+
+    // Premium Folder Card
+    premiumFolderCard: { flex: 1, margin: 6, padding: 16, borderRadius: 20, overflow: 'hidden', height: 140 },
+    premiumFolderIconHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+    premiumFolderIconWrapper: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    premiumFolderInfo: { flex: 1, justifyContent: 'flex-end' },
+    premiumFolderName: { fontSize: 16, fontFamily: 'Outfit_600SemiBold', marginBottom: 4 },
+    premiumFolderMeta: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+
+    breadcrumb: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 16, padding: 12, borderRadius: 16, gap: 8 },
+    breadcrumbText: { flex: 1, fontSize: 15, fontFamily: 'Outfit_600SemiBold' },
+
+    emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
+    emptyStateText: { fontSize: 18, fontFamily: 'Outfit_600SemiBold', marginTop: 16 },
+
+    // Modals
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    modalTitle: { fontSize: 18, fontFamily: 'Outfit_700Bold', flex: 1, marginRight: 16 },
+    modalOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 16 },
+    modalOptionText: { fontSize: 16, fontFamily: 'Outfit_500Medium' },
+    modalOptionDangerText: { color: '#ff4b4b' },
+    renameInput: { borderRadius: 12, padding: 16, fontSize: 16, fontFamily: 'Outfit_500Medium', marginBottom: 24 },
+    modalActions: { flexDirection: 'row', gap: 12 },
+    modalButton: { flex: 1, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    modalButtonConfirm: { backgroundColor: '#6366f1' },
+    modalButtonText: { color: '#fff', fontSize: 16, fontFamily: 'Outfit_600SemiBold' },
+    infoContainer: { marginBottom: 24 },
+    infoRow: { marginBottom: 16 },
+    infoLabel: { color: '#64748b', fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 4, textTransform: 'uppercase' },
+    infoValue: { fontSize: 15, fontFamily: 'Outfit_500Medium' },
+    divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', width: '100%', marginVertical: 10 },
 });

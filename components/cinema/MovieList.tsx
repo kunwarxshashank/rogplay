@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, ScrollView } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Colors } from '@/constants/Colors';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -8,19 +9,35 @@ import { TVFocusable } from '@/components/TVFocusable';
 import { MovieCardSkeleton } from '@/components/Skeleton';
 import MovieCard from './MovieCard';
 import { useTheme } from '@/hooks/useTheme';
+import { useThemeStore, POSTER_STYLES } from '@/store/themeStore';
 
 interface MovieListProps {
     title: string;
     fetchFunction: (page?: number) => Promise<any[] | { results: any[], total_pages?: number }>;
     type?: 'movie' | 'tv' | 'all';
     mode?: 'horizontal' | 'grid';
-    paginated?: boolean;
     addonType?: string;
     catalogRawType?: string | undefined;
+    onSeeAll?: () => void;
+    hideTitle?: boolean;
+    addonManifestStr?: string;
 }
 
-function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated = false, addonType, catalogRawType }: MovieListProps) {
+function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated = false, addonType, catalogRawType, onSeeAll, hideTitle = false, addonManifestStr }: MovieListProps) {
     const { colors: currentColors } = useTheme();
+    const posterStyleKey = useThemeStore((s) => s.posterStyle);
+
+    const addonPosterStyle = useMemo(() => {
+        if (!addonManifestStr) return null;
+        try {
+            const manifest = JSON.parse(addonManifestStr);
+            return manifest?.style?.posterstyle || null;
+        } catch (e) {
+            return null;
+        }
+    }, [addonManifestStr]);
+
+    const activePosterStyleKey = addonPosterStyle || posterStyleKey;
 
     // Keep a ref to the latest fetchFunction so reference changes from
     // parent re-renders don't trigger a reload.
@@ -42,7 +59,8 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
         queryFn: async ({ pageParam = 1 }) => {
             const result = await fetchFunctionRef.current(pageParam);
             if (Array.isArray(result)) {
-                return { results: result, total_pages: 1, page: pageParam };
+                const nextTotal = (paginated && result.length > 0) ? pageParam + 1 : 1;
+                return { results: result, total_pages: nextTotal, page: pageParam };
             }
             return {
                 results: result.results || [],
@@ -74,27 +92,19 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
     }, [queryData]);
 
     const isGrid = mode === 'grid';
-    const numColumns = Platform.isTV ? 5 : 3;
-    const cardWidth = Platform.isTV ? 240 : 130;
-    const itemSpacing = Platform.isTV ? 20 : 16;
+    const posterStyle = POSTER_STYLES[activePosterStyleKey as keyof typeof POSTER_STYLES] || POSTER_STYLES[posterStyleKey as keyof typeof POSTER_STYLES] || POSTER_STYLES.netflix;
+    const numColumns = Platform.isTV ? (posterStyle.tvAspectRatio > 1 ? 3 : 7) : (posterStyle.mobileAspectRatio > 1 ? 2 : 3); // no. of cols
+    const cardWidth = Platform.isTV ? posterStyle.tvWidth : (activePosterStyleKey === 'cinematic' ? 200 : 130); // each card width
+    const itemSpacing = activePosterStyleKey === 'cinematic' ? 10 : 16; // spacing between catalog
 
     const itemStyle = useMemo(
-        () => (isGrid ? { flex: 1 / numColumns, margin: 6 } : { marginRight: itemSpacing }),
-        [isGrid, numColumns, itemSpacing]
+        () => (isGrid ? { padding: Platform.isTV ? 12 : 6 } : { marginRight: itemSpacing }),
+        [isGrid, itemSpacing]
     );
 
     const listContentStyle = useMemo(
         () => [styles.list, isGrid && { paddingHorizontal: 16 }],
         [isGrid]
-    );
-
-    const getItemLayout = useCallback(
-        (_: any, index: number) => ({
-            length: cardWidth + itemSpacing,
-            offset: (cardWidth + itemSpacing) * index,
-            index,
-        }),
-        [cardWidth, itemSpacing]
     );
 
     const handleLoadMore = useCallback(() => {
@@ -105,16 +115,17 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
 
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
-                <MovieCard
-                    item={item}
-                    type={(item.media_type || type) as 'movie' | 'tv'}
-                    addonType={addonType}
-                    catalogTypeRaw={catalogRawType}
-                    width={isGrid ? undefined : cardWidth}
-                    style={itemStyle}
-                />
+            <MovieCard
+                item={item}
+                type={(item.media_type || type) as 'movie' | 'tv'}
+                addonType={addonType}
+                catalogTypeRaw={catalogRawType}
+                width={isGrid ? '100%' : cardWidth}
+                posterStyleOverride={addonPosterStyle}
+                style={itemStyle}
+            />
         ),
-        [cardWidth, isGrid, itemStyle, type, addonType, catalogRawType]
+        [cardWidth, isGrid, itemStyle, type, addonType, catalogRawType, addonPosterStyle]
     );
 
     const renderFooter = useCallback(() => {
@@ -169,21 +180,23 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
 
     return (
         <View style={[styles.container, isGrid && { flex: 1 }]}>
-            <View style={[styles.header, isGrid && { paddingHorizontal: 24 }]}>
-                <View style={styles.titleSection}>
-                    {!Platform.isTV && <View style={[styles.titleBar, { backgroundColor: currentColors.primary }]} />}
-                    <Text style={[styles.title, { color: currentColors.text }]}>{title}</Text>
-                    {Platform.isTV && <View style={[styles.indicator, { backgroundColor: currentColors.primary }]} />}
+            {!hideTitle && (
+                <View style={[styles.header, isGrid && { paddingHorizontal: 24 }]}>
+                    <View style={styles.titleSection}>
+                        {!Platform.isTV && <View style={[styles.titleBar, { backgroundColor: currentColors.primary }]} />}
+                        <Text style={[styles.title, { color: currentColors.text }]}>{title}</Text>
+                        {Platform.isTV && <View style={[styles.indicator, { backgroundColor: currentColors.primary }]} />}
+                    </View>
+                    {!isGrid && onSeeAll && (
+                        <TouchableOpacity style={[styles.moreBtn, { backgroundColor: currentColors.primary + '18' }]} activeOpacity={0.7} onPress={onSeeAll}>
+                            <Text style={[styles.moreText, { color: currentColors.primary }]}>See all</Text>
+                            <MaterialIcons name="chevron-right" size={16} color={currentColors.primary} />
+                        </TouchableOpacity>
+                    )}
                 </View>
-                {!isGrid && (
-                    <TouchableOpacity style={[styles.moreBtn, { backgroundColor: currentColors.primary + '18' }]} activeOpacity={0.7}>
-                        <Text style={[styles.moreText, { color: currentColors.primary }]}>See all</Text>
-                        <MaterialIcons name="chevron-right" size={16} color={currentColors.primary} />
-                    </TouchableOpacity>
-                )}
-            </View>
-            <FlatList
-                key={isGrid ? `grid-${numColumns}` : 'horizontal'}
+            )}
+            <FlashList
+                key={isGrid ? `grid-${numColumns}-${activePosterStyleKey}` : `horizontal-${activePosterStyleKey}`}
                 data={data}
                 renderItem={renderItem}
                 keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
@@ -191,14 +204,10 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
                 numColumns={isGrid ? numColumns : 1}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={listContentStyle}
-                style={isGrid ? { flex: 1 } : null}
+                style={isGrid ? { flex: 1, minHeight: 200 } : { minHeight: (cardWidth / (Platform.isTV ? posterStyle.tvAspectRatio : posterStyle.mobileAspectRatio)) + (posterStyle.showMetadata ? 35 : 20) }}
                 scrollEnabled={true}
                 nestedScrollEnabled={true}
-                initialNumToRender={isGrid ? numColumns * 2 : 6}
-                maxToRenderPerBatch={isGrid ? numColumns * 2 : 6}
-                windowSize={5}
-                removeClippedSubviews={true}
-                getItemLayout={!isGrid ? getItemLayout : undefined}
+                estimatedItemSize={isGrid ? 200 : cardWidth}
                 ListFooterComponent={renderFooter}
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.5}
@@ -209,14 +218,14 @@ function MovieList({ title, fetchFunction, type, mode = 'horizontal', paginated 
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: Platform.isTV ? 40 : 32,
+        marginBottom: Platform.isTV ? 16 : 32,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: Platform.isTV ? 40 : 16,
-        marginBottom: Platform.isTV ? 20 : 16,
+        marginBottom: Platform.isTV ? 12 : 16,
     },
     titleSection: {
         flexDirection: 'row',

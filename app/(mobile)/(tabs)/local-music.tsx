@@ -16,6 +16,7 @@ import { useFavoritesStore } from '@/store/favoritesStore';
 import type { MusicTrack } from '@/components/player/MusicPlayer';
 import { useTheme } from '@/hooks/useTheme';
 import { MusicTrackSkeleton } from '@/components/Skeleton';
+import BottomMediaPill from '@/components/BottomMediaPill';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARTWORK_SIZE = 48;
@@ -608,6 +609,8 @@ export default function LocalMusicScreen() {
                     </View>
                 </TouchableOpacity>
             </Modal>
+            
+            <BottomMediaPill activeTab="music" />
         </View>
     );
 }

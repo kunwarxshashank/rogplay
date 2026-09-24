@@ -1,0 +1,34 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.rogplay.mediafolders.media-folders-release-28:/values-h720dp-v13/values-h720dp-v13.xml",
+            "map": [
+                {
+                    "source": "/home/highrisk/.gradle/caches/8.14.3/transforms/d7691ab03fd7ed77218f9a8157ac74e2/transformed/appcompat-1.7.0/res/values-h720dp-v13/values-h720dp-v13.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "66",
+                        "endOffsets": "117"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "com.rogplay.mediafolders.media-folders-mergeReleaseResources-26:/values-h720dp-v13/values-h720dp-v13.xml",
+            "map": [
+                {
+                    "source": "/home/highrisk/.gradle/caches/8.14.3/transforms/d7691ab03fd7ed77218f9a8157ac74e2/transformed/appcompat-1.7.0/res/values-h720dp-v13/values-h720dp-v13.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "66",
+                        "endOffsets": "117"
+                    }
+                }
+            ]
+        }
+    ]
+}

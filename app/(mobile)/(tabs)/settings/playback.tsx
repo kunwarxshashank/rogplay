@@ -23,9 +23,7 @@ export default function PlaybackSettings() {
                 { icon: 'speed', label: 'Playback Speed Control', type: 'toggle', value: !!settings.longPressSpeedEnabled, action: () => settings.toggleSetting('longPressSpeedEnabled') },
                 { icon: 'fast-forward', label: 'Double Tap to Seek', type: 'toggle', value: !!settings.doubleTapSeekEnabled, action: () => settings.toggleSetting('doubleTapSeekEnabled') },
                 { icon: 'swipe', label: 'Swipe Gestures', type: 'toggle', value: !!settings.playbackGesturesEnabled, action: () => settings.toggleSetting('playbackGesturesEnabled') },
-                { icon: 'screen-rotation', label: 'Default Landscape', type: 'toggle', value: !!settings.forceLandscape, action: () => settings.toggleSetting('forceLandscape') },
-                { icon: 'auto-fix-high', label: 'Auto-Select Best Source', type: 'toggle', value: !!settings.autoSelectHealthiestSource, action: () => settings.toggleSetting('autoSelectHealthiestSource') },
-            ]
+                { icon: 'screen-rotation', label: 'Default Landscape', type: 'toggle', value: !!settings.forceLandscape, action: () => settings.toggleSetting('forceLandscape') }]
         },
         {
             title: "Streaming",

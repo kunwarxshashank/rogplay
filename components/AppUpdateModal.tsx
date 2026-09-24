@@ -21,7 +21,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout } from '@/constants/Colors';
 import { TVFocusable } from '@/components/TVFocusable';
 import appConfigJson from '../app.json';
-import { downloadApkAndOpenInstaller, openInstallUnknownAppsSettings } from '@/services/androidApkUpdate';
 import { useTheme } from '@/hooks/useTheme';
 
 const { width } = Dimensions.get('window');
@@ -62,10 +61,6 @@ export function AppUpdateModal() {
     const [config, setConfig] = useState<UpdateConfig | null>(null);
     const [isOtaAvailable, setIsOtaAvailable] = useState(false);
     const [isUpdatingOta, setIsUpdatingOta] = useState(false);
-    const [isDownloadingApk, setIsDownloadingApk] = useState(false);
-    const [apkDownloadProgress, setApkDownloadProgress] = useState(0);
-    const [apkDownloadedBytes, setApkDownloadedBytes] = useState(0);
-    const [apkDownloadTotalBytes, setApkDownloadTotalBytes] = useState<number | null>(null);
 
     useEffect(() => {
         const checkForUpdate = async () => {
@@ -140,67 +135,6 @@ export function AppUpdateModal() {
             return;
         }
 
-        if (Platform.OS === 'android' && config?.apklink) {
-            try {
-                setIsDownloadingApk(true);
-                setApkDownloadProgress(0);
-                setApkDownloadedBytes(0);
-                setApkDownloadTotalBytes(null);
-
-                // Add timeout for the download process
-                const downloadPromise = downloadApkAndOpenInstaller(config.apklink, (p) => {
-                    const totalBytes = p.totalBytes > 0 ? p.totalBytes : null;
-                    const progress = totalBytes ? p.bytesWritten / totalBytes : 0;
-                    setApkDownloadProgress(progress);
-                    setApkDownloadedBytes(p.bytesWritten);
-                    setApkDownloadTotalBytes(totalBytes);
-                });
-
-                // Set a reasonable timeout for the entire process
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('Download timed out after 5 minutes')), 5 * 60 * 1000);
-                });
-
-                await Promise.race([downloadPromise, timeoutPromise]);
-
-                // If we get here, the download and install intent were successful
-                console.log('[AppUpdate] APK download and install intent completed successfully');
-
-            } catch (error) {
-                console.error('[AppUpdate] APK download/install failed:', error);
-                const message = error instanceof Error ? error.message : 'Could not download or open the installer.';
-                Alert.alert('Update failed', message, [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Allow installs',
-                        onPress: () => {
-                            openInstallUnknownAppsSettings().catch(() => Linking.openSettings());
-                        },
-                    },
-                    {
-                        text: 'Try again',
-                        onPress: () => {
-                            // Retry the download
-                            handleUpdate();
-                        },
-                    },
-                    {
-                        text: 'Manual install',
-                        onPress: () => {
-                            Alert.alert(
-                                'Manual Installation (Android 7.0+)',
-                                'Due to Android security restrictions, automatic installation may not work. To install manually:\n\n1. Open your file manager app\n2. Navigate to Android/data/com.rogplay.app/files\n3. Find the RogPlay APK file\n4. Tap to install\n\nMake sure "Install unknown apps" is enabled for your file manager in Settings > Apps > [File Manager] > Install unknown apps.',
-                                [{ text: 'OK' }]
-                            );
-                        },
-                    },
-                ]);
-            } finally {
-                setIsDownloadingApk(false);
-            }
-            return;
-        }
-
         if (config?.apklink) {
             Linking.openURL(config.apklink);
         }
@@ -215,16 +149,7 @@ export function AppUpdateModal() {
     if (!visible) return null;
     if (!isOtaAvailable && !config) return null;
 
-    const apkBusy = isDownloadingApk;
-    const primaryDisabled = isUpdatingOta || apkBusy;
-
-    const formatBytes = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
-    const downloadPercent = apkDownloadTotalBytes ? Math.min(100, Math.round(apkDownloadProgress * 100)) : null;
+    const primaryDisabled = isUpdatingOta;
 
     return (
         <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
@@ -240,7 +165,7 @@ export function AppUpdateModal() {
                         />
                     )}
 
-                    {!apkBusy && !isUpdatingOta && (
+                    {!isUpdatingOta && (
                         <TouchableOpacity
                             style={styles.closeButton}
                             onPress={handleClose}
@@ -308,32 +233,8 @@ export function AppUpdateModal() {
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
                                     >
-                                        {apkBusy && downloadPercent !== null && (
-                                            <View
-                                                style={{
-                                                    position: 'absolute',
-                                                    left: 0,
-                                                    top: 0,
-                                                    bottom: 0,
-                                                    width: `${downloadPercent}%`,
-                                                    backgroundColor: 'rgba(255,255,255,0.25)',
-                                                    borderRadius: 16,
-                                                }}
-                                            />
-                                        )}
                                         {isUpdatingOta ? (
                                             <ActivityIndicator color="#fff" size="small" />
-                                        ) : apkBusy ? (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                                <ActivityIndicator color="#fff" size="small" style={{ marginRight: 12 }} />
-                                                <Text style={styles.buttonText}>
-                                                    {downloadPercent !== null
-                                                        ? `Downloading... ${downloadPercent}%`
-                                                        : apkDownloadedBytes > 0
-                                                            ? `Downloading... ${formatBytes(apkDownloadedBytes)}`
-                                                            : 'Connecting...'}
-                                                </Text>
-                                            </View>
                                         ) : (
                                             <Text style={styles.buttonText}>
                                                 {isOtaAvailable ? 'Apply Update' : 'Update Now'}
@@ -343,7 +244,7 @@ export function AppUpdateModal() {
                                 )}
                             </TVFocusable>
 
-                            {!isOtaAvailable && config?.telegram && !apkBusy && (
+                            {!isOtaAvailable && config?.telegram && (
                                 <TVFocusable onPress={handleTelegram} style={styles.buttonWrapper}>
                                     {({ focused }) => (
                                         <View

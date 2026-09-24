@@ -172,7 +172,8 @@ export default function TVAddonsScreen() {
 
     const filteredAddons = useMemo(() => {
         return allAddons.filter(item => {
-            const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase());
+            const searchStr = (item.title || item.name || '').toLowerCase();
+            const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
             const type = item.type?.toLowerCase() || 'others';
             let matchesFilter = true;
 

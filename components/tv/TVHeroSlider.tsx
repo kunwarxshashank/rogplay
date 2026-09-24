@@ -18,7 +18,15 @@ import { useThemeStore, computeThemeColors } from '@/store/themeStore';
 const SIDEBAR_WIDTH = 86;
 const AUTO_SCROLL_INTERVAL = 8000;
 
-export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 'traditional' | 'fullscreen' }) {
+interface TVHeroSliderProps {
+    variant?: 'traditional' | 'fullscreen';
+    fetchFunction?: (page?: number) => Promise<any[]>;
+    addonType?: string;
+    addonManifestStr?: string;
+    addonUrl?: string;
+}
+
+export default function TVHeroSlider({ variant = 'traditional', fetchFunction, addonType, addonManifestStr, addonUrl }: TVHeroSliderProps) {
     const [trending, setTrending] = useState<any[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
@@ -34,7 +42,7 @@ export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 't
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [addonUrl]);
 
     const stopAutoScroll = React.useCallback(() => {
         if (autoScrollTimer.current) {
@@ -61,20 +69,35 @@ export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 't
 
     const loadData = React.useCallback(async () => {
         try {
-            const response = await getTrending('week');
-            const data = response.results || [];
-            setTrending(data.slice(0, 6));
+            if (fetchFunction) {
+                const data = await fetchFunction(1);
+                setTrending(data.slice(0, 10));
+            } else {
+                const response = await getTrending('week');
+                const data = response.results || [];
+                setTrending(data.slice(0, 6));
+            }
         } catch (error) {
             console.error('Error loading trending for TV Hero:', error);
         }
-    }, []);
+    }, [fetchFunction]);
 
     const handlePress = React.useCallback((item: any) => {
+        if (addonType === 'jsaddon' || addonType === 'scrapperaddon' || addonType === 'serveraddon') {
+            const params: any = {
+                query: item.title || item.name || '', type: 'addon',
+                movieUrl: item.url, title: item.title || item.name, poster: item.logo || item.poster_path,
+                addonManifestStr: addonManifestStr
+            };
+            router.push({ pathname: '/(tv)/server-selection', params });
+            return;
+        }
+
         router.push({
             pathname: '/(tv)/details/[type]/[id]',
             params: { id: item.id, type: item.media_type || 'movie' }
         });
-    }, [router]);
+    }, [router, addonType, addonManifestStr]);
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
@@ -95,7 +118,7 @@ export default function TVHeroSlider({ variant = 'traditional' }: { variant?: 't
 
     const renderSlide = React.useCallback(
         ({ item, index }: { item: any; index: number }) => {
-            const backdropUrl = `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${item.backdrop_path}`;
+            const backdropUrl = item.backdrop_path ? `${process.env.EXPO_PUBLIC_TMDB_BASEPOSTER}${item.backdrop_path}` : (item.logo || item.poster_path);
             const year = getYearFromDate(item.release_date || item.first_air_date);
             const rating = item.vote_average || 0;
             const mediaType = item.media_type === 'tv' ? 'Series' : 'Movie';

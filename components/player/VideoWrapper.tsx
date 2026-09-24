@@ -1,5 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Platform } from 'react-native';
+import { PremiumLoader } from './PremiumLoader';
 import Video, { SelectedTrackType, SelectedVideoTrackType, DRMType } from 'react-native-video';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useStreamType } from './useStreamType';
@@ -123,12 +124,37 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         return () => subscription.remove();
     }, []);
 
-    const vlcSource = React.useMemo(() => ({
-        uri: safeStreamUrl,
-        headers: finalHeaders,
-        isNetwork: !!(safeStreamUrl && safeStreamUrl.startsWith('http')),
-        autoplay: true,
-    }), [safeStreamUrl, finalHeaders]);
+    const vlcSource = React.useMemo(() => {
+        let uri = safeStreamUrl;
+        let isNetwork = false;
+
+        if (uri) {
+            if (uri.startsWith('http://') || uri.startsWith('https://')) {
+                // Network streams — VLC uses Uri.parse() for these
+                isNetwork = true;
+            } else if (uri.startsWith('content://')) {
+                // Android content provider URIs — VLC needs Uri.parse() for these too
+                isNetwork = true;
+            } else if (uri.startsWith('file://')) {
+                // Local file URIs — VLC's non-network path expects a raw filesystem path
+                // e.g. "file:///storage/emulated/0/Download/video.mkv" → "/storage/emulated/0/Download/video.mkv"
+                // Also decode percent-encoding since safeStreamUrl may have encoded spaces/special chars
+                try {
+                    uri = decodeURIComponent(uri.replace(/^file:\/\//, ''));
+                } catch {
+                    uri = uri.replace(/^file:\/\//, '');
+                }
+                isNetwork = false;
+            }
+        }
+
+        return {
+            uri,
+            headers: finalHeaders,
+            isNetwork,
+            autoplay: true,
+        };
+    }, [safeStreamUrl, finalHeaders]);
 
     const vlcInitOptions = React.useMemo(() => [
         "--codec=hw",
@@ -164,48 +190,72 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
             return { type: SelectedTrackType.DISABLED };
         }
 
-        const importedOffset = allTextTracks.length;
-        if (selectedTextTrack >= importedOffset) {
-            const importedIndex = selectedTextTrack - importedOffset;
-            const importedTrack = importedSubtitles[importedIndex];
-            if (importedTrack?.title) {
-                return {
-                    type: SelectedTrackType.TITLE,
-                    value: importedTrack.title,
-                };
-            }
+        // Build the combined track list (same as SubtitleModal does)
+        // This ensures our index lookup matches exactly what the user sees
+        const combinedTracks = [
+            ...allTextTracks,
+            ...importedSubtitles.filter(sub => !allTextTracks.some(t => t.title === sub.title))
+        ];
+
+        const selectedTrack = combinedTracks[selectedTextTrack];
+
+        if (!selectedTrack) {
+            console.warn('[Subtitles] Index out of bounds:', selectedTextTrack, 'of', combinedTracks.length);
+            return { type: SelectedTrackType.DISABLED };
         }
 
+        // Check if this track is an imported subtitle
+        const isImported = importedSubtitles.some(sub => sub.title === selectedTrack.title);
+
+        if (isImported && selectedTrack.title) {
+            // For imported subtitles, ALWAYS use TITLE-based selection
+            // This is robust against index shifts when onTextTracks fires
+            console.log('[Subtitles] Selecting imported track by TITLE:', selectedTrack.title);
+            return {
+                type: SelectedTrackType.TITLE,
+                value: selectedTrack.title,
+                _updateId: Date.now(), // Force update across bridge
+            };
+        }
+
+        // For embedded tracks, use INDEX
+        console.log('[Subtitles] Selecting embedded track by INDEX:', selectedTextTrack);
         return {
             type: SelectedTrackType.INDEX,
             value: selectedTextTrack,
+            _updateId: Date.now(), // Force update across bridge
         };
-    }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
+    }, [selectedTextTrack, allTextTracks, importedSubtitles]);
 
     // Compute VLC-safe subtitle URI — never pass undefined, always a string
     const vlcSubtitleUri = React.useMemo(() => {
         if (selectedTextTrack < 0) return '';
-        const importedOffset = allTextTracks.length;
-        if (selectedTextTrack >= importedOffset) {
-            const importedIndex = selectedTextTrack - importedOffset;
-            const track = importedSubtitles[importedIndex];
-            return track?.uri || '';
-        }
-        return '';
-    }, [selectedTextTrack, allTextTracks.length, importedSubtitles]);
+        const combinedTracks = [
+            ...allTextTracks,
+            ...importedSubtitles.filter(sub => !allTextTracks.some(t => t.title === sub.title))
+        ];
+        const selectedTrack = combinedTracks[selectedTextTrack];
+        if (!selectedTrack) return '';
+        // If this is an imported subtitle, return its URI for VLC sideloading
+        const isImported = importedSubtitles.some(sub => sub.title === selectedTrack.title);
+        return isImported ? (selectedTrack.uri || '') : '';
+    }, [selectedTextTrack, allTextTracks, importedSubtitles]);
 
     // Compute VLC text track ID for embedded tracks
     const vlcTextTrackId = React.useMemo(() => {
         if (selectedTextTrack < 0) return -1;
-        const importedOffset = allTextTracks.length;
-        if (selectedTextTrack < importedOffset) {
-            // Use the VLC SPU track id from allTextTracks
-            const track = allTextTracks[selectedTextTrack];
-            return track?.id ?? selectedTextTrack;
-        }
-        // External subtitle is loaded via subtitleUri, no embedded track to select
-        return -1;
-    }, [selectedTextTrack, allTextTracks]);
+        const combinedTracks = [
+            ...allTextTracks,
+            ...importedSubtitles.filter(sub => !allTextTracks.some(t => t.title === sub.title))
+        ];
+        const selectedTrack = combinedTracks[selectedTextTrack];
+        if (!selectedTrack) return -1;
+        // If this is an imported subtitle, don't set an embedded track ID
+        const isImported = importedSubtitles.some(sub => sub.title === selectedTrack.title);
+        if (isImported) return undefined;
+        // For embedded tracks, use the VLC SPU track id
+        return selectedTrack?.id ?? selectedTextTrack;
+    }, [selectedTextTrack, allTextTracks, importedSubtitles]);
 
     useImperativeHandle(ref, () => ({
         seek: (seconds: number) => {
@@ -252,8 +302,12 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
         }
 
         if (drmData) {
+            // Native Android DRMManager.kt checks drmType against uppercase strings (e.g. "CLEARKEY")
+            // but the JS DRMType enum values are lowercase (e.g. 'clearkey').
+            // Without uppercasing, ClearKey falls through to HttpMediaDrmCallback → "Malformed URL" error.
+            const drmTypeStr = typeof newDrmType === 'string' ? newDrmType.toUpperCase() : newDrmType;
             src.drm = {
-                type: newDrmType,
+                type: drmTypeStr as any,
                 licenseServer: drmData,
             };
         }
@@ -264,7 +318,7 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
     if (isDetecting || !safeStreamUrl) {
         return (
             <View style={[styles.loaderContainer, style]}>
-                <ActivityIndicator size="large" color="white" />
+                <PremiumLoader size={40} color="white" />
             </View>
         );
     }
@@ -365,7 +419,9 @@ const VideoWrapperComponent = forwardRef<any, VideoWrapperProps>(function VideoW
                 type: SelectedVideoTrackType.INDEX,
                 value: selectedVideoTrack
             }}
-            textTracks={importedSubtitles && importedSubtitles.length > 0 ? importedSubtitles : undefined}
+            debug={{ enable: true }}
+            subtitleStyle={{ paddingBottom: 40, fontSize: 20, opacity: 1 }}
+            // textTracks is already set via source.textTracks in videoSource memo — don't set both
             selectedTextTrack={selectedTextTrackProps}
             onError={(e: any) => {
                 console.warn('ExoPlayer Error', e, { selectedTextTrack, importedSubtitles });

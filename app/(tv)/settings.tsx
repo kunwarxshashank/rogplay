@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Switch, Dimensions, TextInput, Platform } from 'react-native';
 import { useSettingsStore, AppTheme } from '@/store/settingsStore';
 import { useThemeStore, THEME_PALETTES, ACCENT_COLORS, POSTER_STYLES, HOME_LAYOUT_CONFIG, ThemeId, AccentColorId, PosterStyleId, HomeLayoutId, AnimationIntensity, FontScale } from '@/store/themeStore';
@@ -19,24 +20,15 @@ const hexAlpha = (hex: string, alpha: number) => {
 const THEMES: { id: ThemeId; name: string; color: string; gradient: readonly [string, string]; icon: any; desc: string }[] = [
     { id: 'amoled', name: 'AMOLED', color: '#000000', gradient: ['#000000', '#1a1a2e'], icon: 'brightness-1', desc: 'Pure black, max battery' },
     { id: 'glassmorphism', name: 'Glassmorphism', color: '#6366f1', gradient: ['rgba(99,102,241,0.3)', 'rgba(99,102,241,0.1)'], icon: 'blur', desc: 'Frosted glass depth' },
-    { id: 'gradient', name: 'Gradient', color: '#10b981', gradient: ['#1a1a2e', '#0a0a0f'], icon: 'gradient', desc: 'Premium dynamic gradients' },
+    { id: 'gradient', name: 'Gradient', color: '#10b981', gradient: ['#1a1a2e', '#0a0a0f'], icon: 'gradient-horizontal', desc: 'Premium dynamic gradients' },
     { id: 'cinema', name: 'Cinema', color: '#ef4444', gradient: ['#ef4444', '#050508'], icon: 'theater', desc: 'Theater-inspired drama' },
 ];
 
 const POSTER_STYLE_ITEMS = Object.values(POSTER_STYLES);
 
-const LAYOUT_ITEMS: { id: HomeLayoutId; name: string; icon: any; desc: string }[] = [
-    { id: 'netflix', name: 'Netflix', icon: 'play-box', desc: 'Hero + content rows' },
-    { id: 'plex', name: 'Plex', icon: 'view-dashboard', desc: 'Dashboard layout' },
-    { id: 'tv_grid', name: 'TV Grid', icon: 'grid', desc: 'Traditional grid' },
-    { id: 'gradient', name: 'Gradient', icon: 'brush', desc: 'Dynamic gradients' },
-    { id: 'cinema', name: 'Cinema', icon: 'theater', desc: 'Immersive backdrops' },
-];
 
-const HERO_SLIDER_ITEMS: { id: 'traditional' | 'fullscreen'; name: string; icon: any; desc: string }[] = [
-    { id: 'traditional', name: 'Traditional', icon: 'slideshow', desc: 'Multi-layer gradients' },
-    { id: 'fullscreen', name: 'Fullscreen', icon: 'fullscreen', desc: 'Details-page aesthetic' },
-];
+
+
 
 const FONT_SCALES: { id: FontScale; label: string }[] = [
     { id: 'small', label: 'Small' },
@@ -68,7 +60,8 @@ export default function TVSettingsScreen() {
     const themeStore = useThemeStore();
     const { colors: c } = useTheme();
 
-    const [activeTab, setActiveTab] = useState('appearance');
+    const params = useLocalSearchParams();
+    const [activeTab, setActiveTab] = useState((params.tab as string) || 'appearance');
     const [hexInput, setHexInput] = useState(themeStore.customHexAccent);
     const [tvApiKeyInput, setTvApiKeyInput] = useState(debridApiKey);
 
@@ -185,29 +178,7 @@ export default function TVSettingsScreen() {
         );
     };
 
-    const renderLayoutItem = (item: typeof LAYOUT_ITEMS[0]) => {
-        const isActive = themeStore.homeBuilder.layout === item.id;
-        return (
-            <TVFocusable
-                key={item.id}
-                style={[styles.compactCard, { backgroundColor: hexAlpha(c.card, 0.4), borderColor: isActive ? c.primary : c.border }]}
-                onPress={() => themeStore.setHomeLayout(item.id)}
-                focusedScale={1.03}
-                focusedBorderColor={c.primary}
-            >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <View style={[styles.compactIconWrap, { backgroundColor: isActive ? hexAlpha(c.primary, 0.15) : hexAlpha(c.text, 0.05) }]}>
-                        <MaterialCommunityIcons name={item.icon as any} size={20} color={isActive ? c.primary : c.textSecondary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={[styles.compactLabel, { color: isActive ? c.primary : c.text }]}>{item.name}</Text>
-                        <Text style={[styles.compactDesc, { color: c.textMuted }]}>{item.desc}</Text>
-                    </View>
-                    {isActive && <MaterialCommunityIcons name="check-circle" size={18} color={c.primary} style={styles.compactCheck} />}
-                </View>
-            </TVFocusable>
-        );
-    };
+
 
     const renderSlider = (label: string, value: number, onChange: (v: number) => void, min = 0, max = 100, step = 5) => {
         const steps = Math.floor((max - min) / step);
@@ -261,8 +232,7 @@ export default function TVSettingsScreen() {
         { key: 'longPressSpeedEnabled', label: 'Long Press 2× Speed', desc: 'Hold to fast-forward at 2× speed', icon: 'fast-forward' },
         { key: 'doubleTapSeekEnabled', label: 'Double Tap Seek', desc: 'Tap sides to skip forward or back', icon: 'gesture-tap' },
         { key: 'playbackGesturesEnabled', label: 'Playback Gestures', desc: 'Swipe to control volume & brightness', icon: 'gesture-swipe' },
-        { key: 'autoRotate', label: 'Auto Rotate', desc: 'Rotate screen with device orientation', icon: 'phone-rotate-landscape' },
-        { key: 'autoSelectHealthiestSource', label: 'Auto-Select Best Source', desc: 'Automatically skip selection screen with the highest health score stream', icon: 'auto-fix' },
+        { key: 'autoRotate', label: 'Auto Rotate', desc: 'Rotate screen with device orientation', icon: 'phone-rotate-landscape' }
     ];
 
     const DEFAULT_SCREENS: { id: string; name: string; icon: any; gradient: readonly [string, string] }[] = [
@@ -485,39 +455,9 @@ export default function TVSettingsScreen() {
                                 {POSTER_STYLE_ITEMS.map(renderPosterStyle)}
                             </View>
 
-                            {/* Layout */}
-                            {renderSection('Home Layout')}
-                            <View style={styles.gridContainer}>
-                                {LAYOUT_ITEMS.map(renderLayoutItem)}
-                            </View>
 
-                            {/* Home Slider Style */}
-                            {renderSection('Home Slider')}
-                            <View style={styles.gridContainer}>
-                                {HERO_SLIDER_ITEMS.map(item => {
-                                    const isActive = themeStore.homeBuilder.heroBannerStyle === item.id;
-                                    return (
-                                        <TVFocusable
-                                            key={item.id}
-                                            style={[styles.compactCard, { backgroundColor: hexAlpha(c.card, 0.4), borderColor: isActive ? c.primary : c.border }]}
-                                            onPress={() => themeStore.setHeroBannerStyle(item.id)}
-                                            focusedScale={1.03}
-                                            focusedBorderColor={c.primary}
-                                        >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                                <View style={[styles.compactIconWrap, { backgroundColor: isActive ? hexAlpha(c.primary, 0.15) : hexAlpha(c.text, 0.05) }]}>
-                                                    <MaterialCommunityIcons name={item.icon as any} size={20} color={isActive ? c.primary : c.textSecondary} />
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={[styles.compactLabel, { color: isActive ? c.primary : c.text }]}>{item.name}</Text>
-                                                    <Text style={[styles.compactDesc, { color: c.textMuted }]}>{item.desc}</Text>
-                                                </View>
-                                                {isActive && <MaterialCommunityIcons name="check-circle" size={18} color={c.primary} style={styles.compactCheck} />}
-                                            </View>
-                                        </TVFocusable>
-                                    );
-                                })}
-                            </View>
+
+
 
                             {/* Animation Intensity */}
                             {renderSection('Animation Intensity')}
@@ -671,7 +611,7 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
 
     return (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 24, paddingBottom: 40, paddingHorizontal: 10 }}>
-            <TVFocusable 
+            <TVFocusable
                 style={[localStyles.insightHero, { backgroundColor: hexAlpha(c.primary, 0.15), borderColor: hexAlpha(c.primary, 0.3), overflow: 'hidden' }]}
                 focusedScale={1.02}
                 focusedBorderColor={c.primary}
@@ -698,8 +638,8 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
                     { label: 'THIS MONTH', value: data.hoursMonth.toFixed(0) + 'h', color: c.success },
                     { label: 'LIFETIME', value: hoursLifetime.toFixed(0) + 'h', color: c.warning }
                 ].map((stat, i) => (
-                    <TVFocusable 
-                        key={i} 
+                    <TVFocusable
+                        key={i}
                         style={[localStyles.insightStatCard, { flex: 1, backgroundColor: hexAlpha(stat.color, 0.1), borderColor: hexAlpha(stat.color, 0.2), paddingVertical: 24 }]}
                         focusedScale={1.05}
                         focusedBorderColor={stat.color}
@@ -711,7 +651,7 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
             </View>
 
             <View style={{ flexDirection: 'row', gap: 16 }}>
-                <TVFocusable 
+                <TVFocusable
                     style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
                     focusedScale={1.02}
                     focusedBorderColor={c.primary}
@@ -733,7 +673,7 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
                     </View>
                 </TVFocusable>
 
-                <TVFocusable 
+                <TVFocusable
                     style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
                     focusedScale={1.02}
                     focusedBorderColor={c.primary}
@@ -762,7 +702,7 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
             </View>
 
             <View style={{ flexDirection: 'row', gap: 16 }}>
-                <TVFocusable 
+                <TVFocusable
                     style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
                     focusedScale={1.02}
                     focusedBorderColor={p.color || c.primary}
@@ -779,7 +719,7 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
                     </View>
                 </TVFocusable>
 
-                <TVFocusable 
+                <TVFocusable
                     style={[localStyles.insightCard, { flex: 1, backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
                     focusedScale={1.02}
                     focusedBorderColor={c.primary}
@@ -797,8 +737,8 @@ function TVInsightsTab({ colors: c }: { colors: any }) {
                     </View>
                 </TVFocusable>
             </View>
-            
-            <TVFocusable 
+
+            <TVFocusable
                 style={[localStyles.insightCard, { backgroundColor: hexAlpha(c.card, 0.3), borderColor: c.border }]}
                 focusedScale={1.02}
                 focusedBorderColor={c.primary}

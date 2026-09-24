@@ -190,9 +190,9 @@ const TVExpandedItem = ({ item, isFocused, onPress, onFocus, onBlur }: any) => {
 const FavoriteButton = ({ item, toggleFavorite, showToast }: any) => {
     const favId = `${item.media_type || 'movie'}:${item.id}`;
     const exists = useFavoritesStore((state) => state.isFavorite(favId));
-    
+
     const scaleAnim = useRef(new Animated.Value(1)).current;
-    
+
     // Track previous exists to only animate on change, not on mount
     const prevExists = useRef(exists);
 
@@ -238,7 +238,7 @@ function TrendingSlider({ fullScreen = false, variant = 'traditional' }: Trendin
     const flatListRef = useRef<FlatList>(null);
     const router = useRouter();
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-    
+
     const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
     const showToast = useToastStore((state) => state.showToast);
 

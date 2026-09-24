@@ -7,7 +7,6 @@ import {
     StatusBar,
     Animated,
     Image,
-    ActivityIndicator,
     Dimensions,
     Platform
 } from 'react-native';
@@ -23,6 +22,7 @@ import SubtitleModal from './SubtitleModal';
 import EpgSidebar from './EpgSidebar';
 import WatchPartyModal from './WatchPartyModal';
 import JoinPremiumModal from './JoinPremiumModal';
+import { PremiumLoader } from './PremiumLoader';
 
 import { useSettingsStore } from '@/store/settingsStore';
 import { Colors } from '@/constants/Colors';
@@ -69,30 +69,37 @@ const MobilePlayerTopBar = React.memo(function MobilePlayerTopBar({ onBack, acti
     );
 });
 
-const MobilePlayerCenterControls = React.memo(function MobilePlayerCenterControls({ handleSkipBackward, handleSkipForward, onLocalPause, onLocalPlay, handlePlayPause, isPlaying }: any) {
+const MobilePlayerCenterControls = React.memo(function MobilePlayerCenterControls({ handleSkipBackward, handleSkipForward, onLocalPause, onLocalPlay, handlePlayPause, isPlaying, isBuffering, currentColors }: any) {
     return (
         <View style={styles.centerControls}>
-            <TouchableOpacity onPress={handleSkipBackward} style={styles.skipButton}>
-                <MaterialIcons name="replay-10" size={50} color="white" />
+            <TouchableOpacity onPress={handleSkipBackward} style={styles.skipButton} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+                <MaterialIcons name="replay-10" size={44} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-                onPress={() => {
-                    handlePlayPause();
-                    if (isPlaying) onLocalPause();
-                    else onLocalPlay();
-                }}
-                style={styles.playButton}
-            >
-                <FontAwesome5
-                    name={isPlaying ? "pause" : "play"}
-                    size={40}
-                    color="white"
-                />
-            </TouchableOpacity>
+            <View style={styles.playButtonContainer}>
+                {isBuffering ? (
+                    <PremiumLoader size={54} color={currentColors.primary} style={styles.loaderIndicator} />
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => {
+                            handlePlayPause();
+                            if (isPlaying) onLocalPause();
+                            else onLocalPlay();
+                        }}
+                        style={styles.playButton}
+                        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                    >
+                        <MaterialIcons
+                            name={isPlaying ? "pause" : "play-arrow"}
+                            size={64}
+                            color="white"
+                        />
+                    </TouchableOpacity>
+                )}
+            </View>
 
-            <TouchableOpacity onPress={handleSkipForward} style={styles.skipButton}>
-                <MaterialIcons name="forward-10" size={50} color="white" />
+            <TouchableOpacity onPress={handleSkipForward} style={styles.skipButton} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+                <MaterialIcons name="forward-10" size={44} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
         </View>
     );
@@ -150,7 +157,7 @@ const MobilePlayerBottomBar = React.memo(function MobilePlayerBottomBar({
 
                 <View style={styles.rightActions}>
                     <TouchableOpacity onPress={() => setSpeedModalVisible(true)} style={styles.badge}>
-                        <Text style={styles.badgeText}>{playbackSpeed}x</Text>
+                        <Text style={styles.badgeText}>{Number(playbackSpeed).toFixed(2).replace(/\.?0+$/, '')}x</Text>
                     </TouchableOpacity>
                     {hasEpg && (
                         <TouchableOpacity onPress={() => setEpgSidebarVisible(true)} style={[styles.badge, styles.epgBadge]}>
@@ -420,7 +427,10 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
 
             <SubtitleModal
                 visible={subtitleModalVisible}
-                textTracks={[...allTextTracks, ...importedSubtitles]}
+                textTracks={[
+                    ...allTextTracks, 
+                    ...importedSubtitles.filter(sub => !allTextTracks.some(t => t.title === sub.title))
+                ]}
                 selectedTextTrack={selectedTextTrack}
                 subtitleDelay={subtitleDelay}
                 isFetchingSubtitles={isFetchingSubtitles}
@@ -513,6 +523,8 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
                             onLocalPlay={watchParty.onLocalPlay}
                             handlePlayPause={handlePlayPause}
                             isPlaying={isPlaying}
+                            isBuffering={isBuffering}
+                            currentColors={currentColors}
                         />
                     )}
 
@@ -550,11 +562,7 @@ export default function MobilePlayer(props: UsePlayerLogicProps) {
                     volume={volume}
                 />
 
-                {isBuffering && (
-                    <View style={styles.loaderContainer}>
-                        <ActivityIndicator size={60} color={currentColors.primary} style={styles.loaderIndicator} />
-                    </View>
-                )}
+                {/* Loader has been moved to MobilePlayerCenterControls */}
 
                 {isSpeedingUp && (
                     <View style={styles.speedBoostIndicator}>
@@ -633,9 +641,10 @@ const styles = StyleSheet.create({
     titleText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12, flex: 1 },
     headerLogo: { width: 32, height: 32, marginLeft: 12, borderRadius: 4 },
     topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    centerControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 40 },
-    skipButton: { opacity: 0.9 },
-    playButton: { opacity: 0.95 },
+    centerControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 50 },
+    skipButton: { opacity: 0.9, padding: 10 },
+    playButtonContainer: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
+    playButton: { opacity: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 40, padding: 8 },
     bottomBar: { width: '100%' },
     progressContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 10 },
     slider: { flex: 1, height: 40, marginHorizontal: 10 },
